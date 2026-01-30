@@ -35,7 +35,8 @@ const navItems: NavItem[] = [
   {
     icon: <GridIcon />,
     name: "Dashboard",
-    path: "/",
+    icon: <GridIcon />,
+    subItems: [{ name: "Ecommerce", path: "/" }],
   },
   {
     name: "SIMS",
@@ -70,7 +71,29 @@ const navItems: NavItem[] = [
   },
   { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
   { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+{
+    name: "Forms",
+    icon: <ListIcon />,
+    subItems: [
+      { name: "Form Elements", path: "/form-elements" },
+    ],
+  },
+{
+    name: "Tables",
+    icon: <TableIcon />,
+    subItems: [{ name: "Basic Tables", path: "/basic-tables" }],
+  },
+  {
+    name: "Pages",
+    icon: <PageIcon />,
+    subItems: [
+      { name: "Blank Page", path: "/blank" },
+      { name: "404 Error", path: "/error-404" },
+    ]
+    }
 ];
+
+
 
 const othersItems: NavItem[] = [
   {
@@ -200,7 +223,7 @@ const AppSidebar: React.FC = () => {
         lg:translate-x-0
       `}
       onMouseEnter={() => !isExpanded && setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
     >
       <div className="p-6">
         <Link href="/">
