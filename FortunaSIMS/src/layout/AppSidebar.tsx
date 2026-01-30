@@ -17,6 +17,7 @@ import {
   PlugInIcon,
   TableIcon,
   UserCircleIcon,
+  
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
@@ -39,38 +40,111 @@ const navItems: NavItem[] = [
     subItems: [{ name: "Ecommerce", path: "/" }],
   },
   {
-    name: "SIMS",
+    name: "SIMS Modules",
     icon: <BoxCubeIcon />,
     subItems: [
-      { name: "Dashboard", path: "/sims" },
+      
       {
         name: "Masters",
         subItems: [
           { name: "Item Master", path: "/sims/masters/items" },
           { name: "Warehouse Master", path: "/sims/masters/warehouses" },
           { name: "UOM Master", path: "/sims/masters/uom" },
+          { name: "Vendor Master", path: "/sims/masters/Vendors" },
+          { name: "Customer Master", path: "/sims/masters/Vendors" },
         ],
       },
-      {
-        name: "Inventory",
+      /***SIMS Modules Menu Links */
+{
+        name: "Procurement",
         subItems: [
-          { name: "Stock Dashboard", path: "/sims/inventory/stock-dashboard" },
-          { name: "Goods Inward (GRN)", path: "/sims/inventory/grn" },
-          { name: "Goods Outward (GIN)", path: "/sims/inventory/gin" },
-          { name: "Stock Adjustment", path: "/sims/inventory/adjustment" },
+          
+          { name: "Purchase Requisition (PR)", path: "sims/procurement/pr" },
+          { name: "RFQ Management", path: "sims/procurement/rfq" },
+          { name: "Purchase Order (PO)", path: "sims/procurement/po" },
+          { name: "Goods Receipt (GRN)", path: "sims/procurement/grn" },
+          { name: "Supplier Performance", path: "sims/procurement/vendor-performance" },
         ],
       },
+      
+      {
+        name: "Inventory & (WMS)",
+        subItems: [
+          { name: "Goods Inward", path: "sims/inventory/inward" },
+          { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
+          { name: "Stock Transfer", path: "sims/inventory/transfer" },
+          { name: "Warehouse Layout", path: "sims/inventory/layout" },
+          { name: "Batch & Serial Tracking", path: "sims/inventory/batch-tracking" },
+          { name: "Cycle Count & Audit", path: "sims/inventory/audit" },
+          { name: "Stock Reservation", path: "sims/inventory/reservation" },
+          { name: "Smart Alerts", path: "sims/inventory/alerts" },
+          { name: "Stock Dashboard", path: "sims/inventory/stock-dashboard" },
+        ],
+      },
+{
+  name: "Fleet & Logistics",
+  subItems: [
+    { name: "Vehicle Master", path: "sims/logistics/vehicles" },
+    { name: "Driver Master", path: "sims/logistics/drivers" },
+    { name: "Dispatch Planning", path: "sims/logistics/dispatch" },
+    { name: "Live Tracking", path: "sims/logistics/tracking" },
+    { name: "Trip Sheet Management", path: "sims/logistics/trip-sheet" },
+    { name: "Fuel & Maintenance Logs", path: "sims/logistics/maintenance" },
+  ]
+},
+
+      {
+        name: "Sales & Orders",
+        subItems: [
+          { name: "Sales Quotation", path: "/sales/quotation" },
+          { name: "Sales Order (SO)", path: "/sales/orders" },
+          { name: "Dispatch Planning", path: "/sales/dispatch" },
+          { name: "Invoicing", path: "/sales/invoice" },
+          { name: "Returns Management", path: "/sales/returns" },
+  ]
+},
+
+{
+  name: "AI Forecasting",
+  subItems: [
+    { name: "Demand Forecast", path: "sims/ai/forecast" },
+    { name: "Auto Replenishment", path: "sims/ai/replenishment" },
+    { name: "Trend Analytics", path: "sims/ai/trends" },
+    { name: "Multi-Warehouse Balancing", path: "sims/ai/balancing" },
+  ]
+},
+
+{
+  name: "Analytics & BI",
+  subItems: [
+    { name: "Executive Dashboard", path: "sims/bi/executive-dashboard" },
+    { name: "Procurement Dashboard", path: "sims/bi/procurement-dashboard" },
+    { name: "Inventory Dashboard", path: "sims/bi/inventory-dashboard" },
+    { name: "Sales Dashboard", path: "sims/bi/sales-dashboard" },
+    { name: "Logistics Dashboard", path: "sims/bi/logistics-dashboard" },
+    { name: "KPI Monitoring", path: "sims/bi/kpi-monitoring" },
+    { name: "AI Predictive Insights", path: "sims/bi/predictive-insights" },
+    { name: "Custom Report Builder", path: "sims/bi/report-builder" },
+    { name: "Data Visualization", path: "sims/bi/data-visualization" },
+    { name: "Export & Integration", path: "sims/bi/export-integration" },
+  ]
+},
+
       {
         name: "Reports",
         subItems: [
-          { name: "Stock Report", path: "/sims/reports/stock" },
-          { name: "Movement Report", path: "/sims/reports/movement" },
+          { name: "Stock Movement Reports", path: "/sims/reports/stock" },
+          { name: "Procurement Reports", path: "sims/reports/procurement" },
+          { name: "Inventory Reports", path: "sims/reports/inventory" },
+          { name: "Sales Reports", path: "sims/reports/sales" },
+          { name: "Logistics Reports", path: "sims/reports/logistics" },
+          { name: "Executive MIS Dashboard", path: "sims/reports/mis" },
         ],
       },
     ],
   },
   { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
-  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+  
 {
     name: "Forms",
     icon: <ListIcon />,
@@ -96,6 +170,19 @@ const navItems: NavItem[] = [
 
 
 const othersItems: NavItem[] = [
+  {
+  name: "Administration",
+  icon: <UserCircleIcon/>,
+  subItems: [
+    { name: "User Management", path: "sims/admin/users" },
+    { name: "Role & Permissions", path: "sims/admin/roles" },
+    { name: "Workflow Configuration", path: "sims/admin/workflows" },
+    { name: "Master Configuration", path: "sims/admin/config" },
+    { name: "Audit Logs", path: "sims/admin/audit-logs" },
+  ]
+},
+{ icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
+  
   {
     icon: <PieChartIcon />,
     name: "Charts",
