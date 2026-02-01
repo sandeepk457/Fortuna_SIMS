@@ -43,14 +43,17 @@ const navItems: NavItem[] = [
     name: "SIMS Modules",
     icon: <BoxCubeIcon />,
     subItems: [
-      
+   
       {
         name: "Masters",
         subItems: [
-          { name: "Item Master", path: "/sims/masters/items" },
-          { name: "Warehouse Master", path: "/sims/masters/warehouses" },
+          { name: "Item Master", path: "/ItemMaster"},
+          { name: "Item Master Form", path: "/ItemMasterForm"},
+          { name: "Warehouse Master", path: "/WarehouseMaster" },
+          { name: "Warehouse Master Form", path: "/WarehouseForm" },
           { name: "UOM Master", path: "/sims/masters/uom" },
-          { name: "Vendor Master", path: "/sims/masters/Vendors" },
+          { name: "Vendor Master", path: "/VendorMaster" },
+          { name: "Vendor Master Form", path: "/VendorForm"},
           { name: "Customer Master", path: "/sims/masters/Vendors" },
         ],
       },
@@ -163,6 +166,7 @@ const navItems: NavItem[] = [
     subItems: [
       { name: "Blank Page", path: "/blank" },
       { name: "404 Error", path: "/error-404" },
+      
     ]
     }
 ];
