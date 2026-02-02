@@ -51,10 +51,11 @@ const navItems: NavItem[] = [
           { name: "Item Master Form", path: "/ItemMasterForm"},
           { name: "Warehouse Master", path: "/WarehouseMaster" },
           { name: "Warehouse Master Form", path: "/WarehouseForm" },
-          { name: "UOM Master", path: "/sims/masters/uom" },
+          { name: "UOM Master", path: "/UOMmaster" },
           { name: "Vendor Master", path: "/VendorMaster" },
           { name: "Vendor Master Form", path: "/VendorForm"},
-          { name: "Customer Master", path: "/sims/masters/Vendors" },
+          { name: "Customer Master", path: "/CustomerMaster" },
+          { name: "Customer Master Form", path: "/CustomerForm"},
         ],
       },
       /***SIMS Modules Menu Links */
@@ -148,27 +149,27 @@ const navItems: NavItem[] = [
   },
   { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
   
-{
-    name: "Forms",
-    icon: <ListIcon />,
-    subItems: [
-      { name: "Form Elements", path: "/form-elements" },
-    ],
-  },
-{
-    name: "Tables",
-    icon: <TableIcon />,
-    subItems: [{ name: "Basic Tables", path: "/basic-tables" }],
-  },
-  {
-    name: "Pages",
-    icon: <PageIcon />,
-    subItems: [
-      { name: "Blank Page", path: "/blank" },
-      { name: "404 Error", path: "/error-404" },
+// {
+//     name: "Forms",
+//     icon: <ListIcon />,
+//     subItems: [
+//       { name: "Form Elements", path: "/form-elements" },
+//     ],
+//   },
+// {
+//     name: "Tables",
+//     icon: <TableIcon />,
+//     subItems: [{ name: "Basic Tables", path: "/basic-tables" }],
+//   },
+//   {
+//     name: "Pages",
+//     icon: <PageIcon />,
+//     subItems: [
+//       { name: "Blank Page", path: "/blank" },
+//       { name: "404 Error", path: "/error-404" },
       
-    ]
-    }
+//     ]
+//     }
 ];
 
 
