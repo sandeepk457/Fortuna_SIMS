@@ -63,7 +63,8 @@ const navItems: NavItem[] = [
         name: "Procurement",
         subItems: [
           
-          { name: "Purchase Requisition (PR)", path: "/PurchaseRequisition" },
+          { name: "Purchase Req. Form(PR)", path: "/PurchaseRequisition" },
+          { name: "Purchase Requisition (PR)", path: "/PurchaseRequisitionList" },
           { name: "RFQ Management", path: "sims/procurement/rfq" },
           { name: "Purchase Order (PO)", path: "sims/procurement/po" },
           { name: "Goods Receipt (GRN)", path: "sims/procurement/grn" },

@@ -13,7 +13,9 @@ type TabKey = "basic" | "items" | "delivery" | "attachments" | "status";
 /** Enums */
 type Priority = "Low" | "Medium" | "High" | "Critical" | "";
 type PRType = "Capex" | "Opex" | "Service" | "";
-type PRStatus = "Draft" | "Submitted" | "Approved" | "Rejected" | "Cancelled";
+
+/** ✅ UPDATED: PR Status includes Pending Approval */
+type PRStatus = "Draft" | "Pending Approval" | "Approved" | "Rejected" | "Cancelled";
 
 type ItemType = "Inventory" | "Non-inventory" | "Service";
 type Currency = "INR" | "USD" | "EUR";
@@ -188,9 +190,7 @@ export default function PurchaseRequisitionCreatePage() {
   const [form, setForm] = useState<PRFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-
-
-  /** Lock editing after submission/approval */
+  /** ✅ Lock editing after leaving Draft */
   const isLocked = form.pr_status !== "Draft";
 
   /** Derived totals */
@@ -407,27 +407,34 @@ export default function PurchaseRequisitionCreatePage() {
     alert("Saved Draft (demo). Next: connect API.");
   };
 
-  const onSubmitForApproval = () => {
+  /** ✅ NEW: Send for Approval (does validations) */
+  const onSendForApproval = () => {
+    if (isLocked) return;
+
     touchAll();
 
     if (form.items.length === 0) {
       setActiveTab("items");
-      alert("PR cannot be submitted without at least one item.");
+      alert("PR cannot be sent for approval without at least one item.");
       return;
     }
 
     if (hasErrors) {
       setActiveTab(firstErrorTab());
+      alert("Please fix validation errors before sending for approval.");
       return;
     }
 
-    setForm((p) => ({ ...p, pr_status: "Submitted" }));
+    setForm((p) => ({ ...p, pr_status: "Pending Approval" }));
     setActiveTab("status");
-    alert("Submitted for approval (demo). PR is now locked.");
+    alert("Sent for approval (demo). PR is now locked.");
   };
 
+  /** OPTIONAL: Keep old function name if you use it in other places */
+  const onSubmitForApproval = onSendForApproval;
+
   return (
-    /** ✅ FIX #2: Force this page to never create viewport horizontal scroll */
+    /** ✅ FIX: Force this page to never create viewport horizontal scroll */
     <div className="w-full max-w-[100vw] min-w-0 overflow-x-hidden space-y-6">
       <PageBreadcrumb pageTitle="Purchase Requisition (PR)" />
 
@@ -435,11 +442,11 @@ export default function PurchaseRequisitionCreatePage() {
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">PR Creation</h3>
-          <p className={helperBase}>Step 1: Items → Step 2: Qty & Required Date → Step 3: Submit for Approval.</p>
+          <p className={helperBase}>Step 1: Items → Step 2: Qty & Required Date → Step 3: Send for Approval.</p>
 
           {isLocked && (
             <p className="mt-1 text-xs font-semibold" style={{ color: FORTUNA_PRIMARY_RED }}>
-              Locked: PR cannot be edited after submission.
+              Locked: PR cannot be edited after sending for approval.
             </p>
           )}
         </div>
@@ -459,14 +466,15 @@ export default function PurchaseRequisitionCreatePage() {
             Save Draft
           </button>
 
+          {/* ✅ CHANGED: Send for Approval */}
           <button
             type="button"
             className={classNames(primaryBtn, "active:scale-95")}
-            style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-            onClick={onSubmitForApproval}
+            style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
+            onClick={onSendForApproval}
             disabled={isLocked}
           >
-            Submit
+            Send for Approval
           </button>
         </div>
       </div>
@@ -483,9 +491,7 @@ export default function PurchaseRequisitionCreatePage() {
                 onClick={() => setActiveTab(t.key)}
                 className={classNames(
                   "relative rounded-lg px-3 py-2 text-sm font-semibold transition",
-                  isActive
-                    ? "text-white shadow-sm"
-                    : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5"
+                  isActive ? "text-white shadow-sm" : "text-gray-600 hover:bg-gray-50 dark:text-gray-300 dark:hover:bg-white/5"
                 )}
                 style={isActive ? { backgroundColor: FORTUNA_PRIMARY_RED } : undefined}
               >
@@ -511,7 +517,11 @@ export default function PurchaseRequisitionCreatePage() {
                   <label className={labelBase}>
                     PR ID <span className="text-xs text-gray-400">(System)</span>
                   </label>
-                  <input readOnly value={form.pr_id} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                  <input
+                    readOnly
+                    value={form.pr_id}
+                    className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-w-0">
@@ -519,13 +529,21 @@ export default function PurchaseRequisitionCreatePage() {
                     <label className={labelBase}>
                       PR Number <span className="text-xs text-gray-400">(System)</span>
                     </label>
-                    <input readOnly value={form.pr_number} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                    <input
+                      readOnly
+                      value={form.pr_number}
+                      className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    />
                   </div>
                   <div>
                     <label className={labelBase}>
                       PR Date <span className="text-xs text-gray-400">(System)</span>
                     </label>
-                    <input readOnly value={form.pr_date} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                    <input
+                      readOnly
+                      value={form.pr_date}
+                      className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    />
                   </div>
                 </div>
 
@@ -533,7 +551,11 @@ export default function PurchaseRequisitionCreatePage() {
                   <label className={labelBase}>
                     Requested By <span className="text-xs text-gray-400">(System)</span>
                   </label>
-                  <input readOnly value={form.requested_by} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                  <input
+                    readOnly
+                    value={form.requested_by}
+                    className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                  />
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-w-0">
@@ -583,7 +605,9 @@ export default function PurchaseRequisitionCreatePage() {
                 </div>
 
                 <div>
-                  <label className={labelBase}>Project Code <span className={helperBase}>(Optional)</span></label>
+                  <label className={labelBase}>
+                    Project Code <span className={helperBase}>(Optional)</span>
+                  </label>
                   <input
                     value={form.project_code}
                     disabled={isLocked}
@@ -679,7 +703,11 @@ export default function PurchaseRequisitionCreatePage() {
                     + Add Item
                   </button>
 
-                  <button type="button" className={classNames(outlineBtn, "active:scale-95")} onClick={() => setActiveTab("items")}>
+                  <button
+                    type="button"
+                    className={classNames(outlineBtn, "active:scale-95")}
+                    onClick={() => setActiveTab("items")}
+                  >
                     Go to Item Details →
                   </button>
                 </div>
@@ -709,7 +737,7 @@ export default function PurchaseRequisitionCreatePage() {
                 </div>
               </div>
 
-              {/** ✅ FIX #3: H-scroll ONLY inside this box. No more viewport scrollbar */}
+              {/* ✅ H-scroll ONLY inside this box (bottom scrollbar) */}
               <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
                 <table className="min-w-[1500px] w-full border-collapse text-sm whitespace-nowrap">
                   <thead className="bg-gray-100 dark:bg-gray-800">
@@ -732,7 +760,10 @@ export default function PurchaseRequisitionCreatePage() {
                       const k = (name: string) => `item_${idx}_${name}`;
 
                       return (
-                        <tr key={line.pr_item_id} className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                        <tr
+                          key={line.pr_item_id}
+                          className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
+                        >
                           <td className="px-4 py-3">
                             <select
                               value={line.item_type}
@@ -750,7 +781,9 @@ export default function PurchaseRequisitionCreatePage() {
                               <option value="Non-inventory">Non-inventory</option>
                               <option value="Service">Service</option>
                             </select>
-                            {showError(k("item_type")) && <p className="mt-1 text-xs text-brand-500">{errors[k("item_type")]}</p>}
+                            {showError(k("item_type")) && (
+                              <p className="mt-1 text-xs text-brand-500">{errors[k("item_type")]}</p>
+                            )}
                           </td>
 
                           <td className="px-4 py-3">
@@ -767,7 +800,9 @@ export default function PurchaseRequisitionCreatePage() {
                                 showError(k("item_id")) && "border-brand-500"
                               )}
                             />
-                            {showError(k("item_id")) && <p className="mt-1 text-xs text-brand-500">{errors[k("item_id")]}</p>}
+                            {showError(k("item_id")) && (
+                              <p className="mt-1 text-xs text-brand-500">{errors[k("item_id")]}</p>
+                            )}
                           </td>
 
                           <td className="px-4 py-3">
@@ -810,7 +845,9 @@ export default function PurchaseRequisitionCreatePage() {
                             <input
                               value={line.requested_qty}
                               disabled={isLocked}
-                              onChange={(e) => updateItem(idx, { requested_qty: e.target.value.replace(/[^\d.]/g, "") })}
+                              onChange={(e) =>
+                                updateItem(idx, { requested_qty: e.target.value.replace(/[^\d.]/g, "") })
+                              }
                               onBlur={() => markTouched(k("requested_qty"))}
                               placeholder="> 0"
                               className={classNames(
@@ -829,7 +866,9 @@ export default function PurchaseRequisitionCreatePage() {
                             <input
                               value={line.estimated_unit_price}
                               disabled={isLocked}
-                              onChange={(e) => updateItem(idx, { estimated_unit_price: e.target.value.replace(/[^\d.]/g, "") })}
+                              onChange={(e) =>
+                                updateItem(idx, { estimated_unit_price: e.target.value.replace(/[^\d.]/g, "") })
+                              }
                               onBlur={() => markTouched(k("estimated_unit_price"))}
                               placeholder=">= 0"
                               className={classNames(
@@ -890,7 +929,10 @@ export default function PurchaseRequisitionCreatePage() {
                           <td className="px-4 py-3">
                             <button
                               type="button"
-                              className={classNames("text-sm font-semibold text-rose-600 hover:underline", isLocked && "opacity-50 cursor-not-allowed")}
+                              className={classNames(
+                                "text-sm font-semibold text-rose-600 hover:underline",
+                                isLocked && "opacity-50 cursor-not-allowed"
+                              )}
                               onClick={() => removeItem(idx)}
                               disabled={isLocked}
                             >
@@ -903,7 +945,10 @@ export default function PurchaseRequisitionCreatePage() {
 
                     {form.items.length === 0 && (
                       <tr>
-                        <td colSpan={10} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300">
+                        <td
+                          colSpan={10}
+                          className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300"
+                        >
                           No items added. Click “+ Add Item” to start.
                         </td>
                       </tr>
@@ -953,14 +998,23 @@ export default function PurchaseRequisitionCreatePage() {
                       </option>
                     ))}
                   </select>
-                  {showError("delivery_location") && <p className="mt-1 text-xs text-brand-500">{errors.delivery_location}</p>}
+                  {showError("delivery_location") && (
+                    <p className="mt-1 text-xs text-brand-500">{errors.delivery_location}</p>
+                  )}
                 </div>
 
                 <div>
                   <label className={labelBase}>
                     Delivery Address <span className="text-xs text-gray-400">(System)</span>
                   </label>
-                  <textarea readOnly value={form.delivery_address} className={classNames(inputBase, "min-h-[100px] cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                  <textarea
+                    readOnly
+                    value={form.delivery_address}
+                    className={classNames(
+                      inputBase,
+                      "min-h-[100px] cursor-not-allowed bg-gray-50 dark:bg-white/5"
+                    )}
+                  />
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
@@ -980,7 +1034,9 @@ export default function PurchaseRequisitionCreatePage() {
                   </div>
 
                   <div className="mt-4">
-                    <label className={labelBase}>Budget Reference <span className={helperBase}>(Optional)</span></label>
+                    <label className={labelBase}>
+                      Budget Reference <span className={helperBase}>(Optional)</span>
+                    </label>
                     <input
                       value={form.budget_reference}
                       disabled={isLocked}
@@ -1020,7 +1076,9 @@ export default function PurchaseRequisitionCreatePage() {
                     </div>
 
                     <div>
-                      <label className={labelBase}>Tax Estimate <span className={helperBase}>(Optional)</span></label>
+                      <label className={labelBase}>
+                        Tax Estimate <span className={helperBase}>(Optional)</span>
+                      </label>
                       <input
                         value={form.tax_estimate}
                         disabled={isLocked}
@@ -1033,7 +1091,9 @@ export default function PurchaseRequisitionCreatePage() {
                           showError("tax_estimate") && "border-brand-500"
                         )}
                       />
-                      {showError("tax_estimate") && <p className="mt-1 text-xs text-brand-500">{errors.tax_estimate}</p>}
+                      {showError("tax_estimate") && (
+                        <p className="mt-1 text-xs text-brand-500">{errors.tax_estimate}</p>
+                      )}
                     </div>
                   </div>
 
@@ -1104,7 +1164,9 @@ export default function PurchaseRequisitionCreatePage() {
                     </div>
 
                     <div className="sm:col-span-7 min-w-0">
-                      <label className={labelBase}>Attachment File <span className={helperBase}>(Optional PDF/DOC/XLS)</span></label>
+                      <label className={labelBase}>
+                        Attachment File <span className={helperBase}>(Optional PDF/DOC/XLS)</span>
+                      </label>
                       <input
                         type="file"
                         disabled={isLocked}
@@ -1135,7 +1197,9 @@ export default function PurchaseRequisitionCreatePage() {
               </div>
 
               <div>
-                <label className={labelBase}>Internal Notes <span className={helperBase}>(Optional)</span></label>
+                <label className={labelBase}>
+                  Internal Notes <span className={helperBase}>(Optional)</span>
+                </label>
                 <textarea
                   value={form.internal_notes}
                   disabled={isLocked}
@@ -1159,11 +1223,15 @@ export default function PurchaseRequisitionCreatePage() {
               <div className="space-y-5">
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
                   <h4 className="text-base font-semibold text-gray-900 dark:text-white">PR Status</h4>
-                  <p className={helperBase}>Draft / Submitted / Approved / Rejected / Cancelled</p>
+                  <p className={helperBase}>Draft / Pending Approval / Approved / Rejected / Cancelled</p>
 
                   <div className="mt-4">
                     <label className={labelBase}>Status</label>
-                    <input readOnly value={form.pr_status} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                    <input
+                      readOnly
+                      value={form.pr_status}
+                      className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    />
                   </div>
 
                   <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
@@ -1182,28 +1250,44 @@ export default function PurchaseRequisitionCreatePage() {
                       <label className={labelBase}>
                         PR Date <span className="text-xs text-gray-400">(System)</span>
                       </label>
-                      <input readOnly value={form.pr_date} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                      <input
+                        readOnly
+                        value={form.pr_date}
+                        className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      />
                     </div>
 
                     <div>
                       <label className={labelBase}>
                         Requested By <span className="text-xs text-gray-400">(System)</span>
                       </label>
-                      <input readOnly value={form.requested_by} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                      <input
+                        readOnly
+                        value={form.requested_by}
+                        className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      />
                     </div>
 
                     <div>
                       <label className={labelBase}>
                         Compliance Verified By <span className="text-xs text-gray-400">(System)</span>
                       </label>
-                      <input readOnly value={form.compliance_verified_by} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                      <input
+                        readOnly
+                        value={form.compliance_verified_by}
+                        className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      />
                     </div>
 
                     <div>
                       <label className={labelBase}>
                         Compliance Verified Date <span className="text-xs text-gray-400">(System)</span>
                       </label>
-                      <input readOnly value={form.compliance_verified_date} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
+                      <input
+                        readOnly
+                        value={form.compliance_verified_date}
+                        className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      />
                     </div>
                   </div>
 
@@ -1222,6 +1306,7 @@ export default function PurchaseRequisitionCreatePage() {
         <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
           Reset
         </button>
+
         <button
           type="button"
           className={classNames(primaryBtn, "active:scale-95")}
@@ -1231,14 +1316,16 @@ export default function PurchaseRequisitionCreatePage() {
         >
           Save Draft
         </button>
+
+        {/* ✅ Send for Approval button (instead of Submit) */}
         <button
           type="button"
           className={classNames(primaryBtn, "active:scale-95")}
-          style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-          onClick={onSubmitForApproval}
+          style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
+          onClick={onSendForApproval}
           disabled={isLocked}
         >
-          Submit
+          Send for Approval
         </button>
       </div>
     </div>
