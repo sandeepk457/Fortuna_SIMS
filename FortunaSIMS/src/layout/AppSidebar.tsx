@@ -69,8 +69,9 @@ const navItems: NavItem[] = [
           { name: "RFQ Form", path: "/RFQForm" },
           { name: "Purchase Order (PO)", path: "/PurchaseOrderForm" },
           { name: "Purchase Order List", path: "/PurchaseOrderList" },
-          { name: "Goods Receipt (GRN)", path: "sims/procurement/grn" },
-          { name: "Supplier Performance", path: "sims/procurement/vendor-performance" },
+          { name: "Goods Receipt (GRN)", path: "/GRN" },
+          { name: "Goods Receipt List (GRN)", path: "/GRNList" },
+          { name: "Supplier Performance", path: "/SPAnalysis" },
         ],
       },
       
