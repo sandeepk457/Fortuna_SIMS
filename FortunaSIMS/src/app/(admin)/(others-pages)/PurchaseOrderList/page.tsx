@@ -2,20 +2,22 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
 
-/** RFQ Domain */
-type RFQStatus =
+/** PO Domain */
+type POStatus =
   | "Draft"
-  | "Submitted"
   | "Pending Approval"
   | "Approved"
   | "Rejected"
-  | "Closed";
+  | "Issued to Vendor"
+  | "Partially Received"
+  | "Fully Received"
+  | "Closed"
+  | "Cancelled";
 
 type Priority = "Low" | "Medium" | "High" | "Urgent";
 type Department = "Stores" | "Operations" | "Maintenance" | "Finance" | "IT" | "Admin" | "Procurement";
@@ -26,77 +28,44 @@ type ApprovalDecision = "Approved" | "Rejected";
 
 type ApprovalStep = {
   level: ApprovalLevel;
-  approverRole: string; // ex: "Department Head", "Finance", "Procurement"
+  approverRole: string; // ex: "Finance", "Procurement Head"
   decision?: ApprovalDecision;
   decidedAt?: string; // ISO date
   remarks?: string;
 };
 
-type RFQItemLine = {
-  rfq_item_id: string;
-  item_code: string;
-  item_description: string;
-  uom: string;
-  qty: number;
-  target_price?: number;
-};
-
-type RFQVendorLine = {
-  vendor_id: string;
-  vendor_name: string;
-  vendor_code: string;
-  email?: string;
-  phone?: string;
-  invited: boolean;
-  responded: boolean;
-  quoted_total?: number;
-};
-
-interface RFQRecord {
-  rfqNo: string;
-  title: string;
-  department: Department;
-  requestor: string;
+type PurchaseOrder = {
+  poNo: string;
+  poDate: string; // yyyy-mm-dd (system)
   createdOn: string; // yyyy-mm-dd
-  requiredBy: string; // yyyy-mm-dd
-  priority: Priority;
-  status: RFQStatus;
+  buyer: string;
+  department: Department;
+
+  rfqNo: string; // source RFQ (optional in future)
+  prNo: string; // source PR
+  vendorName: string;
+  vendorCode: string;
 
   currency: Currency;
   totalItems: number;
-  estimatedValue: number;
+  grandTotal: number;
 
-  prNo: string; // source
+  priority: Priority;
+  status: POStatus;
+
+  deliveryWarehouse: string; // WH-001 etc
+
+  approvalRequired: boolean; // configurable
   approvalRoute: ApprovalStep[];
   currentApprovalLevel: ApprovalLevel;
-
-  vendors: RFQVendorLine[];
-  items: RFQItemLine[];
-
-  /** Optional draft handoff payload */
-  draftPayload?: any;
-}
+};
 
 /** Tabs */
-type ListTab = "all" | "drafts";
+type ListTab = "all" | "drafts" | "pending" | "approved" | "issued";
 
-/** localStorage key for edit draft handoff (optional) */
-const LS_EDIT_DRAFT = "FORTUNA_RFQ_EDIT_DRAFT";
-
-/** helpers */
+/** UI helpers */
 function classNames(...v: Array<string | false | undefined | null>) {
   return v.filter(Boolean).join(" ");
-}
-function formatMoney(n: number, currency: Currency) {
-  try {
-    return new Intl.NumberFormat("en-IN", {
-      style: "currency",
-      currency,
-      maximumFractionDigits: 0,
-    }).format(n);
-  } catch {
-    return `${currency} ${Math.round(n)}`;
-  }
 }
 function todayISO() {
   const d = new Date();
@@ -117,148 +86,151 @@ function withinRange(dateISO: string, from?: string, to?: string) {
   }
   return true;
 }
+function formatMoney(value: number, currency: Currency) {
+  try {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return `${currency} ${Math.round(value)}`;
+  }
+}
 
-export default function RFQListPage() {
-  const router = useRouter();
-
-  const [data, setData] = useState<RFQRecord[]>([
+export default function PurchaseOrderListPage() {
+  const [data, setData] = useState<PurchaseOrder[]>([
     {
+      poNo: "PO-2026-000201",
+      poDate: "2026-02-03",
+      createdOn: "2026-02-03",
+      buyer: "Sandeep",
+      department: "Procurement",
       rfqNo: "RFQ-2026-000101",
-      title: "Packaging materials (monthly)",
-      department: "Stores",
-      requestor: "Ravi",
-      createdOn: "2026-02-01",
-      requiredBy: "2026-02-07",
-      priority: "High",
-      status: "Pending Approval",
-      currency: "INR",
-      totalItems: 4,
-      estimatedValue: 68080,
       prNo: "PR-000103",
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      vendors: [
-        { vendor_id: "V1", vendor_name: "Sri Lakshmi Suppliers", vendor_code: "V-001", invited: true, responded: false },
-        { vendor_id: "V2", vendor_name: "Aparna Packaging", vendor_code: "V-002", invited: true, responded: true, quoted_total: 67500 },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "PKG-001", item_description: "Carton boxes", uom: "Nos", qty: 1000, target_price: 45 },
-        { rfq_item_id: "I2", item_code: "PKG-002", item_description: "Bubble wrap roll", uom: "Nos", qty: 50, target_price: 350 },
-        { rfq_item_id: "I3", item_code: "PKG-003", item_description: "Packing tape", uom: "Nos", qty: 200, target_price: 65 },
-        { rfq_item_id: "I4", item_code: "PKG-004", item_description: "Stretch film", uom: "Nos", qty: 40, target_price: 420 },
-      ],
-    },
-    {
-      rfqNo: "RFQ-2026-000102",
-      title: "Conveyor spare parts",
-      department: "Maintenance",
-      requestor: "Sandeep",
-      createdOn: "2026-02-02",
-      requiredBy: "2026-02-10",
-      priority: "Urgent",
-      status: "Approved",
-      currency: "INR",
-      totalItems: 6,
-      estimatedValue: 145000,
-      prNo: "PR-000101",
-      currentApprovalLevel: 3,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head", decision: "Approved", decidedAt: "2026-02-02", remarks: "OK" },
-        { level: 2, approverRole: "Finance", decision: "Approved", decidedAt: "2026-02-03", remarks: "Budget ok" },
-        { level: 3, approverRole: "Procurement", decision: "Approved", decidedAt: "2026-02-03", remarks: "Proceed PO" },
-      ],
-      vendors: [
-        { vendor_id: "V1", vendor_name: "Sri Lakshmi Suppliers", vendor_code: "V-001", invited: true, responded: true, quoted_total: 146500 },
-        { vendor_id: "V3", vendor_name: "Prime 3PL", vendor_code: "V-010", invited: true, responded: true, quoted_total: 145000 },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "SP-101", item_description: "Bearing set", uom: "Nos", qty: 10, target_price: 3500 },
-        { rfq_item_id: "I2", item_code: "SP-102", item_description: "Belt roller", uom: "Nos", qty: 6, target_price: 6200 },
-        { rfq_item_id: "I3", item_code: "SP-103", item_description: "Chain lubricant", uom: "Ltr", qty: 15, target_price: 650 },
-        { rfq_item_id: "I4", item_code: "SP-104", item_description: "Sensor", uom: "Nos", qty: 3, target_price: 4500 },
-        { rfq_item_id: "I5", item_code: "SP-105", item_description: "Fasteners", uom: "Nos", qty: 300, target_price: 12 },
-        { rfq_item_id: "I6", item_code: "SP-106", item_description: "Alignment kit", uom: "Set", qty: 1, target_price: 15000 },
-      ],
-    },
-    {
-      rfqNo: "RFQ-2026-000103",
-      title: "New barcode scanners",
-      department: "IT",
-      requestor: "Aparna",
-      createdOn: "2026-02-03",
-      requiredBy: "2026-02-15",
-      priority: "Medium",
-      status: "Submitted",
-      currency: "INR",
-      totalItems: 3,
-      estimatedValue: 78000,
-      prNo: "PR-000102",
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      vendors: [
-        { vendor_id: "V4", vendor_name: "TechZone India", vendor_code: "V-021", invited: true, responded: false },
-        { vendor_id: "V5", vendor_name: "ScanPro Systems", vendor_code: "V-022", invited: true, responded: false },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "IT-201", item_description: "Barcode scanner handheld", uom: "Nos", qty: 3, target_price: 26000 },
-      ],
-    },
-
-    /** ✅ Draft sample row */
-    {
-      rfqNo: "RFQ-2026-000104",
-      title: "Draft: Laptop procurement for new joiners",
-      department: "IT",
-      requestor: "Sandeep",
-      createdOn: "2026-02-03",
-      requiredBy: "2026-02-22",
-      priority: "Medium",
-      status: "Draft",
+      vendorName: "Aparna Packaging",
+      vendorCode: "V-002",
       currency: "INR",
       totalItems: 2,
-      estimatedValue: 120000,
-      prNo: "PR-000106",
+      grandTotal: 68080,
+      priority: "High",
+      status: "Pending Approval",
+      deliveryWarehouse: "WH-002",
+      approvalRequired: true,
       currentApprovalLevel: 1,
       approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
+        { level: 1, approverRole: "Finance" },
+        { level: 2, approverRole: "Procurement Head" },
+        { level: 3, approverRole: "Admin" },
       ],
-      vendors: [
-        { vendor_id: "V6", vendor_name: "LaptopWorld", vendor_code: "V-030", invited: false, responded: false },
+    },
+    {
+      poNo: "PO-2026-000202",
+      poDate: "2026-02-02",
+      createdOn: "2026-02-02",
+      buyer: "Aparna",
+      department: "Maintenance",
+      rfqNo: "RFQ-2026-000099",
+      prNo: "PR-000101",
+      vendorName: "Sri Lakshmi Suppliers",
+      vendorCode: "V-001",
+      currency: "INR",
+      totalItems: 6,
+      grandTotal: 145000,
+      priority: "Urgent",
+      status: "Approved",
+      deliveryWarehouse: "WH-001",
+      approvalRequired: true,
+      currentApprovalLevel: 2,
+      approvalRoute: [
+        { level: 1, approverRole: "Finance", decision: "Approved", decidedAt: "2026-02-02", remarks: "OK" },
+        { level: 2, approverRole: "Procurement Head" },
+        { level: 3, approverRole: "Admin" },
       ],
-      items: [
-        { rfq_item_id: "I1", item_code: "LT-001", item_description: "Laptop i5 16GB", uom: "Nos", qty: 2, target_price: 60000 },
+    },
+    {
+      poNo: "PO-2026-000203",
+      poDate: "2026-02-01",
+      createdOn: "2026-02-01",
+      buyer: "Divya",
+      department: "Admin",
+      rfqNo: "RFQ-2026-000090",
+      prNo: "PR-000104",
+      vendorName: "Prime 3PL",
+      vendorCode: "V-010",
+      currency: "INR",
+      totalItems: 1,
+      grandTotal: 18000,
+      priority: "Low",
+      status: "Draft",
+      deliveryWarehouse: "WH-003",
+      approvalRequired: false,
+      currentApprovalLevel: 1,
+      approvalRoute: [
+        { level: 1, approverRole: "Finance" },
+        { level: 2, approverRole: "Procurement Head" },
+        { level: 3, approverRole: "Admin" },
       ],
-      draftPayload: {
-        rfqNo: "RFQ-2026-000104",
-        department: "IT",
-        priority: "Medium",
-        title: "Laptop procurement for new joiners",
-        vendors: [{ vendor_name: "LaptopWorld", vendor_code: "V-030" }],
-        items: [{ item_code: "LT-001", qty: 2, price: 60000 }],
-      },
+    },
+    {
+      poNo: "PO-2026-000204",
+      poDate: "2026-01-30",
+      createdOn: "2026-01-30",
+      buyer: "Kiran",
+      department: "Operations",
+      rfqNo: "RFQ-2026-000088",
+      prNo: "PR-000105",
+      vendorName: "FastLine Transport",
+      vendorCode: "V-007",
+      currency: "INR",
+      totalItems: 1,
+      grandTotal: 95000,
+      priority: "High",
+      status: "Issued to Vendor",
+      deliveryWarehouse: "WH-002",
+      approvalRequired: true,
+      currentApprovalLevel: 3,
+      approvalRoute: [
+        { level: 1, approverRole: "Finance", decision: "Approved", decidedAt: "2026-01-31" },
+        { level: 2, approverRole: "Procurement Head", decision: "Approved", decidedAt: "2026-02-01" },
+        { level: 3, approverRole: "Admin", decision: "Approved", decidedAt: "2026-02-01" },
+      ],
+    },
+    {
+      poNo: "PO-2026-000205",
+      poDate: "2026-01-28",
+      createdOn: "2026-01-28",
+      buyer: "Ravi",
+      department: "Stores",
+      rfqNo: "RFQ-2026-000080",
+      prNo: "PR-000099",
+      vendorName: "Sri Lakshmi Suppliers",
+      vendorCode: "V-001",
+      currency: "INR",
+      totalItems: 3,
+      grandTotal: 42000,
+      priority: "Medium",
+      status: "Rejected",
+      deliveryWarehouse: "WH-001",
+      approvalRequired: true,
+      currentApprovalLevel: 1,
+      approvalRoute: [
+        { level: 1, approverRole: "Finance", decision: "Rejected", decidedAt: "2026-01-29", remarks: "Budget not available" },
+        { level: 2, approverRole: "Procurement Head" },
+        { level: 3, approverRole: "Admin" },
+      ],
     },
   ]);
 
-  /** Tabs state */
+  /** Tabs */
   const [activeTab, setActiveTab] = useState<ListTab>("all");
 
   /** Filters */
-  const [searchRfqNo, setSearchRfqNo] = useState("");
-  const [searchTitle, setSearchTitle] = useState("");
-  const [searchRequestor, setSearchRequestor] = useState("");
+  const [searchPoNo, setSearchPoNo] = useState("");
+  const [searchVendor, setSearchVendor] = useState("");
+  const [searchBuyer, setSearchBuyer] = useState("");
   const [deptFilter, setDeptFilter] = useState<Department | "">("");
-  const [priorityFilter, setPriorityFilter] = useState<Priority | "">("");
-  const [statusFilter, setStatusFilter] = useState<RFQStatus | "">("");
+  const [statusFilter, setStatusFilter] = useState<POStatus | "">("");
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
 
@@ -266,37 +238,39 @@ export default function RFQListPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
 
-  /** Approval modal */
+  /** Approval Modal */
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
-  const [selectedRfqNo, setSelectedRfqNo] = useState("");
+  const [selectedPoNo, setSelectedPoNo] = useState("");
   const [approvalRemarks, setApprovalRemarks] = useState("");
 
-  /** Tab base filter */
+  /** Tab base filtering */
   const tabFilteredBase = useMemo(() => {
     if (activeTab === "drafts") return data.filter((x) => x.status === "Draft");
+    if (activeTab === "pending") return data.filter((x) => x.status === "Pending Approval");
+    if (activeTab === "approved") return data.filter((x) => x.status === "Approved");
+    if (activeTab === "issued") return data.filter((x) => x.status === "Issued to Vendor");
     return data;
   }, [data, activeTab]);
 
-  /** Filtered data */
+  /** Apply filters */
   const filteredData = useMemo(() => {
-    return tabFilteredBase.filter((rfq) => {
+    return tabFilteredBase.filter((po) => {
       const ok =
-        rfq.rfqNo.toLowerCase().includes(searchRfqNo.toLowerCase()) &&
-        rfq.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
-        rfq.requestor.toLowerCase().includes(searchRequestor.toLowerCase()) &&
-        (deptFilter ? rfq.department === deptFilter : true) &&
-        (priorityFilter ? rfq.priority === priorityFilter : true) &&
-        (statusFilter ? rfq.status === statusFilter : true) &&
-        withinRange(rfq.createdOn, createdFrom || undefined, createdTo || undefined);
+        po.poNo.toLowerCase().includes(searchPoNo.toLowerCase()) &&
+        po.vendorName.toLowerCase().includes(searchVendor.toLowerCase()) &&
+        po.buyer.toLowerCase().includes(searchBuyer.toLowerCase()) &&
+        (deptFilter ? po.department === deptFilter : true) &&
+        (statusFilter ? po.status === statusFilter : true) &&
+        withinRange(po.createdOn, createdFrom || undefined, createdTo || undefined);
+
       return ok;
     });
   }, [
     tabFilteredBase,
-    searchRfqNo,
-    searchTitle,
-    searchRequestor,
+    searchPoNo,
+    searchVendor,
+    searchBuyer,
     deptFilter,
-    priorityFilter,
     statusFilter,
     createdFrom,
     createdTo,
@@ -305,54 +279,61 @@ export default function RFQListPage() {
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  /** Stats */
+  /** Stats (based on filteredData) */
   const stats = useMemo(() => {
     const total = filteredData.length;
     const draft = filteredData.filter((x) => x.status === "Draft").length;
-    const submitted = filteredData.filter((x) => x.status === "Submitted").length;
     const pending = filteredData.filter((x) => x.status === "Pending Approval").length;
     const approved = filteredData.filter((x) => x.status === "Approved").length;
+    const issued = filteredData.filter((x) => x.status === "Issued to Vendor").length;
     const rejected = filteredData.filter((x) => x.status === "Rejected").length;
+    const closed = filteredData.filter((x) => x.status === "Closed").length;
 
-    const totalValue = filteredData.reduce((s, x) => s + (Number(x.estimatedValue) || 0), 0);
+    const totalValue = filteredData.reduce((s, x) => s + (Number(x.grandTotal) || 0), 0);
     const avgValue = total ? Math.round(totalValue / total) : 0;
 
-    return { total, draft, submitted, pending, approved, rejected, totalValue, avgValue };
+    return { total, draft, pending, approved, issued, rejected, closed, totalValue, avgValue };
   }, [filteredData]);
 
-  /** CSV Export */
+  /** Badges */
+  const draftsCount = useMemo(() => data.filter((x) => x.status === "Draft").length, [data]);
+  const pendingCount = useMemo(() => data.filter((x) => x.status === "Pending Approval").length, [data]);
+
+  /** Export */
   const exportToCSV = () => {
     const header = [
-      "RFQ No",
-      "Title",
+      "PO No",
+      "Vendor",
+      "Buyer",
       "Department",
-      "Requestor",
       "Created On",
-      "Required By",
+      "PO Date",
+      "RFQ No",
       "PR No",
-      "Priority",
-      "Status",
-      "Vendors",
-      "Items",
+      "Warehouse",
       "Currency",
-      "Estimated Value",
+      "Grand Total",
+      "Status",
+      "Items",
+      "Priority",
     ];
 
-    const rows = filteredData.map((rfq) =>
+    const rows = filteredData.map((po) =>
       [
-        rfq.rfqNo,
-        rfq.title,
-        rfq.department,
-        rfq.requestor,
-        rfq.createdOn,
-        rfq.requiredBy,
-        rfq.prNo,
-        rfq.priority,
-        rfq.status,
-        rfq.vendors.length,
-        rfq.items.length,
-        rfq.currency,
-        rfq.estimatedValue,
+        po.poNo,
+        po.vendorName,
+        po.buyer,
+        po.department,
+        po.createdOn,
+        po.poDate,
+        po.rfqNo,
+        po.prNo,
+        po.deliveryWarehouse,
+        po.currency,
+        po.grandTotal,
+        po.status,
+        po.totalItems,
+        po.priority,
       ]
         .map((x) => `"${String(x).replace(/"/g, '""')}"`)
         .join(",")
@@ -363,43 +344,40 @@ export default function RFQListPage() {
 
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.download = "rfq-list.csv";
+    link.download = "purchase-order-list.csv";
     link.click();
   };
 
   const resetFilters = () => {
-    setSearchRfqNo("");
-    setSearchTitle("");
-    setSearchRequestor("");
+    setSearchPoNo("");
+    setSearchVendor("");
+    setSearchBuyer("");
     setDeptFilter("");
-    setPriorityFilter("");
     setStatusFilter("");
     setCreatedFrom("");
     setCreatedTo("");
     setCurrentPage(1);
   };
 
-  /** Approval actions */
-  const openApproval = (rfqNo: string) => {
-    setSelectedRfqNo(rfqNo);
+  /** Approval modal actions */
+  const openApproval = (poNo: string) => {
+    setSelectedPoNo(poNo);
     setApprovalRemarks("");
     setApprovalModalOpen(true);
   };
 
   const applyDecision = (decision: ApprovalDecision) => {
-    if (!selectedRfqNo) return;
+    if (!selectedPoNo) return;
 
     setData((prev) =>
-      prev.map((rfq) => {
-        if (rfq.rfqNo !== selectedRfqNo) return rfq;
-
-        // Only pending/submitted actionable (demo)
-        if (!(rfq.status === "Pending Approval" || rfq.status === "Submitted")) return rfq;
+      prev.map((po) => {
+        if (po.poNo !== selectedPoNo) return po;
+        if (po.status !== "Pending Approval") return po;
 
         const now = todayISO();
-        const lvl = rfq.currentApprovalLevel;
+        const lvl = po.currentApprovalLevel;
 
-        const nextRoute = rfq.approvalRoute.map((s) => {
+        const nextRoute = po.approvalRoute.map((s) => {
           if (s.level !== lvl) return s;
           return {
             ...s,
@@ -410,84 +388,92 @@ export default function RFQListPage() {
         });
 
         if (decision === "Rejected") {
-          return { ...rfq, status: "Rejected", approvalRoute: nextRoute };
+          return { ...po, status: "Rejected", approvalRoute: nextRoute };
         }
 
         const nextLevel = (lvl + 1) as ApprovalLevel;
-        const hasNext = rfq.approvalRoute.some((s) => s.level === nextLevel);
+        const hasNext = po.approvalRoute.some((s) => s.level === nextLevel);
 
         if (hasNext) {
           return {
-            ...rfq,
+            ...po,
             status: "Pending Approval",
             approvalRoute: nextRoute,
             currentApprovalLevel: nextLevel,
           };
         }
 
-        return { ...rfq, status: "Approved", approvalRoute: nextRoute };
+        return { ...po, status: "Approved", approvalRoute: nextRoute };
       })
     );
 
     setApprovalModalOpen(false);
   };
 
-  /** ✅ Draft actions */
-  const onEditDraft = (rfq: RFQRecord) => {
-    if (rfq.status !== "Draft") return;
-
-    // optional: store payload for create page prefill
-    localStorage.setItem(
-      LS_EDIT_DRAFT,
-      JSON.stringify({
-        rfqNo: rfq.rfqNo,
-        payload: rfq.draftPayload ?? rfq,
-      })
-    );
-
-    // router.push("/procurement/rfq/new?mode=edit");
-    alert(`Edit Draft RFQ: navigate to RFQ form with prefill for ${rfq.rfqNo} (demo)`);
-  };
-
-  const onSendDraftForApproval = (rfqNo: string) => {
-    const ok = confirm(`Send ${rfqNo} for approval?`);
+  /** Issue action (demo) */
+  const issueToVendor = (poNo: string) => {
+    const ok = confirm(`Issue PO ${poNo} to Vendor?`);
     if (!ok) return;
 
     setData((prev) =>
-      prev.map((rfq) => {
-        if (rfq.rfqNo !== rfqNo) return rfq;
-        if (rfq.status !== "Draft") return rfq;
+      prev.map((po) => {
+        if (po.poNo !== poNo) return po;
+        if (po.status !== "Approved") return po;
+        return { ...po, status: "Issued to Vendor" };
+      })
+    );
+  };
 
-        // Draft -> Submitted (then approval flow can pick it up)
+  /** ✅ Draft actions (ONLY in Drafts tab) */
+  const onEditDraft = (poNo: string) => {
+    // Replace with router.push("/procurement/po/new?mode=edit&poNo=...")
+    alert(`Edit Draft PO: ${poNo} (demo)`);
+  };
+
+  const onSendDraftForApproval = (poNo: string) => {
+    const ok = confirm(`Send draft PO ${poNo} for approval?`);
+    if (!ok) return;
+
+    setData((prev) =>
+      prev.map((po) => {
+        if (po.poNo !== poNo) return po;
+        if (po.status !== "Draft") return po;
+
+        // Draft -> Pending Approval
         return {
-          ...rfq,
-          status: "Submitted",
+          ...po,
+          status: "Pending Approval",
+          approvalRequired: true, // in demo we assume approvals required once submitted
           currentApprovalLevel: 1,
+          approvalRoute: po.approvalRoute.map((s) => ({ ...s, decision: undefined, decidedAt: undefined, remarks: undefined })),
         };
       })
     );
 
-    setActiveTab("all");
+    // UX: switch to Pending tab after send
+    setActiveTab("pending");
     setCurrentPage(1);
   };
 
-  /** ✅ FIX REQUIRED: Delete Draft (ONLY in Drafts tab) */
-  const onDeleteDraft = (rfqNo: string) => {
-    const ok = confirm(`Delete draft ${rfqNo}? This cannot be undone.`);
+  /** ✅ REQUIRED: Delete draft (ONLY in Drafts tab) */
+  const onDeleteDraft = (poNo: string) => {
+    const ok = confirm(`Delete draft PO ${poNo}? This cannot be undone.`);
     if (!ok) return;
-    setData((prev) => prev.filter((x) => x.rfqNo !== rfqNo));
+    setData((prev) => prev.filter((x) => x.poNo !== poNo));
   };
 
-  /** Pills */
-  const statusPill = (s: RFQStatus) =>
+  const statusPill = (s: POStatus) =>
     classNames(
       "rounded-full px-3 py-1 text-xs font-semibold",
       s === "Approved" && "bg-green-100 text-green-700",
       s === "Rejected" && "bg-red-100 text-red-600",
       s === "Pending Approval" && "bg-amber-100 text-amber-800",
-      s === "Submitted" && "bg-blue-100 text-blue-700",
-      s === "Draft" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
-      s === "Closed" && "bg-purple-100 text-purple-700"
+      s === "Issued to Vendor" && "bg-blue-100 text-blue-700",
+      s === "Partially Received" && "bg-indigo-100 text-indigo-700",
+      s === "Fully Received" && "bg-emerald-100 text-emerald-700",
+      s === "Closed" && "bg-purple-100 text-purple-700",
+      s === "Cancelled" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
+      s === "Draft" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
     );
 
   const priorityPill = (p: Priority) =>
@@ -499,33 +485,30 @@ export default function RFQListPage() {
       p === "Urgent" && "bg-rose-100 text-rose-700"
     );
 
-  const getRFQByNo = (rfqNo: string) => data.find((x) => x.rfqNo === rfqNo);
-  const selectedRFQ = selectedRfqNo ? getRFQByNo(selectedRfqNo) : undefined;
-
-  /** Drafts count for badge */
-  const draftsCount = useMemo(() => data.filter((x) => x.status === "Draft").length, [data]);
+  const getPOByNo = (poNo: string) => data.find((x) => x.poNo === poNo);
+  const selectedPO = selectedPoNo ? getPOByNo(selectedPoNo) : undefined;
 
   return (
     <div className="space-y-4">
-      <PageBreadcrumb pageTitle="RFQ Management" />
+      <PageBreadcrumb pageTitle="Purchase Order (PO)" />
 
       <div className="min-h-screen rounded-2xl border border-gray-200 bg-white p-6 dark:border-gray-800 dark:bg-gray-900">
         {/* Header */}
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">RFQ List</h2>
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">PO List</h2>
             <p className="text-sm text-gray-500 dark:text-gray-300">
-              Track RFQs, vendor invitations, and approvals.
+              Track purchase orders, approvals, and vendor issuing status.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => alert("Next step: navigate to RFQ Creation page")}
+              onClick={() => alert("Next step: navigate to PO Creation page (demo)")}
               className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
               style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
             >
-              + Create RFQ
+              + Create PO
             </button>
 
             <button
@@ -546,43 +529,73 @@ export default function RFQListPage() {
 
         {/* Tabs */}
         <div className="mb-4 flex flex-wrap gap-2">
-          <button
-            type="button"
+          <TabBtn
+            active={activeTab === "all"}
+            color={FORTUNA_PRIMARY_RED}
             onClick={() => {
               setActiveTab("all");
               setCurrentPage(1);
             }}
-            className={classNames(
-              "rounded-xl px-4 py-2 text-sm font-semibold transition active:scale-95",
-              activeTab === "all"
-                ? "text-white shadow"
-                : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
-            )}
-            style={activeTab === "all" ? { backgroundColor: FORTUNA_PRIMARY_RED } : undefined}
-          >
-            All RFQs
-          </button>
+            label="All POs"
+          />
 
-          <button
-            type="button"
+          <TabBtn
+            active={activeTab === "drafts"}
+            color={FORTUNA_SECONDARY_BLUE}
             onClick={() => {
               setActiveTab("drafts");
-              setCurrentPage(1);
               setStatusFilter("");
+              setCurrentPage(1);
             }}
-            className={classNames(
-              "rounded-xl px-4 py-2 text-sm font-semibold transition active:scale-95",
-              activeTab === "drafts"
-                ? "text-white shadow"
-                : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
-            )}
-            style={activeTab === "drafts" ? { backgroundColor: FORTUNA_SECONDARY_BLUE } : undefined}
-          >
-            Drafts
-            <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">
-              {draftsCount}
-            </span>
-          </button>
+            label={
+              <>
+                Drafts
+                <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">
+                  {draftsCount}
+                </span>
+              </>
+            }
+          />
+
+          <TabBtn
+            active={activeTab === "pending"}
+            color={FORTUNA_PRIMARY_RED}
+            onClick={() => {
+              setActiveTab("pending");
+              setStatusFilter("");
+              setCurrentPage(1);
+            }}
+            label={
+              <>
+                Pending Approval
+                <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">
+                  {pendingCount}
+                </span>
+              </>
+            }
+          />
+
+          <TabBtn
+            active={activeTab === "approved"}
+            color={FORTUNA_SECONDARY_BLUE}
+            onClick={() => {
+              setActiveTab("approved");
+              setStatusFilter("");
+              setCurrentPage(1);
+            }}
+            label="Approved"
+          />
+
+          <TabBtn
+            active={activeTab === "issued"}
+            color={FORTUNA_PRIMARY_RED}
+            onClick={() => {
+              setActiveTab("issued");
+              setStatusFilter("");
+              setCurrentPage(1);
+            }}
+            label="Issued"
+          />
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
@@ -593,26 +606,39 @@ export default function RFQListPage() {
                 <thead className="bg-gray-100 dark:bg-gray-800">
                   <tr>
                     <th className="px-4 py-3 text-left">
-                      RFQ No
+                      PO No
                       <input
                         className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
                         placeholder="Search"
-                        value={searchRfqNo}
+                        value={searchPoNo}
                         onChange={(e) => {
-                          setSearchRfqNo(e.target.value);
+                          setSearchPoNo(e.target.value);
                           setCurrentPage(1);
                         }}
                       />
                     </th>
 
                     <th className="px-4 py-3 text-left">
-                      Title
+                      Vendor
                       <input
                         className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
                         placeholder="Search"
-                        value={searchTitle}
+                        value={searchVendor}
                         onChange={(e) => {
-                          setSearchTitle(e.target.value);
+                          setSearchVendor(e.target.value);
+                          setCurrentPage(1);
+                        }}
+                      />
+                    </th>
+
+                    <th className="px-4 py-3 text-left">
+                      Buyer
+                      <input
+                        className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
+                        placeholder="Search"
+                        value={searchBuyer}
+                        onChange={(e) => {
+                          setSearchBuyer(e.target.value);
                           setCurrentPage(1);
                         }}
                       />
@@ -640,34 +666,8 @@ export default function RFQListPage() {
                     </th>
 
                     <th className="px-4 py-3 text-left">
-                      Requestor
-                      <input
-                        className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                        placeholder="Search"
-                        value={searchRequestor}
-                        onChange={(e) => {
-                          setSearchRequestor(e.target.value);
-                          setCurrentPage(1);
-                        }}
-                      />
-                    </th>
-
-                    <th className="px-4 py-3 text-left">
                       Priority
-                      <select
-                        className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                        value={priorityFilter}
-                        onChange={(e) => {
-                          setPriorityFilter(e.target.value as any);
-                          setCurrentPage(1);
-                        }}
-                      >
-                        <option value="">All</option>
-                        <option value="Low">Low</option>
-                        <option value="Medium">Medium</option>
-                        <option value="High">High</option>
-                        <option value="Urgent">Urgent</option>
-                      </select>
+                      <div className="mt-2 text-xs text-gray-500 dark:text-gray-300">(from RFQ)</div>
                     </th>
 
                     <th className="px-4 py-3 text-left">
@@ -682,11 +682,14 @@ export default function RFQListPage() {
                       >
                         <option value="">All</option>
                         <option value="Draft">Draft</option>
-                        <option value="Submitted">Submitted</option>
                         <option value="Pending Approval">Pending Approval</option>
                         <option value="Approved">Approved</option>
                         <option value="Rejected">Rejected</option>
+                        <option value="Issued to Vendor">Issued to Vendor</option>
+                        <option value="Partially Received">Partially Received</option>
+                        <option value="Fully Received">Fully Received</option>
                         <option value="Closed">Closed</option>
+                        <option value="Cancelled">Cancelled</option>
                       </select>
                     </th>
 
@@ -714,98 +717,112 @@ export default function RFQListPage() {
                       </div>
                     </th>
 
-                    <th className="px-4 py-3 text-left">Vendors</th>
                     <th className="px-4 py-3 text-left">Items</th>
-                    <th className="px-4 py-3 text-left">Est. Value</th>
+                    <th className="px-4 py-3 text-left">Grand Total</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody className="dark:text-gray-200">
-                  {paginatedData.map((rfq) => (
+                  {paginatedData.map((po) => (
                     <tr
-                      key={rfq.rfqNo}
+                      key={po.poNo}
                       className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
                     >
-                      <td className="px-4 py-3 font-semibold">{rfq.rfqNo}</td>
+                      <td className="px-4 py-3 font-semibold">{po.poNo}</td>
 
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900 dark:text-white">{rfq.title}</div>
-                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                          Required By: <span className="font-semibold">{rfq.requiredBy}</span>
-                        </div>
+                        <div className="font-semibold text-gray-900 dark:text-white">{po.vendorName}</div>
+                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">{po.vendorCode}</div>
                         <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
-                          PR: <span className="font-semibold">{rfq.prNo}</span>
+                          RFQ: <span className="font-semibold">{po.rfqNo}</span> • PR:{" "}
+                          <span className="font-semibold">{po.prNo}</span>
                         </div>
                       </td>
 
-                      <td className="px-4 py-3">{rfq.department}</td>
-                      <td className="px-4 py-3">{rfq.requestor}</td>
+                      <td className="px-4 py-3">{po.buyer}</td>
+                      <td className="px-4 py-3">{po.department}</td>
 
                       <td className="px-4 py-3">
-                        <span className={priorityPill(rfq.priority)}>{rfq.priority}</span>
+                        <span className={priorityPill(po.priority)}>{po.priority}</span>
                       </td>
 
                       <td className="px-4 py-3">
-                        <span className={statusPill(rfq.status)}>{rfq.status}</span>
-                        {rfq.status === "Pending Approval" && (
+                        <span className={statusPill(po.status)}>{po.status}</span>
+
+                        {po.status === "Pending Approval" && po.approvalRequired && (
                           <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
-                            Level {rfq.currentApprovalLevel} •{" "}
-                            {rfq.approvalRoute.find((s) => s.level === rfq.currentApprovalLevel)?.approverRole}
+                            Level {po.currentApprovalLevel} •{" "}
+                            {po.approvalRoute.find((s) => s.level === po.currentApprovalLevel)?.approverRole}
+                          </div>
+                        )}
+
+                        {!po.approvalRequired && po.status !== "Draft" && (
+                          <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
+                            Approval: <span className="font-semibold">Not Required</span>
                           </div>
                         )}
                       </td>
 
-                      <td className="px-4 py-3">{rfq.createdOn}</td>
-                      <td className="px-4 py-3">{rfq.vendors.length}</td>
-                      <td className="px-4 py-3">{rfq.totalItems}</td>
-                      <td className="px-4 py-3 font-semibold">{formatMoney(rfq.estimatedValue, rfq.currency)}</td>
+                      <td className="px-4 py-3">{po.createdOn}</td>
+                      <td className="px-4 py-3">{po.totalItems}</td>
+                      <td className="px-4 py-3 font-semibold">{formatMoney(po.grandTotal, po.currency)}</td>
 
                       <td className="px-4 py-3 space-x-3">
                         <button
                           className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => alert(`View RFQ details for ${rfq.rfqNo} (demo)`)}
+                          onClick={() => alert(`View: open PO detail for ${po.poNo} (demo)`)}
                         >
                           View
                         </button>
 
-                        {/* ✅ EXISTING APPROVAL FLOW stays SAME */}
-                        {(rfq.status === "Submitted" || rfq.status === "Pending Approval") && (
-                          <button
-                            className="font-semibold hover:underline"
-                            style={{ color: FORTUNA_SECONDARY_BLUE }}
-                            onClick={() => openApproval(rfq.rfqNo)}
-                          >
-                            Approve / Reject
-                          </button>
-                        )}
-
-                        {/* ✅ Draft-specific actions: Edit / Send / Delete ONLY in Drafts tab */}
-                        {activeTab === "drafts" && rfq.status === "Draft" && (
+                        {/* ✅ Draft actions ONLY in Drafts tab */}
+                        {activeTab === "drafts" && po.status === "Draft" && (
                           <>
                             <button
                               className="font-semibold hover:underline"
                               style={{ color: FORTUNA_SECONDARY_BLUE }}
-                              onClick={() => onEditDraft(rfq)}
+                              onClick={() => onEditDraft(po.poNo)}
                             >
                               Edit
                             </button>
 
                             <button
                               className="font-semibold hover:underline text-emerald-700"
-                              onClick={() => onSendDraftForApproval(rfq.rfqNo)}
+                              onClick={() => onSendDraftForApproval(po.poNo)}
                             >
                               Send for Approval
                             </button>
 
-                            {/* ✅ FIX: Delete ONLY in Drafts tab */}
+                            {/* ✅ Delete ONLY in Drafts tab */}
                             <button
                               className="font-semibold text-rose-600 hover:underline"
-                              onClick={() => onDeleteDraft(rfq.rfqNo)}
+                              onClick={() => onDeleteDraft(po.poNo)}
                             >
                               Delete
                             </button>
                           </>
+                        )}
+
+                        {/* ✅ Approval modal like PR list (NOT in drafts tab) */}
+                        {activeTab !== "drafts" && po.status === "Pending Approval" && po.approvalRequired && (
+                          <button
+                            className="font-semibold hover:underline"
+                            style={{ color: FORTUNA_SECONDARY_BLUE }}
+                            onClick={() => openApproval(po.poNo)}
+                          >
+                            Approve / Reject
+                          </button>
+                        )}
+
+                        {/* ✅ Issue after approval (NOT in drafts tab) */}
+                        {activeTab !== "drafts" && po.status === "Approved" && (
+                          <button
+                            className="font-semibold hover:underline text-emerald-700"
+                            onClick={() => issueToVendor(po.poNo)}
+                          >
+                            Issue to Vendor
+                          </button>
                         )}
                       </td>
                     </tr>
@@ -813,8 +830,8 @@ export default function RFQListPage() {
 
                   {paginatedData.length === 0 && (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300" colSpan={11}>
-                        No RFQs found for current filters.
+                      <td className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300" colSpan={10}>
+                        No POs found for current filters.
                       </td>
                     </tr>
                   )}
@@ -881,15 +898,17 @@ export default function RFQListPage() {
               </div>
 
               <div className="mt-4 space-y-3 text-sm dark:text-gray-200">
-                <StatRow label="Total RFQs" value={stats.total} />
+                <StatRow label="Total POs" value={stats.total} />
                 <StatRow label="Draft" value={stats.draft} badge="gray" />
-                <StatRow label="Submitted" value={stats.submitted} badge="blue" />
                 <StatRow label="Pending Approval" value={stats.pending} badge="amber" />
                 <StatRow label="Approved" value={stats.approved} badge="green" />
+                <StatRow label="Issued" value={stats.issued} badge="blue" />
                 <StatRow label="Rejected" value={stats.rejected} badge="red" />
+                <StatRow label="Closed" value={stats.closed} badge="purple" />
+
                 <div className="my-3 border-t dark:border-gray-800" />
-                <StatRow label="Total Est. Value" value={stats.totalValue} money />
-                <StatRow label="Avg Value / RFQ" value={stats.avgValue} money />
+                <StatRow label="Total PO Value" value={stats.totalValue} money />
+                <StatRow label="Avg Value / PO" value={stats.avgValue} money />
               </div>
 
               <div className="mt-5 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
@@ -897,25 +916,25 @@ export default function RFQListPage() {
               </div>
 
               <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-                <span className="font-semibold">Drafts:</span> Drafts tab lo Edit → Send for Approval → Delete.
+                <span className="font-semibold">Drafts:</span> Drafts tab lo only Edit / Send for Approval / Delete.
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Approval Modal */}
-      {approvalModalOpen && selectedRFQ && (
+      {/* Approval Modal (PR list la same pattern) */}
+      {approvalModalOpen && selectedPO && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
           <div className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-950">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Approve / Reject RFQ</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Approve / Reject PO</h3>
                 <p className="text-xs text-gray-500 dark:text-gray-300">
-                  RFQ: <span className="font-semibold">{selectedRFQ.rfqNo}</span> • Level{" "}
-                  <span className="font-semibold">{selectedRFQ.currentApprovalLevel}</span> •{" "}
+                  PO: <span className="font-semibold">{selectedPO.poNo}</span> • Level{" "}
+                  <span className="font-semibold">{selectedPO.currentApprovalLevel}</span> •{" "}
                   <span className="font-semibold">
-                    {selectedRFQ.approvalRoute.find((s) => s.level === selectedRFQ.currentApprovalLevel)?.approverRole}
+                    {selectedPO.approvalRoute.find((s) => s.level === selectedPO.currentApprovalLevel)?.approverRole}
                   </span>
                 </p>
               </div>
@@ -928,18 +947,23 @@ export default function RFQListPage() {
             </div>
 
             <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+              {/* PO Summary */}
               <div className="lg:col-span-2 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">{selectedRFQ.title}</div>
+                <div className="text-sm font-semibold text-gray-900 dark:text-white">
+                  {selectedPO.vendorName} ({selectedPO.vendorCode})
+                </div>
 
                 <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm dark:text-gray-200">
-                  <Info label="Department" value={selectedRFQ.department} />
-                  <Info label="Requestor" value={selectedRFQ.requestor} />
-                  <Info label="Created On" value={selectedRFQ.createdOn} />
-                  <Info label="Required By" value={selectedRFQ.requiredBy} />
-                  <Info label="PR No" value={selectedRFQ.prNo} />
-                  <Info label="Vendors" value={String(selectedRFQ.vendors.length)} />
-                  <Info label="Items" value={String(selectedRFQ.totalItems)} />
-                  <Info label="Est. Value" value={formatMoney(selectedRFQ.estimatedValue, selectedRFQ.currency)} />
+                  <Info label="Buyer" value={selectedPO.buyer} />
+                  <Info label="Department" value={selectedPO.department} />
+                  <Info label="Created On" value={selectedPO.createdOn} />
+                  <Info label="PO Date" value={selectedPO.poDate} />
+                  <Info label="RFQ No" value={selectedPO.rfqNo} />
+                  <Info label="PR No" value={selectedPO.prNo} />
+                  <Info label="Warehouse" value={selectedPO.deliveryWarehouse} />
+                  <Info label="Items" value={String(selectedPO.totalItems)} />
+                  <Info label="Grand Total" value={formatMoney(selectedPO.grandTotal, selectedPO.currency)} />
+                  <Info label="Priority" value={selectedPO.priority} />
                 </div>
 
                 <div className="mt-4">
@@ -953,6 +977,7 @@ export default function RFQListPage() {
                 </div>
               </div>
 
+              {/* Approval Route */}
               <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Approval Route</h4>
@@ -960,10 +985,9 @@ export default function RFQListPage() {
                 </div>
 
                 <div className="mt-3 space-y-2 text-sm dark:text-gray-200">
-                  {selectedRFQ.approvalRoute.map((s) => {
+                  {selectedPO.approvalRoute.map((s) => {
                     const isCurrent =
-                      s.level === selectedRFQ.currentApprovalLevel &&
-                      (selectedRFQ.status === "Submitted" || selectedRFQ.status === "Pending Approval");
+                      s.level === selectedPO.currentApprovalLevel && selectedPO.status === "Pending Approval";
                     const decision = s.decision ?? "Pending";
 
                     return (
@@ -1033,6 +1057,34 @@ export default function RFQListPage() {
 }
 
 /** Small components */
+function TabBtn({
+  active,
+  color,
+  onClick,
+  label,
+}: {
+  active: boolean;
+  color: string;
+  onClick: () => void;
+  label: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={classNames(
+        "rounded-xl px-4 py-2 text-sm font-semibold transition active:scale-95",
+        active
+          ? "text-white shadow"
+          : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+      )}
+      style={active ? { backgroundColor: color } : undefined}
+    >
+      {label}
+    </button>
+  );
+}
+
 function StatRow({
   label,
   value,
@@ -1041,7 +1093,7 @@ function StatRow({
 }: {
   label: string;
   value: number;
-  badge?: "green" | "red" | "amber" | "blue" | "gray";
+  badge?: "green" | "red" | "amber" | "blue" | "gray" | "purple";
   money?: boolean;
 }) {
   const showValue = money
@@ -1066,6 +1118,7 @@ function StatRow({
           badge === "red" && "bg-red-100 text-red-600",
           badge === "amber" && "bg-amber-100 text-amber-800",
           badge === "blue" && "bg-blue-100 text-blue-700",
+          badge === "purple" && "bg-purple-100 text-purple-700",
           badge === "gray" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
           !badge && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200"
         )}
