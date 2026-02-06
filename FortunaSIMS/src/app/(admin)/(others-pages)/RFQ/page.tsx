@@ -521,12 +521,13 @@ export default function RFQListPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => alert("Next step: navigate to RFQ Creation page")}
-              className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
-              style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-            >
-              + Create RFQ
-            </button>
+  onClick={() => router.push("/RFQForm")}
+  className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
+  style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+>
+  + Create RFQ
+</button>
+
 
             <button
               onClick={exportToCSV}

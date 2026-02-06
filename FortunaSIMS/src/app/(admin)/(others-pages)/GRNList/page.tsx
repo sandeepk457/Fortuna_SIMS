@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+// ✅ Add-on (for navigation to edit PO form)
+import { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -165,6 +167,7 @@ function todayISO() {
 }
 
 export default function GRNListPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [rows, setRows] = useState<GRNRow[]>(DEMO_GRNS);
 
@@ -373,14 +376,19 @@ export default function GRNListPage() {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={outlineBtn} onClick={() => alert("Open GRN Create (demo)")}>
-            + Create GRN
-          </button>
+          <button
+  onClick={() => router.push("/GRN")}
+  className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
+  style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+>
+  + Create GRN
+</button>
+
 
           <button
             type="button"
             className={classNames(primaryBtn, "active:scale-95")}
-            style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+            style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
             onClick={exportToCSV}
           >
             Export to Excel

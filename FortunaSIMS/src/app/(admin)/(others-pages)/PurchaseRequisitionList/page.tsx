@@ -1,9 +1,9 @@
 "use client";
-
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 // ✅ Add-on (for navigation to edit PR form)
 import { useRouter } from "next/navigation";
+
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -494,13 +494,15 @@ export default function PurchaseRequisitionListPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => alert("Next step: navigate to PR Creation page")}
-              className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
-              style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-            >
-              + Create PR
+            
+            {/* BUtton code */}
+           <button
+            onClick={() => router.push("/PurchaseRequisition")}
+            className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
+            style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}>
+            + Create PR
             </button>
+
 
             <button
               onClick={exportToCSV}
