@@ -80,6 +80,18 @@ const navItems: NavItem[] = [
         subItems: [
           { name: "Goods Inward", path: "sims/inventory/inward" },
           { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
+          {
+            name: "Returns",
+            subItems: [
+          { name: "Supplier Returns", path: "/SupplierReturns" },
+          { name: "Supplier Returns Form", path: "/SupplierReturnsForm" },
+
+          { name: "Customer Returns", path: "/CustomerReturns" },
+          { name: "Customer Returns Form", path: "/CustomerReturnForm" },
+
+            ],
+          },
+          
           { name: "Stock Transfer", path: "sims/inventory/transfer" },
           { name: "Warehouse Layout", path: "sims/inventory/layout" },
           { name: "Batch & Serial Tracking", path: "sims/inventory/batch-tracking" },
@@ -326,8 +338,8 @@ const AppSidebar: React.FC = () => {
           <Image
             src="/images/logo/logo.svg"
             alt="Logo"
-            width={150}
-            height={40}
+            width={175}
+            height={60}
           />
         </Link>
       </div>
