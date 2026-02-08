@@ -84,11 +84,11 @@ const navItems: NavItem[] = [
             name: "Returns",
             subItems: [
           { name: "Supplier Returns", path: "/SupplierReturns" },
-          { name: "Supplier Returns Form", path: "/SupplierReturnsForm" },
+          // { name: "Supplier Returns Form", path: "/SupplierreturnForm" },
 
           { name: "Customer Returns", path: "/CustomerReturns" },
-          { name: "Customer Returns Form", path: "/CustomerReturnForm" },
-
+          // { name: "Customer Returns Form", path: "/CustomerReturnForm" },
+              
             ],
           },
           

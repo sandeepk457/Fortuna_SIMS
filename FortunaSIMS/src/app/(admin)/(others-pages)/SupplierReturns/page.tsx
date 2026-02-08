@@ -463,7 +463,9 @@ export default function SupplierReturnsListPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={onCreateReturn}
+              
+                            onClick={() => router.push("/SupplierreturnForm")}
+
               className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
               style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
             >

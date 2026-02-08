@@ -2,10 +2,15 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
+
+/** ✅ Routes (App Router recommended) */
+const ROUTE_CREATE_CR = "/customer-returns/new"; // ✅ form page route
+const LS_EDIT_DRAFT_KEY = "FORTUNA_CR_EDIT_DRAFT";
 
 /** Customer Return */
 type ReturnStatus =
@@ -16,9 +21,25 @@ type ReturnStatus =
   | "Received"
   | "Closed";
 
-type ReturnType = "Damage Return" | "Wrong Item" | "Short Supply" | "Warranty Return" | "Other";
+type ReturnType =
+  | "Damage Return"
+  | "Wrong Item"
+  | "Short Supply"
+  | "Warranty Return"
+  | "Other";
+
 type Priority = "Low" | "Medium" | "High" | "Urgent";
-type Department = "Stores" | "Operations" | "Maintenance" | "Finance" | "IT" | "Admin" | "Procurement" | "Sales";
+
+type Department =
+  | "Stores"
+  | "Operations"
+  | "Maintenance"
+  | "Finance"
+  | "IT"
+  | "Admin"
+  | "Procurement"
+  | "Sales";
+
 type ReturnSource = "Invoice" | "Delivery" | "Sales Order" | "Other";
 
 type ApprovalDecision = "Approved" | "Rejected";
@@ -84,6 +105,7 @@ function formatINR(value: number) {
 }
 
 export default function CustomerReturnsListPage() {
+  const router = useRouter();
   const [data, setData] = useState<CustomerReturn[]>([
     {
       crNo: "CR-2026-0001",
@@ -102,7 +124,10 @@ export default function CustomerReturnsListPage() {
       estimatedValue: 12000,
       approvalRequired: true,
       currentApproverRole: "Sales Head",
-      draftPayload: { crNo: "CR-2026-0001", note: "Customer reported damage on delivery." },
+      draftPayload: {
+        crNo: "CR-2026-0001",
+        note: "Customer reported damage on delivery.",
+      },
     },
     {
       crNo: "CR-2026-0002",
@@ -238,7 +263,10 @@ export default function CustomerReturnsListPage() {
   ]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
-  const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const paginatedData = filteredData.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
 
   const stats = useMemo(() => {
     const base = filteredData;
@@ -254,7 +282,18 @@ export default function CustomerReturnsListPage() {
     const totalQty = base.reduce((s, x) => s + (Number(x.totalQty) || 0), 0);
     const customerCount = new Set(base.map((x) => x.customerId)).size;
 
-    return { total, draft, pending, approved, rejected, received, closed, totalValue, totalQty, customerCount };
+    return {
+      total,
+      draft,
+      pending,
+      approved,
+      rejected,
+      received,
+      closed,
+      totalValue,
+      totalQty,
+      customerCount,
+    };
   }, [filteredData]);
 
   const resetFilters = () => {
@@ -320,14 +359,18 @@ export default function CustomerReturnsListPage() {
   };
 
   /** Actions (demo) */
-  const onCreateReturn = () => alert("Navigate to Customer Return Create page (demo).");
-
   const onView = (crNo: string) => alert(`View Customer Return: ${crNo} (demo)`);
 
   const onEditDraft = (cr: CustomerReturn) => {
     if (cr.status !== "Draft") return;
-    localStorage.setItem("FORTUNA_CR_EDIT_DRAFT", JSON.stringify({ crNo: cr.crNo, payload: cr.draftPayload ?? cr }));
-    alert(`Edit Draft: ${cr.crNo} (demo). Navigate to form with prefill.`);
+
+    localStorage.setItem(
+      LS_EDIT_DRAFT_KEY,
+      JSON.stringify({ crNo: cr.crNo, payload: cr.draftPayload ?? cr })
+    );
+
+    // ✅ Redirect to create page in edit mode
+    router.push(`${ROUTE_CREATE_CR}?mode=edit&crNo=${encodeURIComponent(cr.crNo)}`);
   };
 
   const onDeleteDraft = (crNo: string) => {
@@ -353,6 +396,7 @@ export default function CustomerReturnsListPage() {
           : x
       )
     );
+
     setActiveTab("all");
     setCurrentPage(1);
   };
@@ -375,7 +419,9 @@ export default function CustomerReturnsListPage() {
           return {
             ...x,
             status: "Rejected",
-            lastRemarks: approvalRemarks?.trim() ? approvalRemarks.trim() : "Rejected",
+            lastRemarks: approvalRemarks?.trim()
+              ? approvalRemarks.trim()
+              : "Rejected",
           };
         }
 
@@ -391,13 +437,20 @@ export default function CustomerReturnsListPage() {
   };
 
   const onMarkReceived = (crNo: string) => {
-    const ok = confirm(`Mark ${crNo} as Received? (Customer returned goods received in returns bay)`);
+    const ok = confirm(
+      `Mark ${crNo} as Received? (Customer returned goods received in returns bay)`
+    );
     if (!ok) return;
 
     setData((prev) =>
       prev.map((x) =>
         x.crNo === crNo && x.status === "Approved"
-          ? { ...x, status: "Received", lastRemarks: "Received into returns bay", approvalRequired: false }
+          ? {
+              ...x,
+              status: "Received",
+              lastRemarks: "Received into returns bay",
+              approvalRequired: false,
+            }
           : x
       )
     );
@@ -434,15 +487,18 @@ export default function CustomerReturnsListPage() {
         {/* Header */}
         <div className="mb-6 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">Customer Returns List</h2>
+            <h2 className="text-2xl font-semibold text-gray-800 dark:text-white">
+              Customer Returns List
+            </h2>
             <p className="text-sm text-gray-500 dark:text-gray-300">
               Track returns from customers (Invoice/Delivery/SO), approvals, and receipt status.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            {/* ✅ FIXED: Create button should go to Form route */}
             <button
-              onClick={onCreateReturn}
+              onClick={() => router.push("/CustomerReturnForm")}
               className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
               style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
             >
@@ -683,9 +739,12 @@ export default function CustomerReturnsListPage() {
                       <td className="px-4 py-3 font-semibold">{cr.crNo}</td>
 
                       <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900 dark:text-white">{cr.customerName}</div>
+                        <div className="font-semibold text-gray-900 dark:text-white">
+                          {cr.customerName}
+                        </div>
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                          {cr.customerId} • {cr.sourceType}: <span className="font-semibold">{cr.sourceRef}</span>
+                          {cr.customerId} • {cr.sourceType}:{" "}
+                          <span className="font-semibold">{cr.sourceRef}</span>
                         </div>
                       </td>
 
@@ -706,7 +765,10 @@ export default function CustomerReturnsListPage() {
                         <span className={statusPill(cr.status)}>{cr.status}</span>
                         {cr.status === "Pending Approval" && (
                           <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
-                            Approver: <span className="font-semibold">{cr.currentApproverRole ?? "—"}</span>
+                            Approver:{" "}
+                            <span className="font-semibold">
+                              {cr.currentApproverRole ?? "—"}
+                            </span>
                           </div>
                         )}
                       </td>
@@ -714,10 +776,15 @@ export default function CustomerReturnsListPage() {
                       <td className="px-4 py-3">{cr.createdOn}</td>
                       <td className="px-4 py-3">{cr.totalItems}</td>
                       <td className="px-4 py-3">{cr.totalQty}</td>
-                      <td className="px-4 py-3 font-semibold">{formatINR(cr.estimatedValue)}</td>
+                      <td className="px-4 py-3 font-semibold">
+                        {formatINR(cr.estimatedValue)}
+                      </td>
 
                       <td className="px-4 py-3 space-x-3">
-                        <button className="font-semibold text-blue-600 hover:underline" onClick={() => onView(cr.crNo)}>
+                        <button
+                          className="font-semibold text-blue-600 hover:underline"
+                          onClick={() => onView(cr.crNo)}
+                        >
                           View
                         </button>
 
@@ -771,7 +838,10 @@ export default function CustomerReturnsListPage() {
 
                   {paginatedData.length === 0 && (
                     <tr>
-                      <td className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300" colSpan={12}>
+                      <td
+                        className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300"
+                        colSpan={12}
+                      >
                         No customer returns found for current filters.
                       </td>
                     </tr>
@@ -786,7 +856,8 @@ export default function CustomerReturnsListPage() {
                 {filteredData.length > 0 ? (
                   <>
                     Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                    {Math.min(currentPage * itemsPerPage, filteredData.length)} of {filteredData.length} entries
+                    {Math.min(currentPage * itemsPerPage, filteredData.length)} of{" "}
+                    {filteredData.length} entries
                   </>
                 ) : (
                   <>Showing 0 entries</>
@@ -834,8 +905,13 @@ export default function CustomerReturnsListPage() {
           <div className="xl:col-span-3">
             <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-semibold text-gray-800 dark:text-white">Quick Stats</h3>
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_PRIMARY_RED }} />
+                <h3 className="text-base font-semibold text-gray-800 dark:text-white">
+                  Quick Stats
+                </h3>
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+                />
               </div>
 
               <div className="mt-4 space-y-3 text-sm dark:text-gray-200">
@@ -870,11 +946,15 @@ export default function CustomerReturnsListPage() {
           <div className="w-full max-w-3xl rounded-2xl bg-white p-5 shadow-xl dark:bg-gray-950">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Approve / Reject Customer Return</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Approve / Reject Customer Return
+                </h3>
                 <p className="text-xs text-gray-500 dark:text-gray-300">
-                  CR: <span className="font-semibold">{selectedCR.crNo}</span> • Customer:{" "}
-                  <span className="font-semibold">{selectedCR.customerName}</span> •{" "}
-                  <span className="font-semibold">{selectedCR.sourceType}:{selectedCR.sourceRef}</span>
+                  CR: <span className="font-semibold">{selectedCR.crNo}</span> •
+                  Customer: <span className="font-semibold">{selectedCR.customerName}</span> •{" "}
+                  <span className="font-semibold">
+                    {selectedCR.sourceType}:{selectedCR.sourceRef}
+                  </span>
                 </p>
               </div>
               <button
@@ -901,7 +981,9 @@ export default function CustomerReturnsListPage() {
                 </div>
 
                 <div className="mt-4">
-                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">Remarks (optional)</label>
+                  <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
+                    Remarks (optional)
+                  </label>
                   <textarea
                     value={approvalRemarks}
                     onChange={(e) => setApprovalRemarks(e.target.value)}
@@ -913,14 +995,23 @@ export default function CustomerReturnsListPage() {
 
               <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Approval</h4>
-                  <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }} />
+                  <h4 className="text-sm font-semibold text-gray-900 dark:text-white">
+                    Approval
+                  </h4>
+                  <span
+                    className="h-2 w-2 rounded-full"
+                    style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+                  />
                 </div>
 
                 <div className="mt-3 text-sm dark:text-gray-200">
                   <div className="rounded-lg border border-gray-200 p-3 dark:border-gray-800">
-                    <div className="text-xs text-gray-500 dark:text-gray-300">Current Approver Role</div>
-                    <div className="font-semibold">{selectedCR.currentApproverRole ?? "—"}</div>
+                    <div className="text-xs text-gray-500 dark:text-gray-300">
+                      Current Approver Role
+                    </div>
+                    <div className="font-semibold">
+                      {selectedCR.currentApproverRole ?? "—"}
+                    </div>
                   </div>
 
                   <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
@@ -985,7 +1076,9 @@ function TabBtn({
     >
       {label}
       {typeof badge === "number" && (
-        <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">{badge}</span>
+        <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold text-white">
+          {badge}
+        </span>
       )}
     </button>
   );
