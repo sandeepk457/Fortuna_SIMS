@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+
 
 interface Warehouse {
   code: string;
@@ -14,6 +16,7 @@ interface Warehouse {
 }
 
 export default function WarehouseMasterPage() {
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [data] = useState<Warehouse[]>([
@@ -109,7 +112,7 @@ export default function WarehouseMasterPage() {
           {/* Right Side Buttons */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => router.push("/WarehouseForm")}
               className="bg-[#005F99] hover:bg-[#004a7a] active:scale-95 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all duration-200"
             >
               + Add New

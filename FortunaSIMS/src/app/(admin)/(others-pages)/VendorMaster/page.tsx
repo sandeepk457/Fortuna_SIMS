@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -26,6 +28,7 @@ function classNames(...v: Array<string | false | undefined | null>) {
 }
 
 export default function VendorMasterListPage() {
+  const router = useRouter(); 
   const [data, setData] = useState<Vendor[]>([
     {
       code: "VEN-001",
@@ -294,7 +297,8 @@ export default function VendorMasterListPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setIsModalOpen(true)}
+                onClick={() => router.push("/VendorForm")}
+
               className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
               style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
             >

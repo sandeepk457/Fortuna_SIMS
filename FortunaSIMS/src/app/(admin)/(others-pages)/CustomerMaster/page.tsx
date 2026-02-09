@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -39,6 +41,7 @@ function formatINR(value: number) {
 }
 
 export default function CustomerMasterListPage() {
+  const router = useRouter();
   const [data, setData] = useState<Customer[]>([
     {
       code: "CUST-001",
@@ -314,7 +317,7 @@ export default function CustomerMasterListPage() {
 
           <div className="flex flex-wrap items-center gap-2">
             <button
-              onClick={() => setIsModalOpen(true)}
+              onClick={() => router.push("/CustomerForm")}
               className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
               style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
             >

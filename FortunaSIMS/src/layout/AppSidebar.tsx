@@ -48,14 +48,14 @@ const navItems: NavItem[] = [
         name: "Masters",
         subItems: [
           { name: "Item Master", path: "/ItemMaster"},
-          { name: "Item Master Form", path: "/ItemMasterForm"},
+          // { name: "Item Master Form", path: "/ItemMasterForm"},
           { name: "Warehouse Master", path: "/WarehouseMaster" },
-          { name: "Warehouse Master Form", path: "/WarehouseForm" },
+          // { name: "Warehouse Master Form", path: "/WarehouseForm" },
           { name: "UOM Master", path: "/UOMmaster" },
           { name: "Vendor Master", path: "/VendorMaster" },
-          { name: "Vendor Master Form", path: "/VendorForm"},
+          // { name: "Vendor Master Form", path: "/VendorForm"},
           { name: "Customer Master", path: "/CustomerMaster" },
-          { name: "Customer Master Form", path: "/CustomerForm"},
+          // { name: "Customer Master Form", path: "/CustomerForm"},
         ],
       },
       /***SIMS Modules Menu Links */

@@ -2,6 +2,8 @@
 
 import React, { useState, useMemo } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+
 
 interface Item {
   code: string;
@@ -12,6 +14,7 @@ interface Item {
 }
 
 export default function ItemMasterPage() {
+  const router = useRouter();
   const [data] = useState<Item[]>([
     { code: "ITM-001", name: "Industrial Pump", category: "Machinery", uom: "Nos", status: "Active" },
     { code: "ITM-002", name: "Safety Helmet", category: "Safety Equipment", uom: "Nos", status: "Inactive" },
@@ -107,7 +110,8 @@ export default function ItemMasterPage() {
 
     {/* Add New Button */}
     <button
-      onClick={() => setIsModalOpen(true)}
+      
+      onClick={() => router.push("/ItemMasterForm")}
       className="bg-[#005F99] hover:bg-[#004a7a] active:scale-95 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all duration-200"
     >
       + Add New
