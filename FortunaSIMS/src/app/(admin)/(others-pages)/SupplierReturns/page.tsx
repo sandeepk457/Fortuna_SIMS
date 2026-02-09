@@ -4,6 +4,7 @@ import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 
+
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";

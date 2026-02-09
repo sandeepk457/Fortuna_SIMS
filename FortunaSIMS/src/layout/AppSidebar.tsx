@@ -98,7 +98,7 @@ const navItems: NavItem[] = [
           { name: "Cycle Count & Audit", path: "sims/inventory/audit" },
           { name: "Stock Reservation", path: "sims/inventory/reservation" },
           { name: "Smart Alerts", path: "sims/inventory/alerts" },
-          { name: "Stock Dashboard", path: "sims/inventory/stock-dashboard" },
+          { name: "Stock Dashboard", path: "/StockDashboard" },
         ],
       },
 {
