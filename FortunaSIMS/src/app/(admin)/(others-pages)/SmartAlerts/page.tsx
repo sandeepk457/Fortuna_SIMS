@@ -510,7 +510,7 @@ function AlertCard({
       </div>
 
       <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-        <span className="font-semibold">Tip:</span> Convert alerts into PR/Transfer/Discount workflows.
+        <span className="font-semibold">Insight:</span> Act early to prevent stockouts, avoid excess, and protect shelf life.
       </div>
     </div>
   );
