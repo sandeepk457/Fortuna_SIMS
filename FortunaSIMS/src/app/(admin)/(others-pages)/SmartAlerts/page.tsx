@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 /** Fortuna Theme (minimal accents) */
 const FORTUNA_RED = "#C8102E";
@@ -61,6 +62,7 @@ const inputBase =
   "focus:border-[rgba(0,95,153,0.45)] dark:bg-gray-950 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30";
 
 export default function StockAlertsDashboard() {
+  const router = useRouter();
   const today = todayISO();
   const whs: Warehouse[] = ["Vizag WH", "Hyderabad WH", "Chennai WH"];
 
@@ -206,6 +208,34 @@ export default function StockAlertsDashboard() {
       s === "OK" && "bg-green-100 text-green-700"
     );
 
+  const createAutoPR = (r: {
+    sku: string;
+    name: string;
+    uom: string;
+    unitCost: number;
+    minLevel: number;
+  }) => {
+    const payload = {
+      source: "smart-alerts",
+      createdAt: todayISO(),
+      items: [
+        {
+          item_id: r.sku,
+          item_description: r.name,
+          uom: r.uom,
+          requested_qty: String(r.minLevel),
+          estimated_unit_price: String(r.unitCost),
+        },
+      ],
+    };
+    try {
+      sessionStorage.setItem("auto_pr_draft", JSON.stringify(payload));
+    } catch {
+      // ignore storage errors and still navigate
+    }
+    router.push("/PurchaseRequisition?autopr=1");
+  };
+
   return (
     <div className="space-y-4">
       <PageBreadcrumb pageTitle="Stock Alerts" />
@@ -221,7 +251,7 @@ export default function StockAlertsDashboard() {
               </h2>
             </div>
             <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">
-              Module 2: Inventory & Warehouse Management (WMS) â€¢ Warehouse: {warehouse} â€¢ Expiry window: {expiryWindow} days
+              Module 2: Inventory & Warehouse Management (WMS) • Warehouse: {warehouse} • Expiry window: {expiryWindow} days
             </p>
           </div>
 
@@ -314,8 +344,8 @@ export default function StockAlertsDashboard() {
             accent={FORTUNA_BLUE}
             rows={understockRows.map((r) => ({
               key: r.sku,
-              title: `${r.sku} â€¢ ${r.name}`,
-              meta: `OnHand(${warehouse}): ${r.onHandSelected} ${r.uom} â€¢ Min: ${r.minLevel}`,
+              title: `${r.sku} • ${r.name}`,
+              meta: `OnHand(${warehouse}): ${r.onHandSelected} ${r.uom} • Min: ${r.minLevel}`,
               right: inr(r.valueSelected),
             }))}
             emptyText="No understock alerts for current filters."
@@ -325,8 +355,8 @@ export default function StockAlertsDashboard() {
             accent={FORTUNA_BLUE}
             rows={overstockRows.map((r) => ({
               key: r.sku,
-              title: `${r.sku} â€¢ ${r.name}`,
-              meta: `OnHand(${warehouse}): ${r.onHandSelected} ${r.uom} â€¢ Max: ${r.maxLevel}`,
+              title: `${r.sku} • ${r.name}`,
+              meta: `OnHand(${warehouse}): ${r.onHandSelected} ${r.uom} • Max: ${r.maxLevel}`,
               right: inr(r.valueSelected),
             }))}
             emptyText="No overstock alerts for current filters."
@@ -336,8 +366,8 @@ export default function StockAlertsDashboard() {
             accent={FORTUNA_RED}
             rows={expiryRows.map((r) => ({
               key: r.sku,
-              title: `${r.sku} â€¢ ${r.name}`,
-              meta: `Expiry: ${r.expiryDate} â€¢ Days: ${r.daysToExpiry}`,
+              title: `${r.sku} • ${r.name}`,
+              meta: `Expiry: ${r.expiryDate} • Days: ${r.daysToExpiry}`,
               right: inr(r.valueSelected),
             }))}
             emptyText="No expiry alerts for current filters."
@@ -383,7 +413,7 @@ export default function StockAlertsDashboard() {
                       <td className="px-4 py-3">
                         <div className="font-semibold text-gray-900 dark:text-white">{r.name}</div>
                         <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                          Cost: {inr(r.unitCost)} â€¢ UOM: {r.uom}
+                          Cost: {inr(r.unitCost)} • UOM: {r.uom}
                         </div>
                       </td>
                       <td className="px-4 py-3">{r.category}</td>
@@ -404,12 +434,15 @@ export default function StockAlertsDashboard() {
                           <button
                             className="font-semibold hover:underline"
                             style={{ color: FORTUNA_BLUE }}
-                            onClick={() => alert(`Next: Create Alert Action for ${r.sku}`)}
+                            onClick={() => createAutoPR(r)}
                           >
                             Create Action
                           </button>
                         ) : (
-                          <button className="font-semibold text-blue-600 hover:underline" onClick={() => alert(`Open SKU Details for ${r.sku}`)}>
+                          <button
+                            className="font-semibold text-blue-600 hover:underline"
+                            onClick={() => router.push("/WarehouseLayout")}
+                          >
                             View
                           </button>
                         )}

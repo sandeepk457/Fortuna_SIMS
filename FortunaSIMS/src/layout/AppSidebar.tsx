@@ -93,7 +93,7 @@ const navItems: NavItem[] = [
           },
           
           { name: "Stock Transfer", path: "sims/inventory/transfer" },
-          { name: "Warehouse Layout", path: "sims/inventory/layout" },
+          { name: "Warehouse Layout", path: "/WarehouseLayout" },
           { name: "Batch & Serial Tracking", path: "sims/inventory/batch-tracking" },
           { name: "Cycle Count & Audit", path: "sims/inventory/audit" },
           { name: "Stock Reservation", path: "sims/inventory/reservation" },

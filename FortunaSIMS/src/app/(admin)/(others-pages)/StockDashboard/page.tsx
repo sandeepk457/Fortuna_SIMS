@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 /** Fortuna Theme (minimal accents) */
@@ -71,6 +72,7 @@ const inputBase =
   "focus:border-[rgba(0,95,153,0.45)] dark:bg-gray-950 dark:border-gray-800 dark:text-white/90 dark:placeholder:text-white/30";
 
 export default function StockDashboardCorporateV2() {
+  const router = useRouter();
   const today = todayISO();
   const whs: Warehouse[] = ["Vizag WH", "Hyderabad WH", "Chennai WH"];
 
@@ -277,6 +279,34 @@ export default function StockDashboardCorporateV2() {
       s === "Out" && "bg-rose-100 text-rose-700"
     );
 
+  const createAutoPR = (r: {
+    sku: string;
+    name: string;
+    uom: string;
+    unitCost: number;
+    reorderLevel: number;
+  }) => {
+    const payload = {
+      source: "stock-dashboard",
+      createdAt: todayISO(),
+      items: [
+        {
+          item_id: r.sku,
+          item_description: r.name,
+          uom: r.uom,
+          requested_qty: String(r.reorderLevel),
+          estimated_unit_price: String(r.unitCost),
+        },
+      ],
+    };
+    try {
+      sessionStorage.setItem("auto_pr_draft", JSON.stringify(payload));
+    } catch {
+      // ignore storage errors and still navigate
+    }
+    router.push("/PurchaseRequisition?autopr=1");
+  };
+
   return (
     <div className="space-y-4">
       <PageBreadcrumb pageTitle="Stock Dashboard" />
@@ -477,12 +507,15 @@ export default function StockDashboardCorporateV2() {
                             <button
                               className="font-semibold hover:underline"
                               style={{ color: FORTUNA_BLUE }}
-                              onClick={() => alert(`Next: Create PR for ${r.sku}`)}
+                              onClick={() => createAutoPR(r)}
                             >
                               Create PR
                             </button>
                           ) : (
-                            <button className="font-semibold text-blue-600 hover:underline" onClick={() => alert(`Open SKU Details for ${r.sku}`)}>
+                            <button
+                              className="font-semibold text-blue-600 hover:underline"
+                              onClick={() => router.push("/WarehouseLayout")}
+                            >
                               View
                             </button>
                           )}

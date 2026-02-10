@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 /** Fortuna Theme Colors */
@@ -186,6 +187,7 @@ const initialState: PRFormState = {
 };
 
 export default function PurchaseRequisitionCreatePage() {
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<PRFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -212,6 +214,51 @@ export default function PurchaseRequisitionCreatePage() {
       total_estimated_cost: totals.total_estimated_cost,
     }));
   }, [totals.estimated_pr_value, totals.total_estimated_cost]);
+
+  /** Auto-PR from Smart Alerts */
+  useEffect(() => {
+    const flag = searchParams.get("autopr");
+    if (!flag) return;
+
+    try {
+      const raw = sessionStorage.getItem("auto_pr_draft");
+      if (!raw) return;
+      const data = JSON.parse(raw);
+
+      if (!data?.items?.length) return;
+
+      const autoItems: PRItemLine[] = data.items.map((it: any) => {
+        const requested_qty = String(it.requested_qty ?? "");
+        const estimated_unit_price = String(it.estimated_unit_price ?? "");
+        const q = toNum(requested_qty);
+        const p = toNum(estimated_unit_price);
+        const qty = Number.isFinite(q) && q > 0 ? q : 0;
+        const price = Number.isFinite(p) && p >= 0 ? p : 0;
+        return {
+          pr_item_id: uuidLike("PRITEM"),
+          item_type: "Inventory",
+          item_id: String(it.item_id ?? ""),
+          item_description: String(it.item_description ?? ""),
+          uom: String(it.uom ?? ""),
+          requested_qty,
+          estimated_unit_price,
+          estimated_total_cost: qty * price,
+          required_by_date: todayISO(),
+          preferred_vendor: "",
+        };
+      });
+
+      setForm((p) => ({
+        ...p,
+        justification: p.justification || "Auto PR from Smart Alerts.",
+        items: autoItems,
+      }));
+      setActiveTab("items");
+      sessionStorage.removeItem("auto_pr_draft");
+    } catch {
+      // ignore malformed payload
+    }
+  }, [searchParams]);
 
   /** Validations */
   const errors = useMemo(() => {
