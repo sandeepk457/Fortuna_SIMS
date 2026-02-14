@@ -78,7 +78,8 @@ const navItems: NavItem[] = [
       {
         name: "Inventory & (WMS)",
         subItems: [
-          { name: "Goods Inward", path: "sims/inventory/inward" },
+          { name: "Goods Inward / Receive", path: "/GoodsInwardList" },
+          // { name: "Goods Inward Form", path: "/GoodsInwardForm" },
           { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
           {
             name: "Returns",
@@ -120,7 +121,7 @@ const navItems: NavItem[] = [
           { name: "Sales Order (SO)", path: "/sales/orders" },
           { name: "Dispatch Planning", path: "/sales/dispatch" },
           { name: "Invoicing", path: "/sales/invoice" },
-          { name: "Returns Management", path: "/sales/returns" },
+          // { name: "Returns Management", path: "/sales/returns" },
   ]
 },
 
