@@ -96,7 +96,43 @@ const navItems: NavItem[] = [
           { name: "Stock Transfer", path: "sims/inventory/transfer" },
           { name: "Warehouse Layout", path: "/WarehouseLayout" },
           { name: "Batch & Serial Tracking", path: "sims/inventory/batch-tracking" },
-          { name: "Cycle Count & Audit", path: "sims/inventory/audit" },
+          // { name: "Cycle Count & Audit", path: "/CycleCount" },
+          {
+  name: "Cycle Count & Audit",
+  subItems: [
+    { name: "CCP List", path: "/CycleCountList" },
+    { 
+      name: "New CC Plan", 
+      path: "/NewCCPForm" 
+    },
+    { 
+      name: "CCP Assignment", 
+      path: "/CCPAssignment" 
+    },
+    { 
+      name: "Count Execution", 
+      path: "/sims/inventory/cycle-count/execution" 
+    },
+    { 
+      name: "Recount Queue", 
+      path: "/sims/inventory/cycle-count/recount" 
+    },
+    { 
+      name: "Reconciliation & Variance", 
+      path: "/sims/inventory/cycle-count/reconciliation" 
+    },
+    { 
+      name: "CCP Approvals", 
+      path: "/sims/inventory/cycle-count/approvals" 
+    },
+    { 
+      name: "Stock Adjustment Posting", 
+      path: "/sims/inventory/cycle-count/posting" 
+    },
+    
+  ],
+},
+
           // { name: "Stock Reservation", path: "sims/inventory/reservation" },
           { name: "Smart Alerts", path: "/SmartAlerts" },
           { name: "Stock Dashboard", path: "/StockDashboard" },
@@ -160,6 +196,7 @@ const navItems: NavItem[] = [
           { name: "Sales Reports", path: "sims/reports/sales" },
           { name: "Logistics Reports", path: "sims/reports/logistics" },
           { name: "Executive MIS Dashboard", path: "sims/reports/mis" },
+          { name: "Cycle Count Reports", path: "/sims/inventory/cycle-count/reports"},
         ],
       },
     ],
