@@ -115,7 +115,7 @@ const navItems: NavItem[] = [
     },
     { 
       name: "Recount Queue", 
-      path: "/sims/inventory/cycle-count/recount" 
+      path: "/RecountQueue" 
     },
     { 
       name: "Reconciliation & Variance", 
