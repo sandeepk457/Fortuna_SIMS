@@ -738,7 +738,7 @@ export default function CCPAssignmentPage() {
                             </div>
                           </div>
 
-                          <div className="mt-3 rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                          {/* <div className="mt-3 rounded-xl border border-gray-200 p-3 flex items-center justify-between">
                             <div>
                               <div className="text-sm font-semibold text-gray-800">Include Mobile Push</div>
                               <div className={helperBase}>Phase-2: push notification integration.</div>
@@ -751,7 +751,7 @@ export default function CCPAssignmentPage() {
                               }
                               className="h-4 w-4"
                             />
-                          </div>
+                          </div> */}
 
                           <div className="mt-3">
                             <label className={labelBase}>Remarks (Optional)</label>
