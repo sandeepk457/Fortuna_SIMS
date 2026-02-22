@@ -119,7 +119,7 @@ const navItems: NavItem[] = [
     },
     { 
       name: "Reconciliation & Variance", 
-      path: "/sims/inventory/cycle-count/reconciliation" 
+      path: "/Reconciliation&Variance" 
     },
     { 
       name: "CCP Approvals", 
