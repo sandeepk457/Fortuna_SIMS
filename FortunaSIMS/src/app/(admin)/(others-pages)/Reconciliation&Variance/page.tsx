@@ -3,118 +3,209 @@
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
-/** Fortuna Theme */
+/** ===== Fortuna Theme ===== */
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
 
-/** Masters */
-const QUEUE_STATUS = ["New", "Assigned", "In-Recount", "Resolved", "Closed"];
+/** ===== Fix for Top App Header overlap (put your real value) ===== */
+const APP_TOPBAR_H = 74; // adjust 64/72/74 based on your layout
 
-// Severity for UI / SLA priority
-const SEVERITY = ["Low", "Medium", "High"];
+/** ===== Tabs ===== */
+type TabKey = "variance" | "reconciliation" | "recount";
 
-// Business thresholds (Phase-1 demo)
-const DEFAULT_THRESHOLDS = {
-  absVarianceQty: 10, // >= 10 qty variance => queue
-  variancePct: 2, // >= 2% => queue
-};
+/** ===== Masters ===== */
+const PLAN_STATUS = [
+  "Draft",
+  "Planned",
+  "Counting In-Progress",
+  "Awaiting Approval",
+  "Approved",
+  "Posted",
+  "Cancelled",
+] as const;
 
 const WAREHOUSES = [
   { id: "WH-001", name: "Vizag Central WH" },
   { id: "WH-002", name: "Hyderabad WH" },
   { id: "WH-003", name: "Chennai WH" },
-];
+] as const;
 
-const USERS = [
-  { id: "U-001", name: "Ravi", mobile: "9xxxx11111", wh: ["WH-001", "WH-002"], role: "Supervisor" },
-  { id: "U-002", name: "Kiran", mobile: "9xxxx22222", wh: ["WH-001"], role: "Counter" },
-  { id: "U-003", name: "Aparna", mobile: "9xxxx33333", wh: ["WH-001", "WH-003"], role: "Counter" },
-  { id: "U-004", name: "Suresh", mobile: "9xxxx44444", wh: ["WH-002"], role: "Counter" },
-  { id: "U-005", name: "Divya", mobile: "9xxxx55555", wh: ["WH-003"], role: "Counter" },
-];
+type PlanStatus = (typeof PLAN_STATUS)[number];
 
-/** Demo data */
-const SAMPLE_RECOUNT_QUEUE = [
+type CountPlan = {
+  plan_id: string;
+  plan_no: string;
+  plan_type: "Cycle Count" | "Physical Audit";
+  count_mode: "Blind" | "Guided";
+  warehouse_id: string;
+  scheduled_date: string;
+  status: PlanStatus;
+  scope_type: "BIN" | "ITEM";
+  scope_summary: string;
+  sku_count: number;
+};
+
+type VarianceLine = {
+  line_id: string;
+  plan_id: string;
+  plan_no: string;
+  warehouse_id: string;
+
+  scope_ref: string; // BIN/RACK/ITEM reference
+  item_id: string;
+  item_desc: string;
+  uom: string;
+
+  system_qty: number; // book
+  counted_qty: number; // physical
+  variance_qty: number; // counted - system
+  variance_pct: number; // abs(variance)/system *100 (system 0 => 100 if variance !=0)
+
+  threshold_exceeded: boolean;
+
+  recount_required: boolean; // derived / user override
+  recount_status: "Queued" | "In Progress" | "Completed" | "Not Required";
+
+  reconciliation_status: "Pending" | "Accepted" | "Adjusted" | "Rejected";
+  reconciliation_action: "Accept Count" | "Adjust Stock" | "Reject Count" | "";
+  reconciliation_remarks: string;
+
+  last_updated: string;
+};
+
+/** ===== Demo Plans ===== */
+const SAMPLE_PLANS: CountPlan[] = [
   {
-    rq_id: "RQ-UUID-0001",
-    rq_no: "RQ-2026-0004",
-    plan_no: "CC-2026-0008",
-    task_id: "CCT-0007",
-    warehouse_id: "WH-001",
-    scope_type: "BIN",
-    scope_summary: "Z-B-01-01 → Z-B-01-05",
+    plan_id: "CCP-UUID-0001",
+    plan_no: "CC-2026-0007",
+    plan_type: "Cycle Count",
     count_mode: "Blind",
-    original_counter_id: "U-002",
-    sku_count: 12,
-    variance_qty: -18,
-    abs_variance: 18,
-    variance_pct: 3.2,
-    severity: "High",
-    status: "Assigned",
-    due_date: "2026-02-20",
-    last_activity: "2026-02-19 13:10",
-    created_reason: "Abs variance threshold exceeded",
-    supervisor_notes: "Random bin shows big mismatch. Assign recount with different counter.",
-    recount_team_ids: ["U-001", "U-003"],
-    audit_log: [
-      { at: "2026-02-19 13:11", by: "System", action: "Queue created (threshold exceeded)" },
-      { at: "2026-02-19 13:12", by: "Ravi", action: "Assigned recount team" },
-    ],
+    warehouse_id: "WH-002",
+    scheduled_date: "2026-02-14",
+    status: "Awaiting Approval",
+    scope_type: "BIN",
+    scope_summary: "Z-A-01-01 → Z-A-01-10",
+    sku_count: 42,
   },
   {
-    rq_id: "RQ-UUID-0002",
-    rq_no: "RQ-2026-0005",
-    plan_no: "CC-2026-0007",
-    task_id: "CCT-0002",
-    warehouse_id: "WH-002",
+    plan_id: "CCP-UUID-0002",
+    plan_no: "CC-2026-0006",
+    plan_type: "Cycle Count",
+    count_mode: "Guided",
+    warehouse_id: "WH-001",
+    scheduled_date: "2026-02-10",
+    status: "Awaiting Approval",
     scope_type: "ITEM",
     scope_summary: "FAST MOVING (A-class)",
-    count_mode: "Guided",
-    original_counter_id: "U-004",
-    sku_count: 8,
-    variance_qty: -5,
-    abs_variance: 5,
-    variance_pct: 2.6,
-    severity: "Medium",
-    status: "New",
-    due_date: "",
-    last_activity: "2026-02-19 16:40",
-    created_reason: "Variance % threshold exceeded",
-    supervisor_notes: "",
-    recount_team_ids: [],
-    audit_log: [{ at: "2026-02-19 16:40", by: "System", action: "Queue created (variance % exceeded)" }],
+    sku_count: 18,
   },
   {
-    rq_id: "RQ-UUID-0003",
-    rq_no: "RQ-2026-0006",
+    plan_id: "CCP-UUID-0003",
     plan_no: "PA-2026-0005",
-    task_id: "PAT-0011",
-    warehouse_id: "WH-003",
-    scope_type: "BIN",
-    scope_summary: "Dock Area Bins",
+    plan_type: "Physical Audit",
     count_mode: "Blind",
-    original_counter_id: "U-005",
-    sku_count: 20,
-    variance_qty: 0,
-    abs_variance: 0,
-    variance_pct: 0,
-    severity: "Low",
-    status: "Resolved",
-    due_date: "2026-02-18",
-    last_activity: "2026-02-18 11:05",
-    created_reason: "Supervisor flagged (manual)",
-    supervisor_notes: "Manual recount requested for audit sampling.",
-    recount_team_ids: ["U-001", "U-005"],
-    audit_log: [
-      { at: "2026-02-17 18:00", by: "Ravi", action: "Manual flag → Recount queue created" },
-      { at: "2026-02-18 10:00", by: "Divya", action: "Recount completed" },
-      { at: "2026-02-18 11:05", by: "Ravi", action: "Resolved (variance acceptable)" },
-    ],
+    warehouse_id: "WH-003",
+    scheduled_date: "2026-01-28",
+    status: "Posted",
+    scope_type: "BIN",
+    scope_summary: "Full WH",
+    sku_count: 220,
   },
 ];
 
-/** Helpers */
-function classNames(...v) {
+/** ===== Demo Variance Lines =====
+ * Rule: threshold_exceeded => auto recount queue
+ * Threshold can be changed in UI (default 5%)
+ */
+const SAMPLE_VARIANCES: VarianceLine[] = [
+  {
+    line_id: "VL-0001",
+    plan_id: "CCP-UUID-0001",
+    plan_no: "CC-2026-0007",
+    warehouse_id: "WH-002",
+    scope_ref: "BIN Z-A-01-03",
+    item_id: "SKU-10021",
+    item_desc: "HDPE Bottle 1L",
+    uom: "Nos",
+    system_qty: 1200,
+    counted_qty: 1120,
+    variance_qty: -80,
+    variance_pct: 6.67,
+    threshold_exceeded: true,
+    recount_required: true,
+    recount_status: "Queued",
+    reconciliation_status: "Pending",
+    reconciliation_action: "",
+    reconciliation_remarks: "",
+    last_updated: "2026-02-18",
+  },
+  {
+    line_id: "VL-0002",
+    plan_id: "CCP-UUID-0001",
+    plan_no: "CC-2026-0007",
+    warehouse_id: "WH-002",
+    scope_ref: "BIN Z-A-01-04",
+    item_id: "SKU-33011",
+    item_desc: "Carton Box 5-ply",
+    uom: "Nos",
+    system_qty: 500,
+    counted_qty: 498,
+    variance_qty: -2,
+    variance_pct: 0.4,
+    threshold_exceeded: false,
+    recount_required: false,
+    recount_status: "Not Required",
+    reconciliation_status: "Pending",
+    reconciliation_action: "",
+    reconciliation_remarks: "",
+    last_updated: "2026-02-18",
+  },
+  {
+    line_id: "VL-0003",
+    plan_id: "CCP-UUID-0002",
+    plan_no: "CC-2026-0006",
+    warehouse_id: "WH-001",
+    scope_ref: "ITEM FAST MOVING",
+    item_id: "SKU-77801",
+    item_desc: "Detergent Powder 10kg",
+    uom: "Bag",
+    system_qty: 80,
+    counted_qty: 70,
+    variance_qty: -10,
+    variance_pct: 12.5,
+    threshold_exceeded: true,
+    recount_required: true,
+    recount_status: "In Progress",
+    reconciliation_status: "Pending",
+    reconciliation_action: "",
+    reconciliation_remarks: "",
+    last_updated: "2026-02-18",
+  },
+  {
+    line_id: "VL-0004",
+    plan_id: "CCP-UUID-0002",
+    plan_no: "CC-2026-0006",
+    warehouse_id: "WH-001",
+    scope_ref: "ITEM FAST MOVING",
+    item_id: "SKU-88910",
+    item_desc: "Hand Gloves - Medium",
+    uom: "Pair",
+    system_qty: 0,
+    counted_qty: 15,
+    variance_qty: 15,
+    variance_pct: 100,
+    threshold_exceeded: true,
+    recount_required: true,
+    recount_status: "Queued",
+    reconciliation_status: "Pending",
+    reconciliation_action: "",
+    reconciliation_remarks: "",
+    last_updated: "2026-02-18",
+  },
+];
+
+/** ===== UI helpers ===== */
+function classNames(...v: Array<string | false | undefined | null>) {
   return v.filter(Boolean).join(" ");
 }
 
@@ -131,57 +222,39 @@ const primaryBtn =
 const outlineBtn =
   "inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition active:scale-95";
 
-function whName(whId) {
-  return WAREHOUSES.find((w) => w.id === whId)?.name || whId;
-}
-
-function userName(uid) {
-  return USERS.find((u) => u.id === uid)?.name || uid;
-}
-
-function userLabel(uid) {
-  const u = USERS.find((x) => x.id === uid);
-  if (!u) return uid;
-  return `${u.name} • ${u.id}`;
-}
-
-/** Pills */
-function StatusPill({ status }) {
+function StatusPill({ status }: { status: string }) {
   const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
   const cls =
-    status === "New"
-      ? "bg-gray-100 text-gray-700"
-      : status === "Assigned"
-      ? "bg-blue-50 text-blue-700"
-      : status === "In-Recount"
+    status === "Awaiting Approval"
+      ? "bg-purple-50 text-purple-700"
+      : status === "Counting In-Progress"
       ? "bg-amber-50 text-amber-800"
-      : status === "Resolved"
+      : status === "Approved"
       ? "bg-green-50 text-green-700"
-      : status === "Closed"
-      ? "bg-rose-50 text-rose-700"
+      : status === "Posted"
+      ? "bg-emerald-50 text-emerald-700"
+      : status === "Draft"
+      ? "bg-gray-100 text-gray-700"
       : "bg-gray-100 text-gray-700";
-
   return <span className={classNames(base, cls)}>{status}</span>;
 }
 
-function SeverityPill({ severity }) {
+function MiniPill({ text, tone }: { text: string; tone: "red" | "blue" | "amber" | "green" | "gray" }) {
   const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
   const cls =
-    severity === "Low"
-      ? "bg-gray-100 text-gray-700"
-      : severity === "Medium"
+    tone === "red"
+      ? "bg-rose-50 text-rose-700"
+      : tone === "blue"
+      ? "bg-blue-50 text-blue-700"
+      : tone === "amber"
       ? "bg-amber-50 text-amber-800"
-      : "bg-rose-50 text-rose-700";
-  return <span className={classNames(base, cls)}>{severity}</span>;
+      : tone === "green"
+      ? "bg-green-50 text-green-700"
+      : "bg-gray-100 text-gray-700";
+  return <span className={classNames(base, cls)}>{text}</span>;
 }
 
-function ModePill({ mode }) {
-  const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
-  const cls = mode === "Blind" ? "bg-gray-100 text-gray-700" : "bg-emerald-50 text-emerald-700";
-  return <span className={classNames(base, cls)}>{mode} Mode</span>;
-}
-
-function SummaryRow({ label, value }) {
+function SummaryRow({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-gray-600">{label}</span>
@@ -190,7 +263,45 @@ function SummaryRow({ label, value }) {
   );
 }
 
-function StatLine({ label, value, pillBg }) {
+/** ===== Quick Stats Card (Right Panel) ===== */
+function QuickStatsCard({
+  stats,
+}: {
+  stats: {
+    total: number;
+    pendingRecon: number;
+    thresholdExceeded: number;
+    recountQueued: number;
+    recountInProgress: number;
+    netVariance: number;
+  };
+}) {
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-gray-800">Quick Stats</h3>
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_PRIMARY_RED }} />
+      </div>
+
+      <div className="mt-4 space-y-3 text-sm">
+        <StatLine label="Total Variance Lines" value={stats.total} pillBg="#E8F0FE" />
+        <StatLine label="Reconciliation Pending" value={stats.pendingRecon} pillBg="#F1E9FF" />
+        <div className="my-3 border-t border-gray-100" />
+        <StatLine label="Threshold Exceeded" value={stats.thresholdExceeded} pillBg="#FFF3D6" />
+        <StatLine label="Recount Queued" value={stats.recountQueued} pillBg="#FFE8EC" />
+        <StatLine label="Recount In-Progress" value={stats.recountInProgress} pillBg="#E8F0FE" />
+        <div className="my-3 border-t border-gray-100" />
+        <StatLine label="Net Variance Qty" value={stats.netVariance} pillBg="#EEF2F7" />
+
+        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
+          <span className="font-semibold">Note:</span> Filters apply to stats + export.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatLine({ label, value, pillBg }: { label: string; value: number | string; pillBg: string }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-gray-700">{label}</span>
@@ -201,322 +312,257 @@ function StatLine({ label, value, pillBg }) {
   );
 }
 
-/** Quick stats (right panel) */
-function QuickStatsCard({ stats }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-800">Quick Stats</h3>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_PRIMARY_RED }} />
-      </div>
+/** ===== Main Page ===== */
+export default function ReconciliationVariancePage() {
+  const [activeTab, setActiveTab] = useState<TabKey>("variance");
 
-      <div className="mt-4 space-y-3 text-sm">
-        <StatLine label="Total Records" value={stats.total} pillBg="#E8F0FE" />
-        <div className="my-3 border-t border-gray-100" />
+  const [plans] = useState<CountPlan[]>(SAMPLE_PLANS);
+  const [lines, setLines] = useState<VarianceLine[]>(SAMPLE_VARIANCES);
 
-        {QUEUE_STATUS.map((s) => (
-          <StatLine
-            key={s}
-            label={s}
-            value={stats.byStatus[s] || 0}
-            pillBg={
-              s === "New"
-                ? "#EEF2F7"
-                : s === "Assigned"
-                ? "#E8F0FE"
-                : s === "In-Recount"
-                ? "#FFF3D6"
-                : s === "Resolved"
-                ? "#E8F7EF"
-                : "#FFE8EC"
-            }
-          />
-        ))}
+  // filters
+  const [warehouse, setWarehouse] = useState<string>("All");
+  const [plan, setPlan] = useState<string>("All");
+  const [search, setSearch] = useState<string>("");
 
-        <div className="my-3 border-t border-gray-100" />
-        <StatLine label="High Severity" value={stats.high} pillBg="#FFE8EC" />
-        <StatLine label="Open (New+Assigned+In-Recount)" value={stats.open} pillBg="#FFF3D6" />
+  // recount threshold
+  const [thresholdPct, setThresholdPct] = useState<string>("5"); // default 5%
 
-        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-          <span className="font-semibold">Tip:</span> Filters apply to stats + export.
-        </div>
-      </div>
-    </div>
-  );
-}
+  // pagination
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10);
 
-/** MAIN PAGE */
-export default function RecountQueuePage() {
-  const [rows, setRows] = useState(SAMPLE_RECOUNT_QUEUE);
+  // modal (detail)
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
+  const [activeLineId, setActiveLineId] = useState<string>("");
 
-  // Filters
-  const [search, setSearch] = useState("");
-  const [warehouse, setWarehouse] = useState("All");
-  const [status, setStatus] = useState("All");
-  const [severity, setSeverity] = useState("All");
+  const whName = (whId: string) => WAREHOUSES.find((w) => w.id === whId)?.name || whId;
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage, setItemsPerPage] = useState(10);
+  const thresholdNumber = useMemo(() => {
+    const n = Number(thresholdPct);
+    return Number.isFinite(n) && n >= 0 ? n : 5;
+  }, [thresholdPct]);
 
-  // Thresholds (Phase-1 control)
-  const [thresholds, setThresholds] = useState(DEFAULT_THRESHOLDS);
+  /** Derived: recompute threshold_exceeded & auto queue flags (demo) */
+  const computedLines = useMemo(() => {
+    return lines.map((l) => {
+      const exceeded = Math.abs(l.variance_pct) >= thresholdNumber;
+      const recountRequired = exceeded ? true : l.recount_required;
 
-  // Modal
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [active, setActive] = useState(null);
+      // if exceeded, ensure in queue unless already completed/not required
+      let recountStatus = l.recount_status;
+      if (exceeded && (recountStatus === "Not Required")) recountStatus = "Queued";
+      if (!exceeded && recountStatus !== "Completed") {
+        // keep user's manual state; we won't force Not Required here
+      }
 
-  // Modal state
-  const [teamSearch, setTeamSearch] = useState("");
-  const [edit, setEdit] = useState({
-    due_date: "",
-    recount_team_ids: [],
-    supervisor_notes: "",
-    status: "New",
-  });
+      return {
+        ...l,
+        threshold_exceeded: exceeded,
+        recount_required: recountRequired,
+        recount_status: recountStatus,
+      };
+    });
+  }, [lines, thresholdNumber]);
 
-  /** Derived filtered list */
-  const filtered = useMemo(() => {
+  /** Filtered list */
+  const filteredLines = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
+
+    return computedLines.filter((l) => {
+      const byWh = warehouse === "All" ? true : l.warehouse_id === warehouse;
+      const byPlan = plan === "All" ? true : l.plan_id === plan;
+
       const bySearch =
         !q ||
-        (r.rq_no || "").toLowerCase().includes(q) ||
-        (r.plan_no || "").toLowerCase().includes(q) ||
-        (r.task_id || "").toLowerCase().includes(q) ||
-        (r.scope_summary || "").toLowerCase().includes(q);
+        l.plan_no.toLowerCase().includes(q) ||
+        l.item_id.toLowerCase().includes(q) ||
+        l.item_desc.toLowerCase().includes(q) ||
+        l.scope_ref.toLowerCase().includes(q);
 
-      const byWh = warehouse === "All" ? true : r.warehouse_id === warehouse;
-      const bySt = status === "All" ? true : r.status === status;
-      const bySev = severity === "All" ? true : r.severity === severity;
-
-      return bySearch && byWh && bySt && bySev;
+      // tab-specific constraints
+      if (activeTab === "recount") {
+        // show only queued/in-progress/completed recount-required
+        return byWh && byPlan && bySearch && l.recount_required === true;
+      }
+      if (activeTab === "reconciliation") {
+        // reconciliation relevant = pending/needs action
+        return byWh && byPlan && bySearch;
+      }
+      // variance tab: all
+      return byWh && byPlan && bySearch;
     });
-  }, [rows, search, warehouse, status, severity]);
+  }, [computedLines, warehouse, plan, search, activeTab]);
 
-  /** Quick stats */
+  /** Stats */
   const quickStats = useMemo(() => {
-    const byStatus = {};
-    let high = 0;
-    let open = 0;
-
-    filtered.forEach((r) => {
-      byStatus[r.status] = (byStatus[r.status] || 0) + 1;
-      if (r.severity === "High") high += 1;
-      if (["New", "Assigned", "In-Recount"].includes(r.status)) open += 1;
+    const base = computedLines.filter((l) => {
+      const byWh = warehouse === "All" ? true : l.warehouse_id === warehouse;
+      const byPlan = plan === "All" ? true : l.plan_id === plan;
+      const q = search.trim().toLowerCase();
+      const bySearch =
+        !q ||
+        l.plan_no.toLowerCase().includes(q) ||
+        l.item_id.toLowerCase().includes(q) ||
+        l.item_desc.toLowerCase().includes(q) ||
+        l.scope_ref.toLowerCase().includes(q);
+      return byWh && byPlan && bySearch;
     });
 
-    return { total: filtered.length, byStatus, high, open };
-  }, [filtered]);
+    const pendingRecon = base.filter((x) => x.reconciliation_status === "Pending").length;
+    const thresholdExceeded = base.filter((x) => x.threshold_exceeded).length;
+    const recountQueued = base.filter((x) => x.recount_status === "Queued").length;
+    const recountInProgress = base.filter((x) => x.recount_status === "In Progress").length;
+    const netVariance = base.reduce((s, x) => s + Number(x.variance_qty || 0), 0);
+
+    return {
+      total: base.length,
+      pendingRecon,
+      thresholdExceeded,
+      recountQueued,
+      recountInProgress,
+      netVariance,
+    };
+  }, [computedLines, warehouse, plan, search]);
 
   /** Pagination */
-  const totalPages = Math.ceil(filtered.length / itemsPerPage);
-  const paginated = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const totalPages = Math.ceil(filteredLines.length / itemsPerPage);
+  const paginated = filteredLines.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
-  /** Export */
+  /** Actions */
+  const openLine = (id: string) => {
+    setActiveLineId(id);
+    setIsModalOpen(true);
+  };
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setActiveLineId("");
+  };
+
+  const activeLine = useMemo(() => computedLines.find((l) => l.line_id === activeLineId), [computedLines, activeLineId]);
+
+  const updateLine = (id: string, patch: Partial<VarianceLine>) => {
+    setLines((prev) => prev.map((x) => (x.line_id === id ? { ...x, ...patch, last_updated: todayISO() } : x)));
+  };
+
   const exportToCSV = () => {
     const header = [
-      "RQ No",
       "Plan No",
-      "Task ID",
       "Warehouse",
-      "Scope Type",
-      "Scope Summary",
-      "Mode",
-      "SKU Count",
+      "Scope Ref",
+      "Item",
+      "System Qty",
+      "Counted Qty",
       "Variance Qty",
-      "Abs Variance",
       "Variance %",
-      "Severity",
-      "Status",
-      "Due Date",
-      "Recount Team",
-      "Last Activity",
-      "Created Reason",
+      "Threshold Exceeded",
+      "Recount Status",
+      "Reconciliation Status",
+      "Reconciliation Action",
+      "Remarks",
     ];
 
-    const rowsCsv = filtered.map((r) =>
+    const rows = filteredLines.map((l) =>
       [
-        r.rq_no,
-        r.plan_no,
-        r.task_id,
-        r.warehouse_id,
-        r.scope_type,
-        (r.scope_summary || "").replaceAll(",", " "),
-        r.count_mode,
-        String(r.sku_count || 0),
-        String(r.variance_qty || 0),
-        String(r.abs_variance || 0),
-        String(r.variance_pct || 0),
-        r.severity,
-        r.status,
-        r.due_date || "",
-        (r.recount_team_ids || []).map((id) => userName(id)).join("|"),
-        r.last_activity,
-        (r.created_reason || "").replaceAll(",", " "),
+        l.plan_no,
+        l.warehouse_id,
+        l.scope_ref,
+        l.item_id,
+        l.system_qty,
+        l.counted_qty,
+        l.variance_qty,
+        l.variance_pct,
+        l.threshold_exceeded ? "Yes" : "No",
+        l.recount_status,
+        l.reconciliation_status,
+        l.reconciliation_action,
+        (l.reconciliation_remarks || "").replaceAll(",", " "),
       ].join(",")
     );
 
-    const csvContent = [header.join(","), ...rowsCsv].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const csv = [header.join(","), ...rows].join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
 
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "recount-queue.csv";
-    link.click();
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "cycle-count-reconciliation-variance.csv";
+    a.click();
   };
 
-  /** Auto create queue (demo) */
-  const autoGenerateDemoQueue = () => {
-    // This simulates system creating a new queue entry when thresholds exceed.
-    const demo = {
-      rq_id: `RQ-UUID-${Math.random().toString(16).slice(2, 6).toUpperCase()}`,
-      rq_no: `RQ-2026-${String(Math.floor(Math.random() * 9000) + 1000)}`,
-      plan_no: "CC-2026-0010",
-      task_id: `CCT-${String(Math.floor(Math.random() * 90) + 10).padStart(4, "0")}`,
-      warehouse_id: "WH-001",
-      scope_type: "BIN",
-      scope_summary: "Z-A-01-06 → Z-A-01-10",
-      count_mode: "Blind",
-      original_counter_id: "U-003",
-      sku_count: 10,
-      variance_qty: -12,
-      abs_variance: 12,
-      variance_pct: 2.4,
-      severity: "High",
-      status: "New",
-      due_date: "",
-      last_activity: "2026-02-21 10:15",
-      created_reason: `Auto: Abs≥${thresholds.absVarianceQty} or %≥${thresholds.variancePct}`,
-      supervisor_notes: "",
-      recount_team_ids: [],
-      audit_log: [{ at: "2026-02-21 10:15", by: "System", action: "Queue created (demo trigger)" }],
-    };
-
-    // basic rule check
-    const eligible =
-      demo.abs_variance >= Number(thresholds.absVarianceQty) || demo.variance_pct >= Number(thresholds.variancePct);
-
-    if (!eligible) {
-      alert("Demo entry did not breach threshold. Adjust threshold and try again.");
-      return;
-    }
-
-    setRows((p) => [demo, ...p]);
-    alert("Recount Queue created (demo).");
-  };
-
-  /** Modal open/close */
-  const openModal = (r) => {
-    setActive(r);
-    setEdit({
-      due_date: r.due_date || "",
-      recount_team_ids: (r.recount_team_ids || []).slice(),
-      supervisor_notes: r.supervisor_notes || "",
-      status: r.status || "New",
-    });
-    setTeamSearch("");
-    setIsModalOpen(true);
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setActive(null);
-    setTeamSearch("");
-  };
-
-  /** Team selection inside modal (filtered by warehouse) */
-  const availableUsers = useMemo(() => {
-    const wh = active?.warehouse_id;
-    const base = wh ? USERS.filter((u) => u.wh.includes(wh)) : USERS;
-
-    const q = teamSearch.trim().toLowerCase();
-    if (!q) return base;
-
-    return base.filter(
-      (u) =>
-        u.name.toLowerCase().includes(q) ||
-        u.id.toLowerCase().includes(q) ||
-        u.mobile.toLowerCase().includes(q)
-    );
-  }, [active, teamSearch]);
-
-  const toggleTeam = (uid) => {
-    setEdit((p) => {
-      const exists = p.recount_team_ids.includes(uid);
-      return { ...p, recount_team_ids: exists ? p.recount_team_ids.filter((x) => x !== uid) : [...p.recount_team_ids, uid] };
-    });
-  };
-
-  /** Modal actions */
-  const save = () => {
-    if (!active) return;
-
-    // simple validation
-    if (["Assigned", "In-Recount"].includes(edit.status) && edit.recount_team_ids.length === 0) {
-      alert("Select at least one recount team member.");
-      return;
-    }
-
-    setRows((p) =>
-      p.map((r) => {
-        if (r.rq_id !== active.rq_id) return r;
-
-        const nowLog = { at: "2026-02-21 10:20", by: "Supervisor", action: `Saved: status=${edit.status}` };
-        return {
-          ...r,
-          due_date: edit.due_date,
-          recount_team_ids: edit.recount_team_ids,
-          supervisor_notes: edit.supervisor_notes,
-          status: edit.status,
-          last_activity: "2026-02-21 10:20",
-          audit_log: [...(r.audit_log || []), nowLog],
-        };
-      })
-    );
-
-    alert("Saved (demo).");
-    closeModal();
-  };
-
-  const setStatusAndSave = (nextStatus) => {
-    setEdit((p) => ({ ...p, status: nextStatus }));
-  };
+  /** UI: Tabs */
+  const TABS: Array<{ key: TabKey; label: string; sub: string }> = [
+    { key: "variance", label: "Variance Summary", sub: "See all variances (plan/bin/item wise)" },
+    { key: "reconciliation", label: "Reconciliation", sub: "Accept / Adjust / Reject with remarks" },
+    { key: "recount", label: "Recount Queue", sub: "Auto queue when threshold exceeded" },
+  ];
 
   return (
-    <div className="w-full max-w-[100vw] min-w-0 overflow-x-hidden">
-      <PageBreadcrumb pageTitle="Recount Queue" />
+    <div
+      className="w-full max-w-[100vw] min-w-0 overflow-x-hidden"
+      style={{ paddingTop: APP_TOPBAR_H }} // ✅ FIX: prevents heading hide under app header
+    >
+      <PageBreadcrumb pageTitle="Cycle Count • Reconciliation & Variance" />
 
       <div className="min-h-screen rounded-2xl border border-gray-200 bg-white p-6">
         {/* Header */}
-        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-2xl font-semibold text-gray-800">Recount Queue</h2>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold text-gray-800 truncate">Reconciliation & Variance</h2>
             <p className="text-sm text-gray-500">
-              Variance threshold exceeded → auto queue → supervisor assigns recount → resolves/close.
+              Variance review → (if threshold exceeded) auto Recount Queue → Final reconciliation.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
-              onClick={exportToCSV}
+              type="button"
               className={classNames(primaryBtn)}
               style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+              onClick={exportToCSV}
             >
-              Export to CSV
-            </button>
-
-            <button
-              onClick={autoGenerateDemoQueue}
-              className={classNames(primaryBtn)}
-              style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-            >
-              + Demo Trigger Queue
+              Export CSV
             </button>
           </div>
         </div>
 
-        {/* Layout: left list + right stats */}
+        {/* Tabs */}
+        <div className="mb-5 rounded-2xl border border-gray-200 bg-white p-2">
+          <div className="flex flex-wrap gap-1">
+            {TABS.map((t) => {
+              const isActive = t.key === activeTab;
+              return (
+                <button
+                  key={t.key}
+                  type="button"
+                  onClick={() => {
+                    setActiveTab(t.key);
+                    setCurrentPage(1);
+                  }}
+                  className={classNames(
+                    "relative rounded-xl px-4 py-2 text-sm font-semibold transition",
+                    isActive ? "text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"
+                  )}
+                  style={isActive ? { backgroundColor: FORTUNA_PRIMARY_RED } : undefined}
+                >
+                  <div className="text-left">
+                    <div>{t.label}</div>
+                    <div className={classNames("text-[11px] font-medium", isActive ? "text-white/80" : "text-gray-400")}>
+                      {t.sub}
+                    </div>
+                  </div>
+
+                  {isActive && (
+                    <span
+                      className="absolute -bottom-[6px] left-4 right-4 h-[3px] rounded-full"
+                      style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Layout: Left content + Right stats */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-[1fr_360px]">
           {/* LEFT */}
           <div className="min-w-0">
@@ -526,7 +572,7 @@ export default function RecountQueuePage() {
                 <label className={labelBase}>Search</label>
                 <input
                   className={classNames(inputBase, "mt-1")}
-                  placeholder="RQ No / Plan No / Task / Scope"
+                  placeholder="Plan / Item / BIN / Description"
                   value={search}
                   onChange={(e) => {
                     setSearch(e.target.value);
@@ -555,155 +601,139 @@ export default function RecountQueuePage() {
               </div>
 
               <div>
-                <label className={labelBase}>Status</label>
+                <label className={labelBase}>Plan</label>
                 <select
                   className={classNames(inputBase, "mt-1")}
-                  value={status}
+                  value={plan}
                   onChange={(e) => {
-                    setStatus(e.target.value);
+                    setPlan(e.target.value);
                     setCurrentPage(1);
                   }}
                 >
                   <option value="All">All</option>
-                  {QUEUE_STATUS.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
+                  {plans.map((p) => (
+                    <option key={p.plan_id} value={p.plan_id}>
+                      {p.plan_no} • {p.warehouse_id} • {p.scope_type}
                     </option>
                   ))}
                 </select>
               </div>
 
               <div>
-                <label className={labelBase}>Severity</label>
-                <select
+                <label className={labelBase}>Variance Threshold %</label>
+                <input
                   className={classNames(inputBase, "mt-1")}
-                  value={severity}
+                  value={thresholdPct}
                   onChange={(e) => {
-                    setSeverity(e.target.value);
+                    setThresholdPct(e.target.value.replace(/[^\d.]/g, ""));
                     setCurrentPage(1);
                   }}
-                >
-                  <option value="All">All</option>
-                  {SEVERITY.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
-            {/* Threshold controls (Phase-1) */}
-            <div className="mb-5 rounded-2xl border border-gray-200 bg-gray-50 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-gray-800">Auto Queue Thresholds (Phase-1)</div>
-                  <div className={helperBase}>System creates a queue when any threshold exceeds.</div>
-                </div>
-                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 sm:gap-3">
-                  <div>
-                    <label className={labelBase}>Abs Variance Qty ≥</label>
-                    <input
-                      className={classNames(inputBase, "mt-1")}
-                      value={String(thresholds.absVarianceQty)}
-                      onChange={(e) =>
-                        setThresholds((p) => ({ ...p, absVarianceQty: Number(e.target.value.replace(/[^\d]/g, "")) || 0 }))
-                      }
-                      placeholder="10"
-                    />
-                  </div>
-                  <div>
-                    <label className={labelBase}>Variance % ≥</label>
-                    <input
-                      className={classNames(inputBase, "mt-1")}
-                      value={String(thresholds.variancePct)}
-                      onChange={(e) =>
-                        setThresholds((p) => ({ ...p, variancePct: Number(e.target.value.replace(/[^\d.]/g, "")) || 0 }))
-                      }
-                      placeholder="2"
-                    />
-                  </div>
+                  placeholder="e.g., 5"
+                />
+                <div className={classNames(helperBase, "mt-1")}>
+                  If |variance %| ≥ threshold → auto Recount Queue.
                 </div>
               </div>
             </div>
 
             {/* Table */}
             <div className="w-full overflow-x-auto rounded-2xl border border-gray-200">
-              <table className="min-w-[1300px] w-full border-collapse text-sm">
+              <table className="min-w-[1400px] w-full border-collapse text-sm">
                 <thead className="bg-gray-100">
                   <tr>
-                    <th className="px-4 py-3 text-left">RQ No</th>
-                    <th className="px-4 py-3 text-left">Plan / Task</th>
+                    <th className="px-4 py-3 text-left">Plan</th>
                     <th className="px-4 py-3 text-left">Warehouse</th>
-                    <th className="px-4 py-3 text-left">Scope</th>
-                    <th className="px-4 py-3 text-left">Mode</th>
-                    <th className="px-4 py-3 text-left">Variance</th>
-                    <th className="px-4 py-3 text-left">Severity</th>
-                    <th className="px-4 py-3 text-left">Status</th>
-                    <th className="px-4 py-3 text-left">Due</th>
+                    <th className="px-4 py-3 text-left">Scope Ref</th>
+                    <th className="px-4 py-3 text-left">Item</th>
+                    <th className="px-4 py-3 text-right">System</th>
+                    <th className="px-4 py-3 text-right">Counted</th>
+                    <th className="px-4 py-3 text-right">Variance</th>
+                    <th className="px-4 py-3 text-left">Flags</th>
+                    <th className="px-4 py-3 text-left">Recount</th>
+                    <th className="px-4 py-3 text-left">Reconciliation</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
 
                 <tbody>
-                  {paginated.map((r) => (
-                    <tr key={r.rq_id} className="border-b hover:bg-gray-50">
-                      <td className="px-4 py-3 font-semibold text-gray-800">
-                        {r.rq_no}
-                        <div className="mt-1 text-xs text-gray-500">{r.rq_id}</div>
-                      </td>
+                  {paginated.map((l) => {
+                    const varianceTone =
+                      Math.abs(l.variance_pct) >= thresholdNumber ? "red" : Math.abs(l.variance_pct) >= thresholdNumber / 2 ? "amber" : "gray";
 
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-800">{r.plan_no}</div>
-                        <div className="mt-1 text-xs text-gray-500">Task: {r.task_id}</div>
-                      </td>
+                    return (
+                      <tr key={l.line_id} className="border-b hover:bg-gray-50">
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{l.plan_no}</div>
+                          <div className="text-xs text-gray-500">{l.plan_id}</div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-800">{r.warehouse_id}</div>
-                        <div className="mt-1 text-xs text-gray-500">{whName(r.warehouse_id)}</div>
-                      </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{l.warehouse_id}</div>
+                          <div className="text-xs text-gray-500">{whName(l.warehouse_id)}</div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-800">{r.scope_type}</div>
-                        <div className="mt-1 text-xs text-gray-500">{r.scope_summary}</div>
-                      </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{l.scope_ref}</div>
+                          <div className="text-xs text-gray-500">{l.last_updated}</div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <ModePill mode={r.count_mode} />
-                      </td>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-gray-900">{l.item_id}</div>
+                          <div className="text-xs text-gray-500">{l.item_desc}</div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-800">
-                          Qty: {r.variance_qty} (Abs: {r.abs_variance})
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500">Var%: {r.variance_pct}% • SKUs: {r.sku_count}</div>
-                      </td>
+                        <td className="px-4 py-3 text-right font-semibold">{l.system_qty}</td>
+                        <td className="px-4 py-3 text-right font-semibold">{l.counted_qty}</td>
 
-                      <td className="px-4 py-3">
-                        <SeverityPill severity={r.severity} />
-                      </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="font-semibold">{l.variance_qty}</div>
+                          <div className="mt-1">
+                            <MiniPill text={`${l.variance_pct.toFixed(2)}%`} tone={varianceTone as any} />
+                          </div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <StatusPill status={r.status} />
-                      </td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-wrap gap-2">
+                            {l.threshold_exceeded ? (
+                              <MiniPill text="Threshold Exceeded" tone="red" />
+                            ) : (
+                              <MiniPill text="Within Limit" tone="gray" />
+                            )}
+                            {l.system_qty === 0 && l.counted_qty > 0 ? <MiniPill text="Found Stock" tone="amber" /> : null}
+                          </div>
+                        </td>
 
-                      <td className="px-4 py-3">{r.due_date || "-"}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            <MiniPill text={l.recount_status} tone={l.recount_status === "Queued" ? "red" : l.recount_status === "In Progress" ? "blue" : l.recount_status === "Completed" ? "green" : "gray"} />
+                            <div className="text-xs text-gray-500">{l.recount_required ? "Recount Required" : "Not Required"}</div>
+                          </div>
+                        </td>
 
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => openModal(r)}
-                          className="text-sm font-semibold hover:underline"
-                          style={{ color: FORTUNA_SECONDARY_BLUE }}
-                        >
-                          View / Manage
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-1">
+                            <MiniPill text={l.reconciliation_status} tone={l.reconciliation_status === "Pending" ? "amber" : l.reconciliation_status === "Adjusted" ? "blue" : l.reconciliation_status === "Accepted" ? "green" : "gray"} />
+                            <div className="text-xs text-gray-500">{l.reconciliation_action || "—"}</div>
+                          </div>
+                        </td>
+
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => openLine(l.line_id)}
+                            className="text-sm font-semibold hover:underline"
+                            style={{ color: FORTUNA_SECONDARY_BLUE }}
+                          >
+                            View / Reconcile
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
 
                   {paginated.length === 0 && (
                     <tr>
-                      <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                      <td colSpan={11} className="px-4 py-10 text-center text-gray-500">
                         No records found.
                       </td>
                     </tr>
@@ -715,8 +745,8 @@ export default function RecountQueuePage() {
             {/* Bottom controls */}
             <div className="mt-6 flex flex-col md:flex-row justify-between items-center gap-4">
               <div className="text-sm text-gray-500">
-                Showing {filtered.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length} entries
+                Showing {filteredLines.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(currentPage * itemsPerPage, filteredLines.length)} of {filteredLines.length} entries
               </div>
 
               <div className="flex items-center gap-2 text-sm">
@@ -754,52 +784,70 @@ export default function RecountQueuePage() {
                 </button>
               </div>
             </div>
+
+            {/* Footer note */}
+            <div className="mt-5 rounded-2xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700">
+              <span className="font-semibold">Flow:</span> Count Execution → Variance Generated → Threshold Check → Recount Queue (if needed) → Final Reconciliation → Post / Adjust.
+            </div>
           </div>
 
           {/* RIGHT */}
           <div className="min-w-0">
             <QuickStatsCard stats={quickStats} />
+
+            <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-semibold text-gray-800">Plan Status (Reference)</h3>
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }} />
+              </div>
+
+              <div className="mt-3 space-y-2 text-sm">
+                {plans.map((p) => (
+                  <div key={p.plan_id} className="rounded-xl border border-gray-200 p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="font-semibold text-gray-900 truncate">{p.plan_no}</div>
+                        <div className="text-xs text-gray-500 truncate">
+                          {p.warehouse_id} • {p.scope_type} • {p.scope_summary}
+                        </div>
+                      </div>
+                      <StatusPill status={p.status} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className={classNames(helperBase, "mt-3")}>
+                This card is just for quick reference while reconciling.
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ========================= MODAL ========================= */}
-        {isModalOpen && active && (
+        {/* ===== Modal: View / Reconcile ===== */}
+        {isModalOpen && activeLine && (
           <div className="fixed inset-0 z-50 bg-black/40">
-            {/* zoom/header safe approach */}
             <div className="h-full w-full overflow-y-auto">
               <div className="min-h-full w-full flex items-start justify-center py-4 px-3 sm:px-6">
-                <div className="w-full max-w-5xl rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col h-[92vh]">
+                <div className="w-full max-w-4xl rounded-2xl bg-white shadow-xl border border-gray-200 flex flex-col max-h-[92vh]">
                   {/* Header */}
                   <div className="flex items-start justify-between gap-3 px-5 py-4 border-b bg-white rounded-t-2xl">
                     <div className="min-w-0">
                       <h3 className="text-lg font-semibold text-gray-800 truncate">
-                        Recount Queue • {active.rq_no}
+                        Reconcile Variance • {activeLine.plan_no} • {activeLine.item_id}
                       </h3>
                       <p className="text-xs text-gray-500">
-                        Plan: <span className="font-semibold">{active.plan_no}</span> • Task:{" "}
-                        <span className="font-semibold">{active.task_id}</span> • Warehouse:{" "}
-                        <span className="font-semibold">{active.warehouse_id}</span> ({whName(active.warehouse_id)})
+                        {activeLine.warehouse_id} • {whName(activeLine.warehouse_id)} • {activeLine.scope_ref}
                       </p>
 
-                      {/* Top “pills” (continuity with your flow) */}
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <span
-                          className="inline-flex rounded-full px-3 py-1 text-xs font-semibold text-white"
-                          style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-                        >
-                          Cycle Count
-                        </span>
-                        <StatusPill status={edit.status} />
-                        <SeverityPill severity={active.severity} />
-                        <ModePill mode={active.count_mode} />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {activeLine.threshold_exceeded ? <MiniPill text="Threshold Exceeded" tone="red" /> : <MiniPill text="Within Limit" tone="gray" />}
+                        <MiniPill text={`Recount: ${activeLine.recount_status}`} tone={activeLine.recount_status === "Queued" ? "red" : activeLine.recount_status === "In Progress" ? "blue" : activeLine.recount_status === "Completed" ? "green" : "gray"} />
+                        <MiniPill text={`Recon: ${activeLine.reconciliation_status}`} tone={activeLine.reconciliation_status === "Pending" ? "amber" : activeLine.reconciliation_status === "Adjusted" ? "blue" : activeLine.reconciliation_status === "Accepted" ? "green" : "gray"} />
                       </div>
                     </div>
 
-                    <button
-                      onClick={closeModal}
-                      className="rounded-xl px-3 py-2 text-gray-600 hover:bg-gray-100"
-                      aria-label="Close"
-                    >
+                    <button onClick={closeModal} className="rounded-xl px-3 py-2 text-gray-600 hover:bg-gray-100" aria-label="Close">
                       ✕
                     </button>
                   </div>
@@ -807,206 +855,126 @@ export default function RecountQueuePage() {
                   {/* Body */}
                   <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4">
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-                      {/* LEFT */}
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <h4 className="text-sm font-semibold text-gray-800">Queue Details</h4>
-                          <p className={classNames(helperBase, "mt-1")}>
-                            Supervisor reviews variance → assigns recount → resolves/close.
-                          </p>
+                      {/* Left: numbers */}
+                      <div className="rounded-2xl border border-gray-200 p-4">
+                        <h4 className="text-sm font-semibold text-gray-800">Variance Details</h4>
 
-                          <div className="mt-4 space-y-2 text-sm">
-                            <SummaryRow label="Scope" value={`${active.scope_type}: ${active.scope_summary}`} />
-                            <SummaryRow label="SKU Count" value={String(active.sku_count)} />
-                            <SummaryRow label="Variance Qty" value={String(active.variance_qty)} />
-                            <SummaryRow label="Abs Variance" value={String(active.abs_variance)} />
-                            <SummaryRow label="Variance %" value={`${active.variance_pct}%`} />
-                            <SummaryRow label="Counter" value={`${userName(active.original_counter_id)} (${active.original_counter_id})`} />
-                            <SummaryRow label="Due Date" value={edit.due_date || "-"} />
-                            <SummaryRow label="Last Activity" value={active.last_activity} />
-                            <SummaryRow label="Created Reason" value={active.created_reason} />
-                          </div>
-
-                          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
-                            <span className="font-semibold">Note:</span> In Blind mode, counter can’t see System Qty.
-                            Recount should be controlled by Supervisor.
-                          </div>
+                        <div className="mt-3 space-y-2 text-sm">
+                          <SummaryRow label="Item" value={`${activeLine.item_id} • ${activeLine.item_desc}`} />
+                          <SummaryRow label="UOM" value={activeLine.uom} />
+                          <SummaryRow label="System Qty" value={String(activeLine.system_qty)} />
+                          <SummaryRow label="Counted Qty" value={String(activeLine.counted_qty)} />
+                          <SummaryRow label="Variance Qty" value={String(activeLine.variance_qty)} />
+                          <SummaryRow label="Variance %" value={`${activeLine.variance_pct.toFixed(2)}%`} />
+                          <SummaryRow label="Threshold %" value={`${thresholdNumber}%`} />
                         </div>
 
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <div className="flex items-center justify-between">
-                            <h4 className="text-sm font-semibold text-gray-800">Supervisor Notes</h4>
-                            <button
-                              type="button"
-                              className="text-xs font-semibold rounded-full px-3 py-1 bg-blue-50 text-blue-700"
-                              onClick={() => setStatusAndSave("Assigned")}
-                            >
-                              Assign
-                            </button>
-                          </div>
-
-                          <textarea
-                            className={classNames(inputBase, "mt-3 min-h-[110px] resize-y")}
-                            value={edit.supervisor_notes}
-                            onChange={(e) => setEdit((p) => ({ ...p, supervisor_notes: e.target.value }))}
-                            placeholder="Supervisor remarks..."
-                          />
-                        </div>
-
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <h4 className="text-sm font-semibold text-gray-800">Audit Trail (Demo)</h4>
-                          <div className="mt-3 space-y-2 text-sm">
-                            {(active.audit_log || []).map((x, idx) => (
-                              <div key={idx} className="flex items-start justify-between gap-3 border-b border-gray-100 pb-2">
-                                <div className="min-w-0">
-                                  <div className="font-semibold text-gray-800">{x.action}</div>
-                                  <div className="text-xs text-gray-500">By: {x.by}</div>
-                                </div>
-                                <div className="text-xs text-gray-500 whitespace-nowrap">{x.at}</div>
-                              </div>
-                            ))}
-                            {(active.audit_log || []).length === 0 && (
-                              <div className="text-sm text-gray-500">No audit logs.</div>
-                            )}
-                          </div>
+                        <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+                          <span className="font-semibold">Rule:</span> If |variance %| ≥ threshold → auto Recount Queue.
                         </div>
                       </div>
 
-                      {/* RIGHT */}
-                      <div className="space-y-4">
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <div className="flex items-start justify-between gap-2">
-                            <div>
-                              <h4 className="text-sm font-semibold text-gray-800">Assign Recount Team</h4>
-                              <p className={helperBase}>Users filtered by Warehouse.</p>
-                            </div>
-                            <button
-                              type="button"
-                              className={outlineBtn}
-                              onClick={() => setEdit((p) => ({ ...p, recount_team_ids: [] }))}
+                      {/* Right: reconciliation actions */}
+                      <div className="rounded-2xl border border-gray-200 p-4">
+                        <h4 className="text-sm font-semibold text-gray-800">Reconciliation Action</h4>
+                        <p className={classNames(helperBase, "mt-1")}>
+                          Supervisor/Approver decides final action after recount completion (or if not required).
+                        </p>
+
+                        <div className="mt-4 space-y-3">
+                          <div>
+                            <label className={labelBase}>Reconciliation Status</label>
+                            <select
+                              className={classNames(inputBase, "mt-1")}
+                              value={activeLine.reconciliation_status}
+                              onChange={(e) =>
+                                updateLine(activeLine.line_id, {
+                                  reconciliation_status: e.target.value as VarianceLine["reconciliation_status"],
+                                })
+                              }
                             >
-                              Clear
-                            </button>
+                              <option value="Pending">Pending</option>
+                              <option value="Accepted">Accepted</option>
+                              <option value="Adjusted">Adjusted</option>
+                              <option value="Rejected">Rejected</option>
+                            </select>
                           </div>
 
-                          <div className="mt-3">
-                            <label className={labelBase}>Recount Due Date</label>
-                            <input
-                              type="date"
+                          <div>
+                            <label className={labelBase}>Action</label>
+                            <select
                               className={classNames(inputBase, "mt-1")}
-                              value={edit.due_date}
-                              onChange={(e) => setEdit((p) => ({ ...p, due_date: e.target.value }))}
-                            />
-                            <p className={classNames(helperBase, "mt-1")}>Optional (recommended for SLAs).</p>
-                          </div>
-
-                          <div className="mt-3">
-                            <label className={labelBase}>User Search</label>
-                            <input
-                              className={classNames(inputBase, "mt-1")}
-                              placeholder="Search name / id / mobile"
-                              value={teamSearch}
-                              onChange={(e) => setTeamSearch(e.target.value)}
-                            />
-                          </div>
-
-                          <div className="mt-3 grid grid-cols-1 gap-2">
-                            {availableUsers.map((u) => {
-                              const checked = edit.recount_team_ids.includes(u.id);
-                              return (
-                                <button
-                                  key={u.id}
-                                  type="button"
-                                  onClick={() => toggleTeam(u.id)}
-                                  className={classNames(
-                                    "flex items-center justify-between rounded-xl border px-3 py-3 text-left transition",
-                                    checked ? "border-transparent text-white shadow-sm" : "border-gray-200 hover:bg-gray-50"
-                                  )}
-                                  style={checked ? { backgroundColor: FORTUNA_SECONDARY_BLUE } : undefined}
-                                >
-                                  <div className="min-w-0">
-                                    <div className={classNames("font-semibold", checked ? "text-white" : "text-gray-900")}>
-                                      {u.name}
-                                    </div>
-                                    <div className={classNames("text-xs", checked ? "text-white/80" : "text-gray-500")}>
-                                      {u.id} • {u.mobile}
-                                    </div>
-                                  </div>
-
-                                  <div
-                                    className={classNames(
-                                      "rounded-full px-3 py-1 text-xs font-semibold",
-                                      checked ? "bg-white/15 text-white" : "bg-gray-100 text-gray-700"
-                                    )}
-                                  >
-                                    {checked ? "Selected" : "Select"}
-                                  </div>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          <div className="mt-4 rounded-xl border border-gray-200 bg-white p-3">
-                            <div className="text-sm font-semibold text-gray-800">Selected</div>
-                            <div className="mt-2 flex flex-wrap gap-2">
-                              {edit.recount_team_ids.length === 0 ? (
-                                <span className="text-sm text-gray-500">No assignees selected.</span>
-                              ) : (
-                                edit.recount_team_ids.map((id) => (
-                                  <span
-                                    key={id}
-                                    className="inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700"
-                                  >
-                                    {userName(id)}
-                                    <button
-                                      type="button"
-                                      className="rounded-full px-2 py-0.5 text-blue-700 hover:bg-blue-100"
-                                      onClick={() => toggleTeam(id)}
-                                      aria-label={`Remove ${userName(id)}`}
-                                    >
-                                      ✕
-                                    </button>
-                                  </span>
-                                ))
-                              )}
+                              value={activeLine.reconciliation_action}
+                              onChange={(e) =>
+                                updateLine(activeLine.line_id, {
+                                  reconciliation_action: e.target.value as VarianceLine["reconciliation_action"],
+                                })
+                              }
+                            >
+                              <option value="">Select</option>
+                              <option value="Accept Count">Accept Count</option>
+                              <option value="Adjust Stock">Adjust Stock</option>
+                              <option value="Reject Count">Reject Count</option>
+                            </select>
+                            <div className={classNames(helperBase, "mt-1")}>
+                              * “Adjust Stock” will later trigger Inventory Adjustment transaction (Phase-2 API).
                             </div>
                           </div>
-                        </div>
 
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <h4 className="text-sm font-semibold text-gray-800">Task Summary</h4>
-                          <div className="mt-3 space-y-2 text-sm">
-                            <SummaryRow label="Task ID" value={active.task_id} />
-                            <SummaryRow label="Plan No" value={active.plan_no} />
-                            <SummaryRow label="Type" value="Cycle Count" />
-                            <SummaryRow label="Mode" value={active.count_mode} />
-                            <SummaryRow label="Warehouse" value={`${active.warehouse_id} • ${whName(active.warehouse_id)}`} />
-                            <SummaryRow label="Assignee" value={edit.recount_team_ids.length ? userLabel(edit.recount_team_ids[0]) : "-"} />
-                            <SummaryRow label="Due Date" value={edit.due_date || "-"} />
-                            <SummaryRow label="Status" value={edit.status} />
+                          <div>
+                            <label className={labelBase}>Remarks</label>
+                            <textarea
+                              className={classNames(inputBase, "mt-1 min-h-[110px] resize-y")}
+                              value={activeLine.reconciliation_remarks}
+                              onChange={(e) => updateLine(activeLine.line_id, { reconciliation_remarks: e.target.value })}
+                              placeholder="Reason / notes for audit trail..."
+                            />
                           </div>
 
-                          <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600">
-                            <span className="font-semibold">Next:</span> In-Recount → Submit results → Reconciliation & Variance.
-                          </div>
-                        </div>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div className="rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-semibold text-gray-800">Force Recount Required</div>
+                                <div className={helperBase}>Manual override (even if within limit).</div>
+                              </div>
+                              <input
+                                type="checkbox"
+                                checked={activeLine.recount_required}
+                                onChange={(e) =>
+                                  updateLine(activeLine.line_id, {
+                                    recount_required: e.target.checked,
+                                    recount_status: e.target.checked ? (activeLine.recount_status === "Completed" ? "Completed" : "Queued") : "Not Required",
+                                  })
+                                }
+                                className="h-4 w-4"
+                              />
+                            </div>
 
-                        <div className="rounded-2xl border border-gray-200 p-4">
-                          <label className={labelBase}>Queue Status</label>
-                          <select
-                            className={classNames(inputBase, "mt-1")}
-                            value={edit.status}
-                            onChange={(e) => setEdit((p) => ({ ...p, status: e.target.value }))}
-                          >
-                            {QUEUE_STATUS.map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                          <p className={classNames(helperBase, "mt-1")}>
-                            Rule suggestion: Assigned/In-Recount requires team.
-                          </p>
+                            <div className="rounded-xl border border-gray-200 p-3 flex items-center justify-between">
+                              <div>
+                                <div className="text-sm font-semibold text-gray-800">Recount Status</div>
+                                <div className={helperBase}>Queue progression.</div>
+                              </div>
+                              <select
+                                className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm"
+                                value={activeLine.recount_status}
+                                onChange={(e) =>
+                                  updateLine(activeLine.line_id, {
+                                    recount_status: e.target.value as VarianceLine["recount_status"],
+                                  })
+                                }
+                              >
+                                <option value="Not Required">Not Required</option>
+                                <option value="Queued">Queued</option>
+                                <option value="In Progress">In Progress</option>
+                                <option value="Completed">Completed</option>
+                              </select>
+                            </div>
+                          </div>
+
+                          <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+                            <span className="font-semibold">Audit Trail:</span> status/action/remarks should be stored with user + timestamp in API.
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1016,7 +984,7 @@ export default function RecountQueuePage() {
                   <div className="border-t bg-white px-5 py-4 rounded-b-2xl">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
                       <button type="button" className={outlineBtn} onClick={closeModal}>
-                        Cancel
+                        Close
                       </button>
 
                       <div className="flex w-full sm:w-auto gap-2">
@@ -1024,51 +992,30 @@ export default function RecountQueuePage() {
                           type="button"
                           className={classNames(primaryBtn, "w-1/2 sm:w-auto")}
                           style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-                          onClick={() => setStatusAndSave("Assigned")}
+                          onClick={() => {
+                            alert("Saved (demo). Next: connect API to persist reconciliation decision.");
+                            closeModal();
+                          }}
                         >
-                          Assign
-                        </button>
-
-                        <button
-                          type="button"
-                          className={classNames(primaryBtn, "w-1/2 sm:w-auto")}
-                          style={{ backgroundColor: "#6D28D9" }}
-                          onClick={() => setStatusAndSave("In-Recount")}
-                        >
-                          In-Recount
-                        </button>
-
-                        <button
-                          type="button"
-                          className={classNames(primaryBtn, "w-1/2 sm:w-auto")}
-                          style={{ backgroundColor: "#0F766E" }}
-                          onClick={() => setStatusAndSave("Resolved")}
-                        >
-                          Resolve
+                          Save (Demo)
                         </button>
 
                         <button
                           type="button"
                           className={classNames(primaryBtn, "w-1/2 sm:w-auto")}
                           style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-                          onClick={() => setStatusAndSave("Closed")}
+                          onClick={() => {
+                            alert("Post/Adjust (demo). Next: create Inventory Adjustment + accounting postings in backend.");
+                            closeModal();
+                          }}
                         >
-                          Close
-                        </button>
-
-                        <button
-                          type="button"
-                          className={classNames(primaryBtn, "w-1/2 sm:w-auto")}
-                          style={{ backgroundColor: "#111827" }}
-                          onClick={save}
-                        >
-                          Save
+                          Post / Adjust (Demo)
                         </button>
                       </div>
                     </div>
 
                     <div className={classNames(helperBase, "mt-2")}>
-                      UI Fix ready: overlay scroll + fixed height + internal body scroll ⇒ header/footer never hide (zoom issues reduced).
+                      UI safe: modal uses <span className="font-semibold">max-h + internal scroll</span> so buttons/heading never hide.
                     </div>
                   </div>
                 </div>
@@ -1076,8 +1023,17 @@ export default function RecountQueuePage() {
             </div>
           </div>
         )}
-        {/* ========================= END MODAL ========================= */}
+        {/* ===== End Modal ===== */}
       </div>
     </div>
   );
+}
+
+/** ===== utils ===== */
+function todayISO() {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
 }
