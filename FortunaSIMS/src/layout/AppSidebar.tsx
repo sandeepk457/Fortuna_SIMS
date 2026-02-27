@@ -123,7 +123,7 @@ const navItems: NavItem[] = [
     },
     { 
       name: "CCP Approvals", 
-      path: "/sims/inventory/cycle-count/approvals" 
+      path: "/CCPApprovals" 
     },
     { 
       name: "Stock Adjustment Posting", 
