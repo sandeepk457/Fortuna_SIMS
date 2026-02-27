@@ -127,7 +127,7 @@ const navItems: NavItem[] = [
     },
     { 
       name: "Stock Adjustment Posting", 
-      path: "/sims/inventory/cycle-count/posting" 
+      path: "/StockAdjustmentPosting" 
     },
     
   ],
