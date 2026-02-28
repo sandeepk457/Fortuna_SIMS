@@ -101,10 +101,10 @@ const navItems: NavItem[] = [
   name: "Cycle Count & Audit",
   subItems: [
     { name: "CCP List", path: "/CycleCountList" },
-    { 
-      name: "New CC Plan", 
-      path: "/NewCCPForm" 
-    },
+    // { 
+    //   name: "New CC Plan", 
+    //   path: "/NewCCPForm" 
+    // },
     { 
       name: "CCP Assignment", 
       path: "/CCPAssignment" 
