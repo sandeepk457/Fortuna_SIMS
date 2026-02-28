@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -11,13 +11,9 @@ import {
   ChevronDownIcon,
   GridIcon,
   HorizontaLDots,
-  ListIcon,
-  PageIcon,
   PieChartIcon,
   PlugInIcon,
-  TableIcon,
   UserCircleIcon,
-  
 } from "../icons/index";
 import SidebarWidget from "./SidebarWidget";
 
@@ -28,13 +24,15 @@ type NavItem = {
   subItems?: NavItem[];
 };
 
-/* ===========================
-   NAVIGATION STRUCTURE
-=========================== */
+/** Fortuna Theme */
+const FORTUNA_PRIMARY_RED = "#C8102E";
+const FORTUNA_SECONDARY_BLUE = "#005F99";
 
+/* ===========================
+   NAVIGATION STRUCTURE (keep yours)
+=========================== */
 const navItems: NavItem[] = [
   {
-    icon: <GridIcon />,
     name: "Dashboard",
     icon: <GridIcon />,
     subItems: [{ name: "Ecommerce", path: "/" }],
@@ -43,205 +41,75 @@ const navItems: NavItem[] = [
     name: "SIMS Modules",
     icon: <BoxCubeIcon />,
     subItems: [
-   
       {
         name: "Masters",
         subItems: [
-          { name: "Item Master", path: "/ItemMaster"},
-          // { name: "Item Master Form", path: "/ItemMasterForm"},
+          { name: "Item Master", path: "/ItemMaster" },
           { name: "Warehouse Master", path: "/WarehouseMaster" },
-          // { name: "Warehouse Master Form", path: "/WarehouseForm" },
           { name: "UOM Master", path: "/UOMmaster" },
           { name: "Vendor Master", path: "/VendorMaster" },
-          // { name: "Vendor Master Form", path: "/VendorForm"},
           { name: "Customer Master", path: "/CustomerMaster" },
-          // { name: "Customer Master Form", path: "/CustomerForm"},
         ],
       },
-      /***SIMS Modules Menu Links */
-{
+      {
         name: "Procurement",
         subItems: [
-          
           { name: "Purchase Requisition", path: "/PurchaseRequisitionList" },
-          // { name: "Purchase Req. Form(PR)", path: "/PurchaseRequisition" },
           { name: "Request For Quote", path: "/RFQ" },
-          // { name: "RFQ Form", path: "/RFQForm" },
           { name: "Purchase Order", path: "/PurchaseOrderList" },
-          // { name: "Purchase Order (PO)", path: "/PurchaseOrderForm" },
           { name: "Goods Receipt (GRN)", path: "/GRNList" },
-          // { name: "Goods Receipt (GRN)", path: "/GRN" },
           { name: "Supplier Performance", path: "/SPAnalysis" },
         ],
       },
-      
       {
         name: "Inventory & (WMS)",
         subItems: [
           { name: "Goods Inward / Receive", path: "/GoodsInwardList" },
-          // { name: "Goods Inward Form", path: "/GoodsInwardForm" },
           { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
           {
             name: "Returns",
             subItems: [
-          { name: "Supplier Returns", path: "/SupplierReturns" },
-          // { name: "Supplier Returns Form", path: "/SupplierreturnForm" },
-
-          { name: "Customer Returns", path: "/CustomerReturns" },
-          // { name: "Customer Returns Form", path: "/CustomerReturnForm" },
-              
+              { name: "Supplier Returns", path: "/SupplierReturns" },
+              { name: "Customer Returns", path: "/CustomerReturns" },
             ],
           },
-          
           { name: "Stock Transfer", path: "sims/inventory/transfer" },
           { name: "Warehouse Layout", path: "/WarehouseLayout" },
           { name: "Batch & Serial Tracking", path: "sims/inventory/batch-tracking" },
-          // { name: "Cycle Count & Audit", path: "/CycleCount" },
           {
-  name: "Cycle Count & Audit",
-  subItems: [
-    { name: "CCP List", path: "/CycleCountList" },
-    // { 
-    //   name: "New CC Plan", 
-    //   path: "/NewCCPForm" 
-    // },
-    { 
-      name: "CCP Assignment", 
-      path: "/CCPAssignment" 
-    },
-    { 
-      name: "Count Execution", 
-      path: "/countexecution" 
-    },
-    { 
-      name: "Recount Queue", 
-      path: "/RecountQueue" 
-    },
-    { 
-      name: "Reconciliation & Variance", 
-      path: "/Reconciliation&Variance" 
-    },
-    { 
-      name: "CCP Approvals", 
-      path: "/CCPApprovals" 
-    },
-    { 
-      name: "Stock Adjustment Posting", 
-      path: "/StockAdjustmentPosting" 
-    },
-    
-  ],
-},
-
-          // { name: "Stock Reservation", path: "sims/inventory/reservation" },
+            name: "Cycle Count & Audit",
+            subItems: [
+              { name: "CCP List", path: "/CycleCountList" },
+              { name: "CCP Assignment", path: "/CCPAssignment" },
+              { name: "Count Execution", path: "/countexecution" },
+              { name: "Recount Queue", path: "/RecountQueue" },
+              { name: "Reconciliation & Variance", path: "/Reconciliation&Variance" },
+              { name: "CCP Approvals", path: "/CCPApprovals" },
+              { name: "Stock Adjustment Posting", path: "/StockAdjustmentPosting" },
+            ],
+          },
           { name: "Smart Alerts", path: "/SmartAlerts" },
           { name: "Stock Dashboard", path: "/StockDashboard" },
-        ],
-      },
-{
-  name: "Fleet & Logistics",
-  subItems: [
-    { name: "Vehicle Master", path: "sims/logistics/vehicles" },
-    { name: "Driver Master", path: "sims/logistics/drivers" },
-    { name: "Dispatch Planning", path: "sims/logistics/dispatch" },
-    { name: "Live Tracking", path: "sims/logistics/tracking" },
-    { name: "Trip Sheet Management", path: "sims/logistics/trip-sheet" },
-    { name: "Fuel & Maintenance Logs", path: "sims/logistics/maintenance" },
-  ]
-},
-
-      {
-        name: "Sales & Orders",
-        subItems: [
-          { name: "Sales Quotation", path: "/sales/quotation" },
-          { name: "Sales Order (SO)", path: "/sales/orders" },
-          { name: "Dispatch Planning", path: "/sales/dispatch" },
-          { name: "Invoicing", path: "/sales/invoice" },
-          // { name: "Returns Management", path: "/sales/returns" },
-  ]
-},
-
-{
-  name: "AI Forecasting",
-  subItems: [
-    { name: "Demand Forecast", path: "sims/ai/forecast" },
-    { name: "Auto Replenishment", path: "sims/ai/replenishment" },
-    { name: "Trend Analytics", path: "sims/ai/trends" },
-    { name: "Multi-Warehouse Balancing", path: "sims/ai/balancing" },
-  ]
-},
-
-{
-  name: "Analytics & BI",
-  subItems: [
-    { name: "Executive Dashboard", path: "sims/bi/executive-dashboard" },
-    { name: "Procurement Dashboard", path: "sims/bi/procurement-dashboard" },
-    { name: "Inventory Dashboard", path: "sims/bi/inventory-dashboard" },
-    { name: "Sales Dashboard", path: "sims/bi/sales-dashboard" },
-    { name: "Logistics Dashboard", path: "sims/bi/logistics-dashboard" },
-    { name: "KPI Monitoring", path: "sims/bi/kpi-monitoring" },
-    { name: "AI Predictive Insights", path: "sims/bi/predictive-insights" },
-    { name: "Custom Report Builder", path: "sims/bi/report-builder" },
-    { name: "Data Visualization", path: "sims/bi/data-visualization" },
-    { name: "Export & Integration", path: "sims/bi/export-integration" },
-  ]
-},
-
-      {
-        name: "Reports",
-        subItems: [
-          { name: "Stock Movement Reports", path: "/sims/reports/stock" },
-          { name: "Procurement Reports", path: "sims/reports/procurement" },
-          { name: "Inventory Reports", path: "sims/reports/inventory" },
-          { name: "Sales Reports", path: "sims/reports/sales" },
-          { name: "Logistics Reports", path: "sims/reports/logistics" },
-          { name: "Executive MIS Dashboard", path: "sims/reports/mis" },
-          { name: "Cycle Count Reports", path: "/sims/inventory/cycle-count/reports"},
         ],
       },
     ],
   },
   { icon: <CalenderIcon />, name: "Calendar", path: "/calendar" },
-  
-// {
-//     name: "Forms",
-//     icon: <ListIcon />,
-//     subItems: [
-//       { name: "Form Elements", path: "/form-elements" },
-//     ],
-//   },
-// {
-//     name: "Tables",
-//     icon: <TableIcon />,
-//     subItems: [{ name: "Basic Tables", path: "/basic-tables" }],
-//   },
-//   {
-//     name: "Pages",
-//     icon: <PageIcon />,
-//     subItems: [
-//       { name: "Blank Page", path: "/blank" },
-//       { name: "404 Error", path: "/error-404" },
-      
-//     ]
-//     }
 ];
-
-
 
 const othersItems: NavItem[] = [
   {
-  name: "Administration",
-  icon: <UserCircleIcon/>,
-  subItems: [
-    { name: "User Management", path: "sims/admin/users" },
-    { name: "Role & Permissions", path: "sims/admin/roles" },
-    { name: "Workflow Configuration", path: "sims/admin/workflows" },
-    { name: "Master Configuration", path: "sims/admin/config" },
-    { name: "Audit Logs", path: "sims/admin/audit-logs" },
-  ]
-},
-{ icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
-  
+    name: "Administration",
+    icon: <UserCircleIcon />,
+    subItems: [
+      { name: "User Management", path: "sims/admin/users" },
+      { name: "Role & Permissions", path: "sims/admin/roles" },
+      { name: "Workflow Configuration", path: "sims/admin/workflows" },
+      { name: "Master Configuration", path: "sims/admin/config" },
+      { name: "Audit Logs", path: "sims/admin/audit-logs" },
+    ],
+  },
+  { icon: <UserCircleIcon />, name: "User Profile", path: "/profile" },
   {
     icon: <PieChartIcon />,
     name: "Charts",
@@ -263,92 +131,131 @@ const othersItems: NavItem[] = [
 /* ===========================
    SIDEBAR COMPONENT
 =========================== */
-
 const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
+
+  /** openMenus stores unique keys (no collision) */
   const [openMenus, setOpenMenus] = useState<string[]>([]);
 
+  const showText = isExpanded || isHovered || isMobileOpen;
+
   const isActive = useCallback(
-    (path?: string) => path && pathname === path,
+    (path?: string) => !!path && pathname === path,
     [pathname]
   );
 
   const toggleMenu = (key: string) => {
-    setOpenMenus((prev) =>
-      prev.includes(key)
-        ? prev.filter((k) => k !== key)
-        : [...prev, key]
-    );
+    setOpenMenus((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
-  /* ===========================
-     RECURSIVE RENDER FUNCTION
-  =========================== */
+  /** --- Styles (keep your old font - do NOT set font-family anywhere) --- */
+  const btnBase =
+    "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] " +
+    "leading-tight select-none";
 
-  const renderItems = (
-    items: NavItem[],
-    parentKey = "",
-    level = 0
-  ) => {
+  const parentBtn =
+    "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800";
+
+  const parentBtnOpen =
+    "bg-[#005F99]/10 border border-[#005F99]/20";
+
+  const linkBase =
+    "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] leading-tight";
+
+  const activeLink =
+    "text-white shadow-sm";
+
+  const inactiveLink =
+    "text-[#C8102E] hover:bg-gray-50 dark:hover:bg-gray-800";
+
+  /** ✅ Key builder: stable + unique */
+  const buildKey = (parentKey: string, index: number, name: string) =>
+    `${parentKey}::${index}::${name}`;
+
+  /** ✅ Recursive renderer (NO hooks inside map) */
+  const renderItems = (items: NavItem[], parentKey = "root", level = 0) => {
     return (
-      <ul className={`${level === 0 ? "space-y-2" : "ml-6 mt-2 space-y-1"}`}>
-        {items.map((item, index) => {
-          const key = `${parentKey}-${index}`;
+      <ul className={level === 0 ? "space-y-2" : "space-y-2"}>
+        {items.map((item, idx) => {
+          const key = buildKey(parentKey, idx, item.name);
           const isOpen = openMenus.includes(key);
 
-          return (
-            <li key={key}>
-              {item.subItems ? (
-                <>
-                  <button
-                    onClick={() => toggleMenu(key)}
-                    className={`flex items-center w-full p-2 rounded-lg transition
-                      ${isOpen ? "bg-gray-200 dark:bg-gray-700" : ""}
-                    `}
-                  >
-                    {item.icon && (
-                      <span className="mr-3">{item.icon}</span>
-                    )}
-                    {(isExpanded || isHovered || isMobileOpen) && (
-                      <>
-                        <span className="flex-1 text-left">
-                          {item.name}
-                        </span>
-                        <ChevronDownIcon
-                          className={`w-4 h-4 transition-transform ${
-                            isOpen ? "rotate-180" : ""
-                          }`}
-                        />
-                      </>
-                    )}
-                  </button>
+          // indentation: controlled padding, NOT margins (prevents overflow)
+          const padLeft = level === 0 ? "pl-1" : level === 1 ? "pl-2" : "pl-3";
 
-                  {isOpen &&
-                    (isExpanded || isHovered || isMobileOpen) &&
-                    renderItems(item.subItems, key, level + 1)}
-                </>
-              ) : (
-                item.path && (
-                  <Link
-                    href={item.path}
-                    className={`flex items-center p-2 rounded-lg transition
-                      ${
-                        isActive(item.path)
-                          ? "bg-brand-500 text-white"
-                          : "hover:bg-gray-100 dark:hover:bg-gray-800"
-                      }
-                    `}
-                  >
-                    {item.icon && (
-                      <span className="mr-3">{item.icon}</span>
-                    )}
-                    {(isExpanded || isHovered || isMobileOpen) && (
-                      <span>{item.name}</span>
-                    )}
-                  </Link>
-                )
-              )}
+          if (item.subItems) {
+            return (
+              <li key={key} className="min-w-0">
+                <button
+                  type="button"
+                  onClick={() => toggleMenu(key)}
+                  className={[
+                    btnBase,
+                    padLeft,
+                    parentBtn,
+                    isOpen ? parentBtnOpen : "",
+                  ].join(" ")}
+                  style={{
+                    color: FORTUNA_PRIMARY_RED,
+                  }}
+                >
+                  {item.icon ? <span className="mr-3 shrink-0">{item.icon}</span> : null}
+
+                  {showText ? (
+                    <>
+                      <span className="flex-1 text-left truncate">{item.name}</span>
+                      <ChevronDownIcon
+                        className={`w-4 h-4 shrink-0 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        style={{ color: FORTUNA_PRIMARY_RED }}
+                      />
+                    </>
+                  ) : null}
+                </button>
+
+                {isOpen && showText ? (
+                  <div className="mt-2 pl-2 pr-2">
+                    {/* ✅ ONE clean box per open group (no repeated vertical lines) */}
+                    <div
+                      className="w-full rounded-2xl border overflow-hidden"
+                      style={{
+                        borderColor: "rgba(0,95,153,0.25)",
+                        backgroundColor: "rgba(0,95,153,0.06)",
+                      }}
+                    >
+                      <div className="p-2">
+                        {renderItems(item.subItems, key, level + 1)}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+              </li>
+            );
+          }
+
+          // Leaf link
+          if (!item.path) return null;
+
+          const active = isActive(item.path);
+
+          return (
+            <li key={key} className="min-w-0">
+              <Link
+                href={item.path}
+                className={[
+                  linkBase,
+                  padLeft,
+                  active ? activeLink : inactiveLink,
+                ].join(" ")}
+                style={
+                  active
+                    ? { backgroundColor: FORTUNA_PRIMARY_RED }
+                    : undefined
+                }
+              >
+                {item.icon ? <span className="mr-3 shrink-0">{item.icon}</span> : null}
+                {showText ? <span className="truncate">{item.name}</span> : null}
+              </Link>
             </li>
           );
         })}
@@ -360,11 +267,7 @@ const AppSidebar: React.FC = () => {
     <aside
       className={`fixed top-0 left-0 h-screen z-50 border-r border-gray-200 
         bg-white dark:bg-gray-900 transition-all duration-300
-        ${
-          isExpanded || isHovered || isMobileOpen
-            ? "w-[290px]"
-            : "w-[90px]"
-        }
+        ${isExpanded || isHovered || isMobileOpen ? "w-[290px]" : "w-[90px]"}
         ${isMobileOpen ? "translate-x-0" : "-translate-x-full"}
         lg:translate-x-0
       `}
@@ -373,31 +276,24 @@ const AppSidebar: React.FC = () => {
     >
       <div className="p-6">
         <Link href="/">
-          <Image
-            src="/images/logo/logo.svg"
-            alt="Logo"
-            width={175}
-            height={60}
-          />
+          <Image src="/images/logo/logo.svg" alt="Logo" width={175} height={60} />
         </Link>
       </div>
 
       <div className="px-4 overflow-y-auto h-[calc(100vh-100px)]">
         <h2 className="text-xs uppercase text-gray-400 mb-3">
-          {isExpanded || isHovered ? "Menu" : <HorizontaLDots />}
+          {showText ? "Menu" : <HorizontaLDots />}
         </h2>
 
-        {renderItems(navItems)}
+        {renderItems(navItems, "menu", 0)}
 
         <h2 className="text-xs uppercase text-gray-400 mt-6 mb-3">
-          {isExpanded || isHovered ? "Others" : <HorizontaLDots />}
+          {showText ? "Others" : <HorizontaLDots />}
         </h2>
 
-        {renderItems(othersItems)}
+        {renderItems(othersItems, "others", 0)}
 
-        {(isExpanded || isHovered || isMobileOpen) && (
-          <SidebarWidget />
-        )}
+        {showText ? <SidebarWidget /> : null}
       </div>
     </aside>
   );
