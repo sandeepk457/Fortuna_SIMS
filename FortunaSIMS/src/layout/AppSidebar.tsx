@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -29,7 +29,7 @@ const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
 
 /* ===========================
-   NAVIGATION STRUCTURE (keep yours)
+   NAVIGATION STRUCTURE (YOUR FULL DATA)
 =========================== */
 const navItems: NavItem[] = [
   {
@@ -51,6 +51,7 @@ const navItems: NavItem[] = [
           { name: "Customer Master", path: "/CustomerMaster" },
         ],
       },
+
       {
         name: "Procurement",
         subItems: [
@@ -61,6 +62,7 @@ const navItems: NavItem[] = [
           { name: "Supplier Performance", path: "/SPAnalysis" },
         ],
       },
+
       {
         name: "Inventory & (WMS)",
         subItems: [
@@ -90,6 +92,67 @@ const navItems: NavItem[] = [
           },
           { name: "Smart Alerts", path: "/SmartAlerts" },
           { name: "Stock Dashboard", path: "/StockDashboard" },
+        ],
+      },
+
+      {
+        name: "Fleet & Logistics",
+        subItems: [
+          { name: "Vehicle Master", path: "sims/logistics/vehicles" },
+          { name: "Driver Master", path: "sims/logistics/drivers" },
+          { name: "Dispatch Planning", path: "sims/logistics/dispatch" },
+          { name: "Live Tracking", path: "sims/logistics/tracking" },
+          { name: "Trip Sheet Management", path: "sims/logistics/trip-sheet" },
+          { name: "Fuel & Maintenance Logs", path: "sims/logistics/maintenance" },
+        ],
+      },
+
+      {
+        name: "Sales & Orders",
+        subItems: [
+          { name: "Sales Quotation", path: "/sales/quotation" },
+          { name: "Sales Order (SO)", path: "/sales/orders" },
+          { name: "Dispatch Planning", path: "/sales/dispatch" },
+          { name: "Invoicing", path: "/sales/invoice" },
+        ],
+      },
+
+      {
+        name: "AI Forecasting",
+        subItems: [
+          { name: "Demand Forecast", path: "sims/ai/forecast" },
+          { name: "Auto Replenishment", path: "sims/ai/replenishment" },
+          { name: "Trend Analytics", path: "sims/ai/trends" },
+          { name: "Multi-Warehouse Balancing", path: "sims/ai/balancing" },
+        ],
+      },
+
+      {
+        name: "Analytics & BI",
+        subItems: [
+          { name: "Executive Dashboard", path: "sims/bi/executive-dashboard" },
+          { name: "Procurement Dashboard", path: "sims/bi/procurement-dashboard" },
+          { name: "Inventory Dashboard", path: "sims/bi/inventory-dashboard" },
+          { name: "Sales Dashboard", path: "sims/bi/sales-dashboard" },
+          { name: "Logistics Dashboard", path: "sims/bi/logistics-dashboard" },
+          { name: "KPI Monitoring", path: "sims/bi/kpi-monitoring" },
+          { name: "AI Predictive Insights", path: "sims/bi/predictive-insights" },
+          { name: "Custom Report Builder", path: "sims/bi/report-builder" },
+          { name: "Data Visualization", path: "sims/bi/data-visualization" },
+          { name: "Export & Integration", path: "sims/bi/export-integration" },
+        ],
+      },
+
+      {
+        name: "Reports",
+        subItems: [
+          { name: "Stock Movement Reports", path: "/sims/reports/stock" },
+          { name: "Procurement Reports", path: "sims/reports/procurement" },
+          { name: "Inventory Reports", path: "sims/reports/inventory" },
+          { name: "Sales Reports", path: "sims/reports/sales" },
+          { name: "Logistics Reports", path: "sims/reports/logistics" },
+          { name: "Executive MIS Dashboard", path: "sims/reports/mis" },
+          { name: "Cycle Count Reports", path: "/sims/inventory/cycle-count/reports" },
         ],
       },
     ],
@@ -135,45 +198,31 @@ const AppSidebar: React.FC = () => {
   const { isExpanded, isMobileOpen, isHovered, setIsHovered } = useSidebar();
   const pathname = usePathname();
 
-  /** openMenus stores unique keys (no collision) */
+  // ✅ Only user-click should open menus (no auto expand on refresh)
   const [openMenus, setOpenMenus] = useState<string[]>([]);
 
   const showText = isExpanded || isHovered || isMobileOpen;
 
-  const isActive = useCallback(
-    (path?: string) => !!path && pathname === path,
-    [pathname]
-  );
+  const isActive = useCallback((path?: string) => !!path && pathname === path, [pathname]);
 
   const toggleMenu = (key: string) => {
     setOpenMenus((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   };
 
-  /** --- Styles (keep your old font - do NOT set font-family anywhere) --- */
+  // unique stable key
+  const buildKey = (parentKey: string, index: number, name: string) => `${parentKey}::${index}::${name}`;
+
   const btnBase =
-    "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] " +
-    "leading-tight select-none";
+    "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] leading-tight select-none";
 
-  const parentBtn =
-    "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800";
+  const parentBtn = "bg-white hover:bg-gray-50 dark:bg-gray-900 dark:hover:bg-gray-800";
 
-  const parentBtnOpen =
-    "bg-[#005F99]/10 border border-[#005F99]/20";
+  const parentBtnOpen = "bg-[#005F99]/10 border border-[#005F99]/20";
 
-  const linkBase =
-    "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] leading-tight";
+  const linkBase = "flex items-center w-full rounded-xl transition px-3 py-2.5 text-[15px] leading-tight";
 
-  const activeLink =
-    "text-white shadow-sm";
+  const inactiveLink = "text-[#C8102E] hover:bg-gray-50 dark:hover:bg-gray-800";
 
-  const inactiveLink =
-    "text-[#C8102E] hover:bg-gray-50 dark:hover:bg-gray-800";
-
-  /** ✅ Key builder: stable + unique */
-  const buildKey = (parentKey: string, index: number, name: string) =>
-    `${parentKey}::${index}::${name}`;
-
-  /** ✅ Recursive renderer (NO hooks inside map) */
   const renderItems = (items: NavItem[], parentKey = "root", level = 0) => {
     return (
       <ul className={level === 0 ? "space-y-2" : "space-y-2"}>
@@ -181,7 +230,6 @@ const AppSidebar: React.FC = () => {
           const key = buildKey(parentKey, idx, item.name);
           const isOpen = openMenus.includes(key);
 
-          // indentation: controlled padding, NOT margins (prevents overflow)
           const padLeft = level === 0 ? "pl-1" : level === 1 ? "pl-2" : "pl-3";
 
           if (item.subItems) {
@@ -190,15 +238,8 @@ const AppSidebar: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => toggleMenu(key)}
-                  className={[
-                    btnBase,
-                    padLeft,
-                    parentBtn,
-                    isOpen ? parentBtnOpen : "",
-                  ].join(" ")}
-                  style={{
-                    color: FORTUNA_PRIMARY_RED,
-                  }}
+                  className={[btnBase, padLeft, parentBtn, isOpen ? parentBtnOpen : ""].join(" ")}
+                  style={{ color: FORTUNA_PRIMARY_RED }}
                 >
                   {item.icon ? <span className="mr-3 shrink-0">{item.icon}</span> : null}
 
@@ -215,7 +256,6 @@ const AppSidebar: React.FC = () => {
 
                 {isOpen && showText ? (
                   <div className="mt-2 pl-2 pr-2">
-                    {/* ✅ ONE clean box per open group (no repeated vertical lines) */}
                     <div
                       className="w-full rounded-2xl border overflow-hidden"
                       style={{
@@ -223,9 +263,7 @@ const AppSidebar: React.FC = () => {
                         backgroundColor: "rgba(0,95,153,0.06)",
                       }}
                     >
-                      <div className="p-2">
-                        {renderItems(item.subItems, key, level + 1)}
-                      </div>
+                      <div className="p-2">{renderItems(item.subItems, key, level + 1)}</div>
                     </div>
                   </div>
                 ) : null}
@@ -233,7 +271,6 @@ const AppSidebar: React.FC = () => {
             );
           }
 
-          // Leaf link
           if (!item.path) return null;
 
           const active = isActive(item.path);
@@ -242,16 +279,8 @@ const AppSidebar: React.FC = () => {
             <li key={key} className="min-w-0">
               <Link
                 href={item.path}
-                className={[
-                  linkBase,
-                  padLeft,
-                  active ? activeLink : inactiveLink,
-                ].join(" ")}
-                style={
-                  active
-                    ? { backgroundColor: FORTUNA_PRIMARY_RED }
-                    : undefined
-                }
+                className={[linkBase, padLeft, active ? "text-white shadow-sm" : inactiveLink].join(" ")}
+                style={active ? { backgroundColor: FORTUNA_PRIMARY_RED } : undefined}
               >
                 {item.icon ? <span className="mr-3 shrink-0">{item.icon}</span> : null}
                 {showText ? <span className="truncate">{item.name}</span> : null}
@@ -281,16 +310,10 @@ const AppSidebar: React.FC = () => {
       </div>
 
       <div className="px-4 overflow-y-auto h-[calc(100vh-100px)]">
-        <h2 className="text-xs uppercase text-gray-400 mb-3">
-          {showText ? "Menu" : <HorizontaLDots />}
-        </h2>
-
+        <h2 className="text-xs uppercase text-gray-400 mb-3">{showText ? "Menu" : <HorizontaLDots />}</h2>
         {renderItems(navItems, "menu", 0)}
 
-        <h2 className="text-xs uppercase text-gray-400 mt-6 mb-3">
-          {showText ? "Others" : <HorizontaLDots />}
-        </h2>
-
+        <h2 className="text-xs uppercase text-gray-400 mt-6 mb-3">{showText ? "Others" : <HorizontaLDots />}</h2>
         {renderItems(othersItems, "others", 0)}
 
         {showText ? <SidebarWidget /> : null}
