@@ -10,4 +10,4 @@ const pool = new Pool({
   database: "fortuna_sims_db",
 });
 
-export default pool;
+export { pool };

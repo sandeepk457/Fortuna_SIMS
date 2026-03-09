@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 type Status = "Active" | "Inactive";
@@ -86,7 +85,7 @@ const DEFAULT_USERS: User[] = [
 
 export default function UserMasterPage() {
 
-  const [data, setData] = useState<User[]>(DEFAULT_USERS);
+  const [data, setData] = useState<User[]>([]);
 
   /* ===== Filters ===== */
 
@@ -95,6 +94,12 @@ const [searchId, setSearchId] = useState("");
 const [searchEmail, setSearchEmail] = useState("");
 const [searchPhone, setSearchPhone] = useState("");
 const [searchRole, setSearchRole] = useState("");
+
+useEffect(() => {
+  fetch("/api/users")
+    .then((res) => res.json())
+    .then((data) => setData(data));
+}, []);
 
   /* ===== Pagination ===== */
 
@@ -122,24 +127,24 @@ const [searchRole, setSearchRole] = useState("");
 
   return data.filter((u) => {
 
-    const byName = u.name
-      .toLowerCase()
-      .includes(searchName.toLowerCase());
+    const byName = (u.name || "")
+  .toLowerCase()
+  .includes(searchName.toLowerCase());
 
-    const byId = u.employeeId
-      .toLowerCase()
-      .includes(searchId.toLowerCase());
+    const byId = (u.employee_id || "")
+  .toLowerCase()
+  .includes(searchId.toLowerCase());
 
-    const byEmail = u.email
-      .toLowerCase()
-      .includes(searchEmail.toLowerCase());
+    const byEmail = (u.email || "")
+  .toLowerCase()
+  .includes(searchEmail.toLowerCase());
 
-    const byPhone = u.phone
-      .includes(searchPhone);
+    const byPhone = (u.phone || "")
+  .includes(searchPhone);
 
-    const byRole = u.role
-      .toLowerCase()
-      .includes(searchRole.toLowerCase());
+    const byRole = (u.role || "")
+  .toLowerCase()
+  .includes(searchRole.toLowerCase());
 
     return byName && byId && byEmail && byPhone && byRole;
 
@@ -227,33 +232,72 @@ const stats = {
 
   };
 
-  const onSave = () => {
+  const onSave = async () => {
 
-  if (!form.employeeId || !form.name) {
-    alert("Employee ID & Name required");
+  if (!form.employeeId) {
+    alert("Employee ID required");
     return;
   }
 
-  if (!form.role) {
-    alert("Please select role");
+  if (!form.name) {
+    alert("Name required");
     return;
   }
 
-  if (editingId) {
-
-    setData((prev) =>
-      prev.map((u) =>
-        u.employeeId === editingId ? form : u
-      )
-    );
-
-  } else {
-
-    setData((prev) => [form, ...prev]);
-
+  if (!form.phone) {
+    alert("Phone required");
+    return;
   }
 
-  closeModal();
+  try {
+
+    if (editingId) {
+
+      // UPDATE USER
+      const res = await fetch(`/api/users/${editingId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) throw new Error("Update failed");
+
+      const updated = await res.json();
+
+      setData((prev) =>
+        prev.map((u) =>
+          u.id === editingId ? updated : u
+        )
+      );
+
+      alert("User updated successfully");
+
+    } else {
+
+      // CREATE USER
+      const res = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+
+      if (!res.ok) throw new Error("Save failed");
+
+      const newUser = await res.json();
+
+      setData((prev) => [newUser, ...prev]);
+
+      alert("User created successfully");
+
+    }
+
+    closeModal();
+
+  } catch (error) {
+
+    alert("Error saving user");
+
+  }
 
 };
 
