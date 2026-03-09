@@ -165,7 +165,7 @@ const othersItems: NavItem[] = [
     name: "Administration",
     icon: <UserCircleIcon />,
     subItems: [
-      { name: "User Management", path: "sims/admin/users" },
+      { name: "User Management", path: "/usermanagement" },
       { name: "Role & Permissions", path: "sims/admin/roles" },
       { name: "Workflow Configuration", path: "sims/admin/workflows" },
       { name: "Master Configuration", path: "sims/admin/config" },

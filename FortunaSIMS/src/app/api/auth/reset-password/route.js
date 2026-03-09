@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { Pool } from "pg";
+import { pool } from "@/lib/db";
 
 const pool = new Pool({
   host: "localhost",
