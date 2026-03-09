@@ -127,26 +127,27 @@ useEffect(() => {
 
   return data.filter((u) => {
 
-    const byName = (u.name || "")
-  .toLowerCase()
-  .includes(searchName.toLowerCase());
+    const byId = (u.employeeId || "")
+      .toLowerCase()
+      .includes(searchId.toLowerCase());
 
-    const byId = (u.employee_id || "")
-  .toLowerCase()
-  .includes(searchId.toLowerCase());
+    const byName = (u.name || "")
+      .toLowerCase()
+      .includes(searchName.toLowerCase());
 
     const byEmail = (u.email || "")
-  .toLowerCase()
-  .includes(searchEmail.toLowerCase());
+      .toLowerCase()
+      .includes(searchEmail.toLowerCase());
 
     const byPhone = (u.phone || "")
-  .includes(searchPhone);
+      .toLowerCase()
+      .includes(searchPhone.toLowerCase());
 
     const byRole = (u.role || "")
-  .toLowerCase()
-  .includes(searchRole.toLowerCase());
+      .toLowerCase()
+      .includes(searchRole.toLowerCase());
 
-    return byName && byId && byEmail && byPhone && byRole;
+    return byId && byName && byEmail && byPhone && byRole;
 
   });
 
