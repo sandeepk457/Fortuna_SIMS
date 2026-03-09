@@ -91,7 +91,10 @@ export default function UserMasterPage() {
   /* ===== Filters ===== */
 
   const [searchName, setSearchName] = useState("");
-  const [searchId, setSearchId] = useState("");
+const [searchId, setSearchId] = useState("");
+const [searchEmail, setSearchEmail] = useState("");
+const [searchPhone, setSearchPhone] = useState("");
+const [searchRole, setSearchRole] = useState("");
 
   /* ===== Pagination ===== */
 
@@ -117,21 +120,33 @@ export default function UserMasterPage() {
 
   const filteredData = useMemo(() => {
 
-    return data.filter((u) => {
+  return data.filter((u) => {
 
-      const byName = u.name
-        .toLowerCase()
-        .includes(searchName.toLowerCase());
+    const byName = u.name
+      .toLowerCase()
+      .includes(searchName.toLowerCase());
 
-      const byId = u.employeeId
-        .toLowerCase()
-        .includes(searchId.toLowerCase());
+    const byId = u.employeeId
+      .toLowerCase()
+      .includes(searchId.toLowerCase());
 
-      return byName && byId;
+    const byEmail = u.email
+      .toLowerCase()
+      .includes(searchEmail.toLowerCase());
 
-    });
+    const byPhone = u.phone
+      .includes(searchPhone);
 
-  }, [data, searchName, searchId]);
+    const byRole = u.role
+      .toLowerCase()
+      .includes(searchRole.toLowerCase());
+
+    return byName && byId && byEmail && byPhone && byRole;
+
+  });
+
+}, [data, searchName, searchId, searchEmail, searchPhone, searchRole]);
+
 
   /* ================= PAGINATION ================= */
 
@@ -382,11 +397,41 @@ const stats = {
 
                   </th>
 
-                  <th className="p-3 text-left">Email</th>
+                  <th className="p-3 text-left">
+  Email
+  <input
+    className="w-full border mt-1 px-2 py-1 text-xs"
+    placeholder="Search"
+    value={searchEmail}
+    onChange={(e) =>
+      setSearchEmail(e.target.value)
+    }
+  />
+</th>
 
-                  <th className="p-3 text-left">Phone</th>
+                  <th className="p-3 text-left">
+  Phone
+  <input
+    className="w-full border mt-1 px-2 py-1 text-xs"
+    placeholder="Search"
+    value={searchPhone}
+    onChange={(e) =>
+      setSearchPhone(e.target.value)
+    }
+  />
+</th>
 
-                  <th className="p-3 text-left">Role</th>
+                  <th className="p-3 text-left">
+  Role
+  <input
+    className="w-full border mt-1 px-2 py-1 text-xs"
+    placeholder="Search"
+    value={searchRole}
+    onChange={(e) =>
+      setSearchRole(e.target.value)
+    }
+  />
+</th>
 
                   <th className="p-3 text-left">Status</th>
 
