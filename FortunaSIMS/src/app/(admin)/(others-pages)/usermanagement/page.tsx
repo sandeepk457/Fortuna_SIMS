@@ -754,10 +754,13 @@ setData((prev) => [mappedUser, ...prev]);
               <input
   placeholder="Employee ID"
   value={form.employeeId}
-  disabled={!!editingId}
+  disabled={editingId !== null}
   onChange={(e) =>
-    setForm({ ...form, employeeId: e.target.valuetoUpperCase() })
-  }
+  setForm({
+    ...form,
+    employeeId: e.target.value.toUpperCase()
+  })
+}
   className="w-full border px-3 py-2 rounded"
 />
 
