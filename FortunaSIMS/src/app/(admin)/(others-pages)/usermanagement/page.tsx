@@ -218,13 +218,20 @@ const stats = {
 
   };
 
-  const openEdit = (u: User) => {
+ const openEdit = (u: User) => {
 
-    setForm(u);
-    setEditingId(u.employeeId);
-    setIsModalOpen(true);
+  const cleanId = u.employeeId.trim();
 
-  };
+  setForm({
+    ...u,
+    employeeId: cleanId
+  });
+
+  setEditingId(cleanId);
+
+  setIsModalOpen(true);
+
+};
 
   const closeModal = () => {
 
@@ -254,26 +261,43 @@ const stats = {
 
     if (editingId) {
 
-      // UPDATE USER
-      const res = await fetch(`/api/users/${editingId}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
+ // UPDATE USER
 
-      if (!res.ok) throw new Error("Update failed");
+const id = form.employeeId.trim().toUpperCase();
 
-      const updated = await res.json();
+const res = await fetch(`/api/users/${encodeURIComponent(form.employeeId.trim())}`, {
+  method: "PUT",
+  headers: {
+    "Content-Type": "application/json"
+  },
+  body: JSON.stringify({
+    name: form.name,
+    email: form.email,
+    phone: form.phone,
+    department: form.department,
+    role: form.role,
+    status: form.status
+  })
+});
 
-      setData((prev) =>
-        prev.map((u) =>
-          u.id === editingId ? updated : u
-        )
-      );
+const result = await res.json();
 
-      alert("User updated successfully");
+if (!res.ok) {
+  alert(result.error || "Update failed");
+  return;
+}
 
-    } else {
+const updatedUser: User = result;
+
+setData(prev =>
+  prev.map(u =>
+    u.employeeId === updatedUser.employeeId ? updatedUser : u
+  )
+);
+
+alert("User updated successfully");
+    }    
+    else {
 
       // CREATE USER
       const res = await fetch("/api/users", {
@@ -286,7 +310,18 @@ const stats = {
 
       const newUser = await res.json();
 
-      setData((prev) => [newUser, ...prev]);
+      /* API snake_case handle */
+      const mappedUser: User = {
+        employeeId: newUser.employeeId || newUser.employee_id,
+        name: newUser.name,
+        email: newUser.email,
+        phone: newUser.phone,
+        department: newUser.department,
+        role: newUser.role,
+        status: newUser.status,
+      };
+
+setData((prev) => [mappedUser, ...prev]);
 
       alert("User created successfully");
 
@@ -294,11 +329,10 @@ const stats = {
 
     closeModal();
 
-  } catch (error) {
-
-    alert("Error saving user");
-
-  }
+  } catch (error: any) {
+  console.error("Save/Update Error:", error);
+  alert(error?.message || "Error saving user");
+}
 
 };
 
@@ -718,13 +752,14 @@ const stats = {
             <div className="space-y-3">
 
               <input
-                placeholder="Employee ID"
-                value={form.employeeId}
-                onChange={(e) =>
-                  setForm({ ...form, employeeId: e.target.value })
-                }
-                className="w-full border px-3 py-2 rounded"
-              />
+  placeholder="Employee ID"
+  value={form.employeeId}
+  disabled={!!editingId}
+  onChange={(e) =>
+    setForm({ ...form, employeeId: e.target.valuetoUpperCase() })
+  }
+  className="w-full border px-3 py-2 rounded"
+/>
 
               <input
                 placeholder="Full Name"

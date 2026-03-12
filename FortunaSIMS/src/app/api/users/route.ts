@@ -6,23 +6,22 @@ import { pool } from "@/lib/db";
 export async function GET() {
 
   const result = await pool.query(`
-  SELECT
-    id,
-    employee_id AS "employeeId",
-    name,
-    email,
-    phone,
-    department,
-    role,
-    status
-  FROM user_master
-  ORDER BY id DESC
-`);
+    SELECT
+      id,
+      employee_id AS "employeeId",
+      name,
+      email,
+      phone,
+      department,
+      role,
+      status
+    FROM user_master
+    ORDER BY id DESC
+  `);
 
   return NextResponse.json(result.rows);
 
 }
-
 
 /* ADD USER */
 
@@ -40,24 +39,31 @@ export async function POST(req: Request) {
     status
   } = body;
 
-  const query = `
+  const result = await pool.query(
+    `
     INSERT INTO user_master
     (employee_id, name, email, phone, department, role, status)
     VALUES ($1,$2,$3,$4,$5,$6,$7)
-    RETURNING *
-  `;
-
-  const values = [
-    employeeId,
-    name,
-    email,
-    phone,
-    department,
-    role,
-    status
-  ];
-
-  const result = await pool.query(query, values);
+    RETURNING
+      id,
+      employee_id AS "employeeId",
+      name,
+      email,
+      phone,
+      department,
+      role,
+      status
+    `,
+    [
+      employeeId.trim().toUpperCase(),
+      name,
+      email,
+      phone,
+      department,
+      role,
+      status
+    ]
+  );
 
   return NextResponse.json(result.rows[0]);
 
