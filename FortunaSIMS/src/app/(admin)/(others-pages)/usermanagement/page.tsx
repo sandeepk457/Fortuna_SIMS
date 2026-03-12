@@ -336,15 +336,36 @@ setData((prev) => [mappedUser, ...prev]);
 
 };
 
-  const onDelete = (id: string) => {
+  const onDelete = async (id: string) => {
 
-    if (!confirm("Delete user?")) return;
+  if (!confirm("Are you sure you want to delete this user?")) return;
+
+  try {
+
+    const res = await fetch(`/api/users/${encodeURIComponent(id)}`, {
+      method: "DELETE"
+    });
+
+    const result = await res.json();
+
+    if (!res.ok) {
+      throw new Error(result.error || "Delete failed");
+    }
 
     setData((prev) =>
       prev.filter((u) => u.employeeId !== id)
     );
 
-  };
+    alert("User deleted successfully");
+
+  } catch (error: any) {
+
+    console.error("Delete Error:", error);
+    alert(error.message || "Delete failed");
+
+  }
+
+};
 
   /* ================= EXPORT ================= */
 

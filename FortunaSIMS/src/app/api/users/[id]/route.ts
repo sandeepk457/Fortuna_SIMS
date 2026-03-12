@@ -67,3 +67,48 @@ export async function PUT(
 
   }
 }
+
+/* DELETE USER */
+
+export async function DELETE(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+
+    const { id } = await params;
+
+    const employeeId = decodeURIComponent(id).trim().toUpperCase();
+
+    const result = await pool.query(
+      `
+      DELETE FROM user_master
+      WHERE employee_id = $1
+      RETURNING employee_id
+      `,
+      [employeeId]
+    );
+
+    if (!result.rows.length) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "User deleted successfully"
+    });
+
+  } catch (error) {
+
+    console.error("DELETE ERROR:", error);
+
+    return NextResponse.json(
+      { error: "Delete failed" },
+      { status: 500 }
+    );
+
+  }
+}
