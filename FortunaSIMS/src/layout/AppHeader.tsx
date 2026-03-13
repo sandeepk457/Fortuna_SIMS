@@ -8,7 +8,18 @@ import Link from "next/link";
 import React, { useState ,useEffect,useRef} from "react";
 
 const AppHeader: React.FC = () => {
+  const [user,setUser] = useState<any>(null)
   const [isApplicationMenuOpen, setApplicationMenuOpen] = useState(false);
+
+  useEffect(() => {
+
+    const storedUser = localStorage.getItem("sims_user");
+
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
+    }
+
+  }, []);
 
   const { isMobileOpen, toggleSidebar, toggleMobileSidebar } = useSidebar();
 
@@ -169,7 +180,15 @@ const AppHeader: React.FC = () => {
             {/* <!-- Notification Menu Area --> */}
           </div>
           {/* <!-- User Area --> */}
-          <UserDropdown /> 
+          <div className="flex items-center gap-3">
+
+{/* <span className="text-sm font-semibold text-gray-700 dark:text-white">
+{user?.full_name}
+</span> */}
+
+<UserDropdown />
+
+</div>
     
         </div>
       </div>

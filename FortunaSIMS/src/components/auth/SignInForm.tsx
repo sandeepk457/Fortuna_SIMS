@@ -25,22 +25,50 @@ export default function SignInPage() {
   // ✅ Popup state
   const [forgotOpen, setForgotOpen] = useState(false);
 
-  const onSubmit = (e) => {
-    e.preventDefault();
+  const onSubmit = async (e) => {
 
-    if (!email.trim() || !password.trim()) {
-      alert("Please enter email & password");
-      return;
-    }
+  e.preventDefault();
 
-    if (isChecked) {
-      localStorage.setItem("FORTUNA_KEEP_LOGGED_IN", "1");
+  if (!email.trim() || !password.trim()) {
+    alert("Please enter email & password");
+    return;
+  }
+
+  try {
+
+    const res = await fetch("http://localhost:5000/api/auth/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        email: email,
+        password: password
+      })
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+
+      localStorage.setItem("sims_user", JSON.stringify(data.user));
+
+      router.push("/");
+
     } else {
-      localStorage.removeItem("FORTUNA_KEEP_LOGGED_IN");
+
+      alert(data.message);
+
     }
 
-    router.push("/");
-  };
+  } catch (error) {
+
+    console.log(error);
+    alert("Server error");
+
+  }
+
+};
 
   return (
     <>
