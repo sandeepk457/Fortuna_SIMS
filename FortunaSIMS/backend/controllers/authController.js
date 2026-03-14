@@ -4,14 +4,16 @@
 // =========================
 
 const pool = require("../config/db");
-
+const bcrypt = require("bcrypt");
 exports.signup = async (req, res) => {
 
   try {
-
+    console.log("Signup Body:", req.body);
     const { full_name, email, password, terms_accepted } = req.body;
 
-    // 1️⃣ Check user exists in user_master (ADMIN CREATED USERS)
+    // 🔐 Hash password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    console.log("HASHED PASSWORD:", hashedPassword);
     const masterUser = await pool.query(
       "SELECT * FROM user_master WHERE email=$1",
       [email]
@@ -24,7 +26,6 @@ exports.signup = async (req, res) => {
       });
     }
 
-    // 2️⃣ Check already registered
     const checkUser = await pool.query(
       "SELECT * FROM users_signup WHERE email=$1",
       [email]
@@ -37,13 +38,12 @@ exports.signup = async (req, res) => {
       });
     }
 
-    // 3️⃣ Insert signup
     const result = await pool.query(
       `INSERT INTO users_signup
       (full_name,email,password,terms_accepted)
       VALUES($1,$2,$3,$4)
       RETURNING *`,
-      [full_name,email,password,terms_accepted]
+      [full_name,email,hashedPassword,terms_accepted]
     );
 
     res.json({
@@ -107,14 +107,14 @@ exports.login = async (req,res)=>{
     }
 
     // STEP 3 → Validate password
-    if(user.rows[0].password !== password){
+    const isMatch = await bcrypt.compare(password, user.rows[0].password);
 
-      return res.json({
-        success:false,
-        message:"Invalid password"
-      });
-
-    }
+if(!isMatch){
+  return res.json({
+    success:false,
+    message:"Invalid password"
+  });
+}
 
     // STEP 4 → Login success
     res.json({
