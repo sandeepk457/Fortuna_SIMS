@@ -15,12 +15,23 @@ export default function SignUpPage() {
 
   const [fullName,setFullName] = useState("")
   const [email,setEmail] = useState("")
+  const [mobile,setMobile] = useState("")
   const [password,setPassword] = useState("")
   const [confirmPassword,setConfirmPassword] = useState("")
 
   const handleSubmit = async (e) => {
 
   e.preventDefault()
+
+  if(password.length < 8 || password.length > 10){
+    alert("Password must be 8 to 10 characters")
+    return
+  }
+
+  if(!/^[0-9]{10}$/.test(mobile)){
+    alert("Mobile number must be 10 digits")
+    return
+  }
 
   if(password !== confirmPassword){
     alert("Passwords do not match")
@@ -37,10 +48,11 @@ export default function SignUpPage() {
       body:JSON.stringify({
         full_name:fullName,
         email:email,
+        mobile:mobile,
         password:password,
         terms_accepted:isChecked
       })
-    })
+    });
 
     const data = await res.json()
 
@@ -81,13 +93,13 @@ export default function SignUpPage() {
         <div className="w-full max-w-md">
 
           {/* Back link */}
-          <Link
+          {/* <Link
             href="/"
             className="inline-flex items-center mb-6 text-sm text-gray-500 hover:text-gray-700"
           >
             <ChevronLeftIcon />
             Back to dashboard
-          </Link>
+          </Link> */}
 
           {/* Header */}
           <h1 className="mb-2 text-2xl font-semibold text-gray-800">
@@ -121,6 +133,26 @@ export default function SignUpPage() {
 />
             </div>
 
+          {/* Mobile Number */}
+<div>
+  <Label>
+    Mobile Number <span className="text-error-500">*</span>
+  </Label>
+
+  <Input
+    type="text"
+    placeholder="Enter mobile number"
+    value={mobile}
+    maxLength={10}
+    onChange={(e)=>{
+      const value = e.target.value.replace(/\D/g,"")
+      if(value.length <= 10){
+        setMobile(value)
+      }
+    }}
+  />
+</div>
+
             {/* Password */}
             <div>
               <Label>
@@ -130,9 +162,10 @@ export default function SignUpPage() {
                 <Input
                   type={showPassword ? "text" : "password"}
                   placeholder="Create a password"
-                  value={password}
-                  onChange={(e)=>setPassword(e.target.value)}
-                  />
+                    value={password}
+                    minLength={8}
+                    maxLength={10}
+                    onChange={(e)=>setPassword(e.target.value)}/>
                 <span
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer"
@@ -156,6 +189,8 @@ export default function SignUpPage() {
   type={showConfirmPassword ? "text" : "password"}
   placeholder="Confirm your password"
   value={confirmPassword}
+  minLength={8}
+  maxLength={10}
   onChange={(e)=>setConfirmPassword(e.target.value)}
 />
                 <span

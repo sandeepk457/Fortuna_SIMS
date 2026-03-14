@@ -243,19 +243,31 @@ const stats = {
   const onSave = async () => {
 
   if (!form.employeeId) {
-    alert("Employee ID required");
-    return;
-  }
+  alert("Employee ID required");
+  return;
+}
 
-  if (!form.name) {
-    alert("Name required");
-    return;
-  }
+if (!form.name) {
+  alert("Name required");
+  return;
+}
 
-  if (!form.phone) {
-    alert("Phone required");
-    return;
-  }
+if (!form.phone) {
+  alert("Phone required");
+  return;
+}
+
+if (!form.email) {
+  alert("Email required");
+  return;
+}
+
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+if (!emailRegex.test(form.email)) {
+  alert("Please enter valid email address");
+  return;
+}
 
   try {
 
@@ -777,40 +789,46 @@ setData((prev) => [mappedUser, ...prev]);
   value={form.employeeId}
   disabled={editingId !== null}
   onChange={(e) =>
-  setForm({
-    ...form,
-    employeeId: e.target.value.toUpperCase()
-  })
-}
+    setForm({
+      ...form,
+      employeeId: e.target.value.replace(/\s/g, "").toUpperCase()
+    })
+  }
+  className="w-full border px-3 py-2 rounded"
+/>
+              <input
+  placeholder="Full Name"
+  value={form.name}
+  onChange={(e) => {
+    const value = e.target.value.replace(/[^a-zA-Z\s]/g, "");
+    setForm({ ...form, name: value });
+  }}
   className="w-full border px-3 py-2 rounded"
 />
 
               <input
-                placeholder="Full Name"
-                value={form.name}
-                onChange={(e) =>
-                  setForm({ ...form, name: e.target.value })
-                }
-                className="w-full border px-3 py-2 rounded"
-              />
+  type="email"
+  placeholder="Email"
+  value={form.email}
+  onChange={(e) => {
+    const value = e.target.value.trim();
+    setForm({ ...form, email: value });
+  }}
+  className="w-full border px-3 py-2 rounded"
+/>
 
               <input
-                placeholder="Email"
-                value={form.email}
-                onChange={(e) =>
-                  setForm({ ...form, email: e.target.value })
-                }
-                className="w-full border px-3 py-2 rounded"
-              />
-
-              <input
-                placeholder="Phone"
-                value={form.phone}
-                onChange={(e) =>
-                  setForm({ ...form, phone: e.target.value })
-                }
-                className="w-full border px-3 py-2 rounded"
-              />
+  placeholder="Phone"
+  value={form.phone}
+  maxLength={10}
+  onChange={(e) => {
+    const value = e.target.value.replace(/\D/g, "");
+    if (value.length <= 10) {
+      setForm({ ...form, phone: value });
+    }
+  }}
+  className="w-full border px-3 py-2 rounded"
+/>
 
               <input
                 placeholder="Department"
