@@ -6,6 +6,7 @@ const FORTUNA_PRIMARY = "#C8102E";
 const FORTUNA_BLUE = "#005F99";
 
 export default function ForgotPasswordPopup({ open, onClose, onSent }) {
+
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
   const [msg, setMsg] = useState("");
@@ -31,29 +32,52 @@ export default function ForgotPasswordPopup({ open, onClose, onSent }) {
     return () => window.removeEventListener("keydown", onEsc);
   }, [open, onClose]);
 
+  // ✅ ADD THIS FUNCTION
   const handleSend = async (e) => {
     e.preventDefault();
-    setErr("");
-    setMsg("");
 
-    if (!email.trim()) return setErr("Please enter your email.");
-    if (!isValidEmail) return setErr("Please enter a valid email address.");
+    if (!isValidEmail) {
+      setErr("Enter valid email");
+      return;
+    }
 
-    setSending(true);
     try {
-      // TODO: connect backend later
-      // await fetch("/api/auth/forgot-password", { method:"POST", ... })
 
-      await new Promise((r) => setTimeout(r, 600));
-      setMsg("Reset link sent. Please check your email.");
+      setSending(true);
+      setErr("");
+      setMsg("");
 
-      onSent?.(email.trim());
-    } catch {
-      setErr("Unable to send reset link. Please try again.");
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: email
+        })
+      });
+
+      const data = await res.json();
+
+      if (data.ok) {
+        setMsg("Reset link sent. Please check your email.");
+        onSent?.();
+      } else {
+        setErr("Unable to send reset link.");
+      }
+
+    } catch (error) {
+
+      console.error(error);
+      setErr("Server error");
+
     } finally {
+
       setSending(false);
+
     }
   };
+
 
   if (!open) return null;
 
