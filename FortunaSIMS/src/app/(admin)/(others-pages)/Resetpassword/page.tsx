@@ -2,12 +2,12 @@
 
 import { useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import Link from "next/link";
 
 const FORTUNA_PRIMARY = "#C8102E";
 const FORTUNA_BLUE = "#005F99";
 
 export default function ResetPasswordPage() {
+
   const sp = useSearchParams();
   const router = useRouter();
   const token = sp.get("token") || "";
@@ -18,7 +18,8 @@ export default function ResetPasswordPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState(false);
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async (e: any) => {
+
     e.preventDefault();
     setErr("");
 
@@ -27,89 +28,211 @@ export default function ResetPasswordPage() {
     if (password !== confirm) return setErr("Passwords do not match.");
 
     setSaving(true);
+
     try {
+
       const res = await fetch("/api/auth/reset-password", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, password }),
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ token, password })
       });
 
       const data = await res.json();
-      if (!res.ok || !data.ok) {
-        setErr(data.message || "Reset failed.");
+
+      if (!data.ok) {
+        setErr(data.message || "Reset failed");
         return;
       }
 
       setOk(true);
-      setTimeout(() => router.push("/signin"), 900);
+
+      setTimeout(() => {
+        router.push("/signin");
+      }, 1500);
+
     } catch {
-      setErr("Server error. Please try again.");
+
+      setErr("Server error");
+
     } finally {
+
       setSaving(false);
+
     }
+
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-white p-6">
-      <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white shadow-xl overflow-hidden">
-        <div className="h-1.5" style={{ background: FORTUNA_PRIMARY }} />
-        <div className="p-6">
-          <Link href="/signin" className="text-sm hover:underline" style={{ color: FORTUNA_PRIMARY }}>
-            ← Back to Sign In
-          </Link>
 
-          <h1 className="mt-4 text-2xl font-semibold text-gray-900">Reset Password</h1>
-          <p className="mt-2 text-sm text-gray-600">
-            Create a new password for your account.
+    <div
+  style={{
+    position: "fixed",
+    top: 0,
+    left: 0,
+    width: "100vw",
+    height: "100vh",
+    background: "#E6EEF5",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 999999
+  }}
+>
+
+      {/* SIMS Watermark */}
+      <img src="../../../../../public/images/logo/sims-logo.png"
+       alt="SIMS Logo"
+        style={{
+          position: "absolute",
+          opacity: 0.06,
+          width: "600px"
+        }}
+      />
+
+      {/* Card */}
+      <div
+        style={{
+          width: "420px",
+          background: "#fff",
+          borderRadius: "16px",
+          boxShadow: "0 10px 30px rgba(0,0,0,0.1)",
+          padding: "35px",
+          textAlign: "center"
+        }}
+      >
+
+        <h2
+          style={{
+            color: FORTUNA_PRIMARY,
+            fontWeight: 700,
+            marginBottom: "20px",
+            marginTop: "10px"
+          }}
+        >
+          Reset Password
+        </h2>
+
+        <p style={{ color: FORTUNA_BLUE, marginBottom: "25px" }}>
+ " create a new secure password for your Fortuna SIMS account. Make sure to choose a strong password that you haven't used before."
+</p>
+
+        <form onSubmit={handleSubmit}>
+
+          {/* New Password */}
+          <div style={{ marginBottom: "15px", textAlign: "left" }}>
+            <label style={{ fontSize: "14px" }}>
+              New Password
+            </label>
+
+            <input
+              type="password"
+              placeholder="Enter new password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #dbeafe",
+                marginTop: "6px",
+                background: "#EFF6FF"
+              }}
+            />
+          </div>
+
+          {/* Confirm Password */}
+          <div style={{ marginBottom: "15px", textAlign: "left" }}>
+            <label style={{ fontSize: "14px" }}>
+              Confirm Password
+            </label>
+
+            <input
+              type="password"
+              placeholder="Confirm password"
+              value={confirm}
+              onChange={(e) => setConfirm(e.target.value)}
+              style={{
+                width: "100%",
+                padding: "12px",
+                borderRadius: "10px",
+                border: "1px solid #dbeafe",
+                marginTop: "6px",
+                background: "#EFF6FF"
+              }}
+            />
+          </div>
+
+          {/* Error */}
+          {err && (
+            <div
+              style={{
+                background: "#fee2e2",
+                color: "#b91c1c",
+                padding: "10px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                fontSize: "14px"
+              }}
+            >
+              {err}
+            </div>
+          )}
+
+          {/* Success */}
+          {ok && (
+            <div
+              style={{
+                background: "#dcfce7",
+                color: "#15803d",
+                padding: "10px",
+                borderRadius: "8px",
+                marginBottom: "15px",
+                fontSize: "14px"
+              }}
+            >
+              Password updated successfully
+            </div>
+          )}
+
+          {/* Button */}
+          <button
+            disabled={saving}
+            style={{
+              width: "100%",
+              padding: "12px",
+              borderRadius: "10px",
+              background: FORTUNA_PRIMARY,
+              color: "#fff",
+              border: "none",
+              fontWeight: 600,
+              cursor: "pointer"
+            }}
+          >
+            {saving ? "Updating..." : "Update Password"}
+          </button>
+
+        </form>
+
+        {/* Powered By */}
+        <div style={{ marginTop: "30px", opacity: 0.7 }}>
+          <p style={{ fontSize: "12px" }}>Powered by
+            <img src="/images/logo/fortuna-global.png" alt="Fortuna Global Logo"
+            style={{ width: "300px", marginTop: "-4px"}} />
           </p>
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            <div>
-              <label className="text-sm font-medium text-gray-800">New Password *</label>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-200 bg-[#EFF6FF] px-4 py-3 outline-none focus:ring-2"
-                style={{ "--tw-ring-color": FORTUNA_BLUE }}
-                placeholder="Enter new password"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-gray-800">Confirm Password *</label>
-              <input
-                type="password"
-                value={confirm}
-                onChange={(e) => setConfirm(e.target.value)}
-                className="mt-2 w-full rounded-xl border border-gray-200 bg-[#EFF6FF] px-4 py-3 outline-none focus:ring-2"
-                style={{ "--tw-ring-color": FORTUNA_BLUE }}
-                placeholder="Confirm new password"
-              />
-            </div>
-
-            {err ? (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {err}
-              </div>
-            ) : null}
-
-            {ok ? (
-              <div className="rounded-xl border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-700">
-                Password updated successfully. Redirecting…
-              </div>
-            ) : null}
-
-            <button
-              disabled={saving}
-              className="w-full rounded-xl py-3 font-semibold text-white disabled:opacity-60"
-              style={{ background: FORTUNA_PRIMARY }}
-            >
-              {saving ? "Updating..." : "Update Password"}
-            </button>
-          </form>
+          <img
+            src="/images/logo/sims-logo.png"
+            alt="Fortuna SIMS Logo"
+            style={{ width: "150px",marginTop: "5px" }}
+          />
         </div>
+
       </div>
+
     </div>
+
   );
+
 }

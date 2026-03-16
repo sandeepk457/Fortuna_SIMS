@@ -50,9 +50,12 @@ export async function POST(req) {
        VALUES ($1,$2,NOW()+ interval '1 hour',NOW())`,
       [userId, tokenHash]
     );
+      // old link
+    // const resetLink =
+    //   `http://localhost:3000/reset-password?token=${token}`;
 
-    const resetLink =
-      `http://localhost:3000/reset-password?token=${token}`;
+      const resetLink =
+  `http://localhost:3000/Resetpassword?token=${token}`;
 
     await transporter.sendMail({
       to: email,

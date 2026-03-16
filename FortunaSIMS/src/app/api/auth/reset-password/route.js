@@ -12,19 +12,27 @@ const pool = new Pool({
 
 export async function POST(req) {
 
-  const { token, password } = await req.json();
-
   const client = await pool.connect();
 
   try {
 
-    // hash incoming token
+    const body = await req.json();
+    const { token, password } = body;
+
+    if (!token || !password) {
+      return Response.json({
+        ok:false,
+        message:"Token and password required"
+      });
+    }
+
+    // hash token
     const tokenHash = crypto
       .createHash("sha256")
       .update(token)
       .digest("hex");
 
-    // check valid reset token
+    // check reset token
     const tokenRes = await client.query(
       `SELECT id, user_id
        FROM password_reset_tokens
@@ -37,45 +45,45 @@ export async function POST(req) {
     if (tokenRes.rowCount === 0) {
 
       return Response.json({
-        ok: false,
-        message: "Invalid or expired reset token"
+        ok:false,
+        message:"Invalid or expired reset link"
       });
 
     }
 
-    const resetToken = tokenRes.rows[0];
+    const { id, user_id } = tokenRes.rows[0];
 
-    // hash new password
+    // hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // update user password
+    // update password
     await client.query(
       `UPDATE users_signup
        SET password=$1
        WHERE user_id=$2`,
-      [hashedPassword, resetToken.user_id]
+      [hashedPassword, user_id]
     );
 
-    // mark token as used
+    // mark token used
     await client.query(
       `UPDATE password_reset_tokens
-       SET used_at = NOW()
-       WHERE id = $1`,
-      [resetToken.id]
+       SET used_at=NOW()
+       WHERE id=$1`,
+      [id]
     );
 
     return Response.json({
-      ok: true,
-      message: "Password updated successfully"
+      ok:true,
+      message:"Password updated successfully"
     });
 
-  } catch (error) {
+  } catch (err) {
 
-    console.error("RESET PASSWORD ERROR:", error);
+    console.error("RESET PASSWORD ERROR:", err);
 
     return Response.json({
-      ok: false,
-      message: "Server error"
+      ok:false,
+      message:"Server error"
     });
 
   } finally {
