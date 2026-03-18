@@ -18,51 +18,55 @@ export default function ResetPasswordPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState(false);
 
-  const handleSubmit = async (e: any) => {
+  // const handleSubmit = async (e: any) => {
 
-    e.preventDefault();
-    setErr("");
+  //   e.preventDefault();
+  //   setErr("");
 
-    if (!token) return setErr("Invalid reset link.");
-    if (!password) return setErr("Please enter new password.");
-    if (password !== confirm) return setErr("Passwords do not match.");
+  //   if (!token) return setErr("Invalid reset link.");
+  //   if (!password) return setErr("Please enter new password.");
+  //   if (password !== confirm) return setErr("Passwords do not match.");
 
-    setSaving(true);
+  //   setSaving(true);
 
-    try {
+  //   try {
 
-      const res = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ token, password })
-      });
+  //     const res = await fetch("/api/auth/reset-password", {
+  //       method: "POST",
+  //       headers: {
+  //         "Content-Type": "application/json"
+  //       },
+  //       body: JSON.stringify({ token, password })
+  //     });
 
-      const data = await res.json();
+  //     const data = await res.json();
 
-      if (!data.ok) {
-        setErr(data.message || "Reset failed");
-        return;
-      }
+  //     if (!data.ok) {
+  //       setErr(data.message || "Reset failed");
+  //       return;
+  //     }
 
-      setOk(true);
+  //     setOk(true);
 
-      setTimeout(() => {
-        router.push("/signin");
-      }, 1500);
+  //     setTimeout(() => {
+  //       router.push("/signin");
+  //     }, 1500);
 
-    } catch {
+  //   } catch {
 
-      setErr("Server error");
+  //     setErr("Server error");
 
-    } finally {
+  //   } finally {
 
-      setSaving(false);
+  //     setSaving(false);
 
-    }
+  //   }
 
-  };
+  // };
+
+  // *****New code for const handleSubmit*****
+
+
 
   return (
 
