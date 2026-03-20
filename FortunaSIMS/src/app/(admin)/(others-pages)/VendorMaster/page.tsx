@@ -1,6 +1,5 @@
 "use client";
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +13,7 @@ type VendorTier = "Tier 1" | "Tier 2" | "Tier 3";
 type VendorCategory = "Packaging" | "Raw Material" | "Transport" | "3PL" | "Services";
 
 interface Vendor {
+  id: string;
   code: string;
   name: string;
   category: VendorCategory;
@@ -29,99 +29,57 @@ function classNames(...v: Array<string | false | undefined | null>) {
 
 export default function VendorMasterListPage() {
   const router = useRouter(); 
-  const [data, setData] = useState<Vendor[]>([
-    {
-      code: "VEN-001",
-      name: "Sri Lakshmi Suppliers",
-      category: "Raw Material",
-      tier: "Tier 1",
-      phone: "9000011111",
-      city: "Hyderabad",
-      status: "Active",
-    },
-    {
-      code: "VEN-002",
-      name: "Aparna Packaging",
-      category: "Packaging",
-      tier: "Tier 2",
-      phone: "9000022222",
-      city: "Vizag",
-      status: "Active",
-    },
-    {
-      code: "VEN-003",
-      name: "FastLine Transport",
-      category: "Transport",
-      tier: "Tier 1",
-      phone: "9000033333",
-      city: "Vijayawada",
-      status: "Inactive",
-    },
-    {
-      code: "VEN-004",
-      name: "Prime 3PL Warehousing",
-      category: "3PL",
-      tier: "Tier 2",
-      phone: "9000044444",
-      city: "Chennai",
-      status: "Active",
-    },
-    {
-      code: "VEN-005",
-      name: "TechFix Services",
-      category: "Services",
-      tier: "Tier 3",
-      phone: "9000055555",
-      city: "Bengaluru",
-      status: "Inactive",
-    },
-    {
-      code: "VEN-006",
-      name: "Omega Raw Traders",
-      category: "Raw Material",
-      tier: "Tier 2",
-      phone: "9000066666",
-      city: "Hyderabad",
-      status: "Active",
-    },
-    {
-      code: "VEN-007",
-      name: "BoxPro Packaging",
-      category: "Packaging",
-      tier: "Tier 1",
-      phone: "9000077777",
-      city: "Pune",
-      status: "Active",
-    },
-    {
-      code: "VEN-008",
-      name: "SkyRoute Transport",
-      category: "Transport",
-      tier: "Tier 2",
-      phone: "9000088888",
-      city: "Delhi",
-      status: "Active",
-    },
-    {
-      code: "VEN-009",
-      name: "ColdChain 3PL",
-      category: "3PL",
-      tier: "Tier 1",
-      phone: "9000099999",
-      city: "Mumbai",
-      status: "Inactive",
-    },
-    {
-      code: "VEN-010",
-      name: "General Facility Services",
-      category: "Services",
-      tier: "Tier 2",
-      phone: "9000000000",
-      city: "Hyderabad",
-      status: "Active",
-    },
-  ]);
+  const [data, setData] = useState<Vendor[]>([]);
 
+  // ✅ FETCH FUNCTION (Reusable)
+  const fetchVendors = () => {
+    fetch("http://localhost:5000/api/vendors")
+      .then((res) => res.json())
+      .then((apiData) => {
+        const mapped = apiData.map((v: any) => ({
+          id: v.id,
+          code: v.code || v.vendor_code || "",
+          name: v.name || v.vendor_name || "",
+          category: v.category || v.vendor_category || "",
+          tier: v.tier || v.vendor_tier || "",
+          phone: v.phone || v.contact_phone || "",
+          city: v.city || "",
+          status: v.status || "",
+        }));
+
+        setData(mapped);
+      })
+      .catch((err) => console.error(err));
+  };
+
+  // ✅ INITIAL LOAD
+  useEffect(() => {
+    fetchVendors();
+  }, []);
+
+  // ✅ DELETE FUNCTION
+  const handleDelete = async (id: number) => {
+    const confirmDelete = confirm("Are you sure to Delete this Vendor?");
+    if (!confirmDelete) return;
+
+    try {
+      await fetch(`http://localhost:5000/api/vendors/${id}`, {
+        method: "DELETE",
+      });
+
+      alert("Deleted Successfully");
+
+      // 🔁 Refresh list after delete
+      fetchVendors();
+
+      // ⚡ (Optional faster UI update)
+      // setData(prev => prev.filter(v => v.id !== id));
+
+    } catch (err) {
+      console.error(err);
+      alert("Delete failed");
+    }
+  };
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");
@@ -150,27 +108,29 @@ export default function VendorMasterListPage() {
   });
 
   // Filtering Logic
-  const filteredData = useMemo(() => {
-    return data.filter(
-      (v) =>
-        v.code.toLowerCase().includes(searchCode.toLowerCase()) &&
-        v.name.toLowerCase().includes(searchName.toLowerCase()) &&
-        v.phone.toLowerCase().includes(searchPhone.toLowerCase()) &&
-        v.city.toLowerCase().includes(searchCity.toLowerCase()) &&
-        (categoryFilter ? v.category === categoryFilter : true) &&
-        (tierFilter ? v.tier === tierFilter : true) &&
-        (statusFilter ? v.status === statusFilter : true)
-    );
-  }, [
-    data,
-    searchCode,
-    searchName,
-    searchPhone,
-    searchCity,
-    categoryFilter,
-    tierFilter,
-    statusFilter,
-  ]);
+  const safe = (val: any) => (val || "").toString().toLowerCase();
+
+const filteredData = useMemo(() => {
+  return data.filter(
+    (v) =>
+      safe(v.code).includes(searchCode.toLowerCase()) &&
+      safe(v.name).includes(searchName.toLowerCase()) &&
+      safe(v.phone).includes(searchPhone.toLowerCase()) &&
+      safe(v.city).includes(searchCity.toLowerCase()) &&
+      (categoryFilter ? v.category === categoryFilter : true) &&
+      (tierFilter ? v.tier === tierFilter : true) &&
+      (statusFilter ? v.status === statusFilter : true)
+  );
+}, [
+  data,
+  searchCode,
+  searchName,
+  searchPhone,
+  searchCity,
+  categoryFilter,
+  tierFilter,
+  statusFilter,
+]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
@@ -230,11 +190,16 @@ export default function VendorMasterListPage() {
   };
 
   // Actions
-  const onDelete = (code: string) => {
-    const ok = confirm(`Delete vendor ${code}?`);
-    if (!ok) return;
-    setData((p) => p.filter((x) => x.code !== code));
-  };
+const onDelete = async (id: string) => {
+  const ok = confirm("Are you sure?");
+  if (!ok) return;
+
+  await fetch(`http://localhost:5000/api/vendors/${id}`, {
+    method: "DELETE",
+  });
+
+  setData(prev => prev.filter(v => v.id !== id));
+};
 
   const onAddVendor = () => {
     if (!newVendor.code.trim() || !newVendor.name.trim()) {
@@ -463,15 +428,13 @@ export default function VendorMasterListPage() {
                       <td className="px-4 py-3 space-x-3">
                         <button
                           className="font-semibold text-blue-600 hover:underline"
-                          onClick={() =>
-                            alert(`Edit flow: open Vendor Form for ${v.code}`)
-                          }
+                          onClick={() => router.push(`/VendorForm?id=${v.id}`)}
                         >
                           Edit
                         </button>
                         <button
                           className="font-semibold text-rose-600 hover:underline"
-                          onClick={() => onDelete(v.code)}
+                          onClick={() => handleDelete(v.id)}
                         >
                           Delete
                         </button>

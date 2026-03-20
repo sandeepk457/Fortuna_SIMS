@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+import router from "next/dist/shared/lib/router/router";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -73,7 +76,7 @@ type VendorFormState = {
 
 const initialState: VendorFormState = {
   vendor_id: "Auto-generated",
-  vendor_code: "",
+  // vendor_code: "",
   vendor_name: "",
   vendor_type: "",
   vendor_category: "",
@@ -149,19 +152,19 @@ function classNames(...v: Array<string | false | undefined | null>) {
 function isEmail(v: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim());
 }
-function isPhone10to15(v: string) {
-  return /^[0-9]{10,15}$/.test(v.trim());
+function isPhone10(v: string) {
+  return /^[0-9]{10}$/.test(v.trim());
 }
 function isPostal(v: string) {
   return /^[0-9]{4,10}$/.test(v.trim());
 }
 function isPAN(v: string) {
-  // PAN: 5 letters + 4 digits + 1 letter
   return /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(v.trim().toUpperCase());
 }
-function isGSTIN15(v: string) {
-  // GSTIN is 15 chars (basic length check)
-  return v.trim().length === 15;
+function isGSTIN(v: string) {
+  return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(
+    v.trim().toUpperCase()
+  );
 }
 function isIFSC(v: string) {
   // IFSC: 4 letters + 0 + 6 alphanumeric
@@ -172,114 +175,122 @@ function isAlphaSpaces(v: string) {
 }
 
 export default function VendorMasterCreatePage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<VendorFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   const errors = useMemo(() => {
-    const e: Record<string, string> = {};
+  const e: Record<string, string> = {};
 
-    /** BASIC REQUIRED */
-    if (!form.vendor_code.trim()) e.vendor_code = "Vendor Code is required";
-    if (!form.vendor_name.trim()) e.vendor_name = "Vendor Name is required";
-    else if (form.vendor_name.trim().length < 3) e.vendor_name = "Min 3 characters";
+  /** BASIC REQUIRED */
+  if (!form.vendor_name.trim()) e.vendor_name = "Vendor Name is required";
+  else if (form.vendor_name.trim().length < 3) e.vendor_name = "Min 3 characters";
 
-    if (!form.vendor_type) e.vendor_type = "Vendor Type is required";
-    if (!form.vendor_category) e.vendor_category = "Vendor Category is required";
+  if (!form.vendor_type) e.vendor_type = "Vendor Type is required";
+  if (!form.vendor_category) e.vendor_category = "Vendor Category is required";
 
-    if (!form.contact_person_name.trim()) e.contact_person_name = "Contact Person Name is required";
-    else if (!isAlphaSpaces(form.contact_person_name)) e.contact_person_name = "Alphabets only";
+  if (!form.contact_person_name.trim()) e.contact_person_name = "Contact Person Name is required";
+  else if (!isAlphaSpaces(form.contact_person_name)) e.contact_person_name = "Alphabets only";
 
-    if (!form.contact_phone.trim()) e.contact_phone = "Contact Phone is required";
-    else if (!isPhone10to15(form.contact_phone)) e.contact_phone = "99XXXXXXXX";
+  if (!form.contact_phone.trim()) e.contact_phone = "Contact Phone is required";
+  else if (!isPhone10(form.contact_phone))
+    e.contact_phone = "Enter valid 10-digit mobile number";
 
-    if (!form.contact_email.trim()) e.contact_email = "Email is required";
-    else if (!isEmail(form.contact_email)) e.contact_email = "Invalid email format";
+  if (!form.contact_email.trim()) e.contact_email = "Email is required";
+  else if (!isEmail(form.contact_email)) e.contact_email = "Invalid email format";
 
-    if (form.alternate_phone.trim() && !isPhone10to15(form.alternate_phone)) {
-      e.alternate_phone = "Alternate phone must be 10–15 digits";
-    }
+  if (!form.registered_address.trim()) e.registered_address = "Registered Address is required";
+  if (!form.city.trim()) e.city = "City is required";
+  if (!form.state.trim()) e.state = "State is required";
+  if (!form.country.trim()) e.country = "Country is required";
 
-    if (!form.registered_address.trim()) e.registered_address = "Registered Address is required";
-    if (!form.city.trim()) e.city = "City is required";
-    if (!form.state.trim()) e.state = "State is required";
-    if (!form.country.trim()) e.country = "Country is required";
+  if (!form.postal_code.trim()) e.postal_code = "PIN/ZIP is required";
+  else if (!isPostal(form.postal_code)) e.postal_code = "PIN must be numeric";
 
-    if (!form.postal_code.trim()) e.postal_code = "PIN/ZIP is required";
-    else if (!isPostal(form.postal_code)) e.postal_code = "PIN must be numeric";
+  if (!form.status) e.status = "Status is required";
 
-    if (!form.status) e.status = "Status is required";
+  /** COMMERCIAL */
+  if (!form.currency) e.currency = "Currency is required";
+  if (!form.payment_terms) e.payment_terms = "Payment Terms is required";
 
-    /** COMMERCIAL REQUIRED */
-    if (!form.currency) e.currency = "Currency is required";
-    if (!form.payment_terms) e.payment_terms = "Payment Terms is required";
+  if (!form.lead_time_days.trim()) e.lead_time_days = "Lead Time (days) is required";
+  else {
+    const n = Number(form.lead_time_days);
+    if (!Number.isInteger(n) || n <= 0)
+      e.lead_time_days = "Lead Time must be integer > 0";
+  }
 
-    if (!form.lead_time_days.trim()) e.lead_time_days = "Lead Time (days) is required";
+  if (form.credit_limit.trim()) {
+    const n = Number(form.credit_limit);
+    if (Number.isNaN(n) || n < 0)
+      e.credit_limit = "Credit Limit must be >= 0";
+  }
+
+  if (form.minimum_order_qty.trim()) {
+    const n = Number(form.minimum_order_qty);
+    if (!Number.isInteger(n) || n < 0)
+      e.minimum_order_qty = "MOQ must be integer >= 0";
+  }
+
+  if (form.discount_percentage.trim()) {
+    const n = Number(form.discount_percentage);
+    if (Number.isNaN(n) || n < 0 || n > 100)
+      e.discount_percentage = "Discount must be 0–100";
+  }
+
+  if (form.tax_applicable) {
+    if (!form.gst_percentage.trim()) e.gst_percentage = "GST % is required";
     else {
-      const n = Number(form.lead_time_days);
-      if (!Number.isInteger(n) || n <= 0) e.lead_time_days = "Lead Time must be integer > 0";
+      const n = Number(form.gst_percentage);
+      if (Number.isNaN(n) || n < 0 || n > 100)
+        e.gst_percentage = "GST % must be 0–100";
     }
+  }
 
-    if (form.credit_limit.trim()) {
-      const n = Number(form.credit_limit);
-      if (Number.isNaN(n) || n < 0) e.credit_limit = "Credit Limit must be >= 0";
-    }
+  /** COMPLIANCE */
+  if (!form.gstin.trim()) e.gstin = "GSTIN is required";
+  else if (!isGSTIN(form.gstin))
+    e.gstin = "Invalid GSTIN format (15 chars)";
 
-    if (form.minimum_order_qty.trim()) {
-      const n = Number(form.minimum_order_qty);
-      if (!Number.isInteger(n) || n < 0) e.minimum_order_qty = "MOQ must be integer >= 0";
-    }
+  if (!form.pan.trim()) e.pan = "PAN is required";
+  else if (!isPAN(form.pan))
+    e.pan = "Invalid PAN (ABCDE1234F)";
 
-    if (form.discount_percentage.trim()) {
-      const n = Number(form.discount_percentage);
-      if (Number.isNaN(n) || n < 0 || n > 100) e.discount_percentage = "Discount must be 0–100";
-    }
+  if (form.msme_registered && !form.msme_number.trim())
+    e.msme_number = "MSME number required";
 
-    // GST% conditional
-    if (form.tax_applicable) {
-      if (!form.gst_percentage.trim()) e.gst_percentage = "GST % is required when tax applicable";
-      else {
-        const n = Number(form.gst_percentage);
-        if (Number.isNaN(n) || n < 0 || n > 100) e.gst_percentage = "GST % must be 0–100";
-      }
-    }
+  if (!form.bank_account_name.trim())
+    e.bank_account_name = "Bank A/C Name is required";
 
-    /** COMPLIANCE REQUIRED */
-    if (!form.gstin.trim()) e.gstin = "GSTIN is required (India)";
-    else if (!isGSTIN15(form.gstin)) e.gstin = "GSTIN must be 15 characters";
+  if (!form.bank_account_number.trim())
+    e.bank_account_number = "Bank A/C Number is required";
+  else if (!/^[0-9]{6,18}$/.test(form.bank_account_number))
+    e.bank_account_number = "6–18 digits required";
 
-    if (!form.pan.trim()) e.pan = "PAN is required";
-    else if (!isPAN(form.pan)) e.pan = "Invalid PAN format";
+  if (!form.bank_name.trim()) e.bank_name = "Bank Name is required";
 
-    if (form.msme_registered) {
-      if (!form.msme_number.trim()) e.msme_number = "MSME/Udyam number is required";
-    }
+  if (!form.ifsc_code.trim()) e.ifsc_code = "IFSC is required";
+  else if (!isIFSC(form.ifsc_code))
+    e.ifsc_code = "Invalid IFSC";
 
-    if (!form.bank_account_name.trim()) e.bank_account_name = "Bank A/C Name is required";
-    if (!form.bank_account_number.trim()) e.bank_account_number = "Bank A/C Number is required";
-    else if (!/^[0-9]{6,18}$/.test(form.bank_account_number.trim()))
-      e.bank_account_number = "A/C Number must be numeric (6–18 digits)";
+  if (form.cancelled_cheque_file) {
+    const ok =
+      form.cancelled_cheque_file.type === "application/pdf" ||
+      form.cancelled_cheque_file.type === "image/jpeg" ||
+      form.cancelled_cheque_file.type === "image/png";
 
-    if (!form.bank_name.trim()) e.bank_name = "Bank Name is required";
+    if (!ok) e.cancelled_cheque_file = "Upload PDF/JPG/PNG only";
+  }
 
-    if (!form.ifsc_code.trim()) e.ifsc_code = "IFSC is required";
-    else if (!isIFSC(form.ifsc_code)) e.ifsc_code = "Invalid IFSC format";
+  if (!form.compliance_status)
+    e.compliance_status = "Compliance Status is required";
 
-    // cancelled cheque file type optional
-    if (form.cancelled_cheque_file) {
-      const ok =
-        form.cancelled_cheque_file.type === "application/pdf" ||
-        form.cancelled_cheque_file.type === "image/jpeg" ||
-        form.cancelled_cheque_file.type === "image/jpg" ||
-        form.cancelled_cheque_file.type === "image/png";
-      if (!ok) e.cancelled_cheque_file = "Upload PDF/JPG/PNG only";
-    }
-
-    // compliance_status required (default Pending)
-    if (!form.compliance_status) e.compliance_status = "Compliance Status is required";
-
-    return e;
-  }, [form]);
+  return e;
+}, [form]);
 
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -344,23 +355,67 @@ export default function VendorMasterCreatePage() {
     return "basic";
   };
 
-  const onSave = () => {
-    // Touch all fields so errors show
-    const allKeys = Object.keys(initialState) as Array<keyof VendorFormState>;
-    setTouched((p) => {
-      const next = { ...p };
-      allKeys.forEach((k) => (next[k as string] = true));
-      return next;
+const onSave = async () => {
+  const allKeys = Object.keys(initialState) as Array<keyof VendorFormState>;
+
+  setTouched((p) => {
+    const next = { ...p };
+    allKeys.forEach((k) => (next[k as string] = true));
+    return next;
+  });
+
+  if (hasErrors) {
+    setActiveTab(firstErrorTab());
+    return;
+  }
+
+  try {
+    console.log("FORM DATA:", form); // 🔥 debug
+
+    const method = id ? "PUT" : "POST";
+    const url = id
+      ? `http://localhost:5000/api/vendors/${id}`
+      : "http://localhost:5000/api/vendors";
+
+    const res = await fetch(url, {
+      method,
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(form),
     });
 
-    if (hasErrors) {
-      setActiveTab(firstErrorTab());
+    // 🔥 SAFE JSON PARSE (important fix)
+    let result;
+    try {
+      result = await res.json();
+    } catch {
+      const text = await res.text();
+      console.error("Non-JSON response:", text);
+      alert("❌ Server returned invalid response");
       return;
     }
 
-    console.log("Vendor Saved:", form);
-    alert("Saved (demo). Next step: connect API.");
-  };
+    if (!res.ok) {
+      alert(result.error || "❌ Failed to save vendor");
+      return;
+    }
+
+    alert(id ? "✅ Vendor Updated Successfully" : "✅ Vendor Created Successfully");
+    router.push("/VendorMaster");
+    
+    // 🔥 RESET AFTER CREATE
+    if (!id) {
+      setForm(initialState);
+      setTouched({});
+      setActiveTab("basic");
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("❌ Server error");
+  }
+};
 
   const onReset = () => {
     setForm(initialState);
@@ -433,19 +488,13 @@ export default function VendorMasterCreatePage() {
                   <input readOnly value={form.vendor_id} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
                 </div>
 
-                <div>
-                  <label className={labelBase}>
-                    Vendor Code <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
-                  </label>
-                  <input
-                    value={form.vendor_code}
-                    onChange={(e) => setField("vendor_code", e.target.value)}
-                    onBlur={() => markTouched("vendor_code")}
-                    placeholder="Ex: VND-000123"
-                    className={classNames(inputBase, showError("vendor_code") && "border-brand-500")}
-                  />
-                  {showError("vendor_code") && <p className="mt-1 text-xs text-brand-500">{errors.vendor_code}</p>}
-                </div>
+              <div>
+  <label className={labelBase}>Vendor Code</label>
+
+  <div className="mt-2 inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 dark:bg-white/10 dark:text-white">
+    AUTO GENERATED
+  </div>
+</div>
 
                 <div>
                   <label className={labelBase}>
