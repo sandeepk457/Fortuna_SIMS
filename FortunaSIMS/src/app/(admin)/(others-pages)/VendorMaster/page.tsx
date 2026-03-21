@@ -80,6 +80,51 @@ export default function VendorMasterListPage() {
       alert("Delete failed");
     }
   };
+
+// edit: moved up for better organization
+
+// GET BY ID (FOR EDIT)
+const getVendorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT 
+        v.*,
+        vc.currency,
+        vc.payment_terms,
+        vc.credit_limit,
+        vc.lead_time_days,
+        vc.incoterms,
+        vc.minimum_order_qty,
+        vc.gst_percentage,
+        vc.discount_percentage,
+        vc.freight_terms,
+        vcom.gstin,
+        vcom.pan,
+        vcom.bank_account_name,
+        vcom.bank_account_number,
+        vcom.bank_name,
+        vcom.ifsc_code,
+        vcom.compliance_status
+      FROM vendors v
+      LEFT JOIN vendor_commercials vc ON v.id = vc.vendor_id
+      LEFT JOIN vendor_compliance vcom ON v.id = vcom.vendor_id
+      WHERE v.id = $1 AND v.is_deleted = false
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Vendor not found" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
   const [searchName, setSearchName] = useState("");

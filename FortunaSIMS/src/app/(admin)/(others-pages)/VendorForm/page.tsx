@@ -4,7 +4,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
-import router from "next/dist/shared/lib/router/router";
+// import router from "next/dist/shared/lib/router/router";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -179,6 +179,56 @@ export default function VendorMasterCreatePage() {
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
 
+  // For Edit: Fetch existing data
+useEffect(() => {
+  if (id) {
+    fetch(`http://localhost:5000/api/vendors/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        setForm((prev) => ({
+          ...prev,
+
+          // 🔹 BASIC
+          vendor_name: data.vendor_name || "",
+          vendor_type: data.vendor_type || "",
+          vendor_category: data.vendor_category || "",
+          vendor_tier: data.vendor_tier || "",
+          contact_person_name: data.contact_person_name || "",
+          contact_phone: data.contact_phone || "",
+          contact_email: data.contact_email || "",
+          alternate_phone: data.alternate_phone || "",
+          registered_address: data.registered_address || "",
+          city: data.city || "",
+          state: data.state || "",
+          country: data.country || "",
+          postal_code: data.postal_code || "",
+          status: data.status || "",
+
+          // 🔹 COMMERCIAL
+          currency: data.currency || "INR",
+          payment_terms: data.payment_terms || "",
+          credit_limit: data.credit_limit || "",
+          lead_time_days: data.lead_time_days || "",
+          incoterms: data.incoterms || "",
+          minimum_order_qty: data.minimum_order_qty || "",
+          gst_percentage: data.gst_percentage || "",
+          discount_percentage: data.discount_percentage || "",
+          freight_terms: data.freight_terms || "",
+
+          // 🔹 COMPLIANCE
+          gstin: data.gstin || "",
+          pan: data.pan || "",
+          bank_account_name: data.bank_account_name || "",
+          bank_account_number: data.bank_account_number || "",
+          bank_name: data.bank_name || "",
+          ifsc_code: data.ifsc_code || "",
+          compliance_status: data.compliance_status || "Pending",
+        }));
+      })
+      .catch((err) => console.error(err));
+  }
+}, [id]);
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<VendorFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -217,33 +267,35 @@ export default function VendorMasterCreatePage() {
   if (!form.currency) e.currency = "Currency is required";
   if (!form.payment_terms) e.payment_terms = "Payment Terms is required";
 
-  if (!form.lead_time_days.trim()) e.lead_time_days = "Lead Time (days) is required";
-  else {
-    const n = Number(form.lead_time_days);
-    if (!Number.isInteger(n) || n <= 0)
-      e.lead_time_days = "Lead Time must be integer > 0";
+  if (!form.lead_time_days) {
+  e.lead_time_days = "Lead Time (days) is required";
+} else {
+  const n = Number(form.lead_time_days);
+  if (!Number.isInteger(n) || n <= 0) {
+    e.lead_time_days = "Lead Time must be integer > 0";
   }
+}
 
-  if (form.credit_limit.trim()) {
+  if (form.credit_limit) {
     const n = Number(form.credit_limit);
     if (Number.isNaN(n) || n < 0)
       e.credit_limit = "Credit Limit must be >= 0";
   }
 
-  if (form.minimum_order_qty.trim()) {
+  if (form.minimum_order_qty) {
     const n = Number(form.minimum_order_qty);
     if (!Number.isInteger(n) || n < 0)
       e.minimum_order_qty = "MOQ must be integer >= 0";
   }
 
-  if (form.discount_percentage.trim()) {
+  if (form.discount_percentage) {
     const n = Number(form.discount_percentage);
     if (Number.isNaN(n) || n < 0 || n > 100)
       e.discount_percentage = "Discount must be 0–100";
   }
 
   if (form.tax_applicable) {
-    if (!form.gst_percentage.trim()) e.gst_percentage = "GST % is required";
+    if (!form.gst_percentage) e.gst_percentage = "GST % is required";
     else {
       const n = Number(form.gst_percentage);
       if (Number.isNaN(n) || n < 0 || n > 100)
@@ -427,24 +479,42 @@ const onSave = async () => {
     <div className="space-y-6">
       <PageBreadcrumb pageTitle="Vendor Master" />
 
-      {/* Header */}
-      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            Vendor Creation
-          </h3>
-          <p className={helperBase}>Capture vendor profile, terms & compliance details.</p>
-        </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={outlineBtn} onClick={onReset}>
-            Reset
-          </button>
-          <button type="button" className={primaryBtn} onClick={onSave}>
-            Save Vendor
-          </button>
-        </div>
-      </div>
+    
+      {/* Header */}
+      <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
+  {/* 🔙 Back Button */}
+  <div>
+    <button
+      type="button"
+      onClick={() => router.push("/VendorMaster")}
+      className="mb-2 inline-flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-black dark:text-gray-300"
+    >
+      ← Back to Vendor List
+    </button>
+  </div>
+
+  {/* Existing Header */}
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+        Vendor Creation
+      </h3>
+      <p className={helperBase}>
+        Capture vendor profile, terms & compliance details.
+      </p>
+    </div>
+
+    <div className="flex flex-wrap gap-2">
+      <button type="button" className={outlineBtn} onClick={onReset}>
+        Reset
+      </button>
+      <button type="button" className={primaryBtn} onClick={onSave}>
+        Save Vendor
+      </button>
+    </div>
+  </div>
+</div>
 
       {/* Tabs */}
       <div className="rounded-xl border border-gray-200 bg-white shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
@@ -593,7 +663,7 @@ const onSave = async () => {
                       value={form.contact_phone}
                       onChange={(e) => setField("contact_phone", e.target.value.replace(/[^\d]/g, ""))}
                       onBlur={() => markTouched("contact_phone")}
-                      placeholder="10-15 digits"
+                      placeholder="10 digits"
                       className={classNames(inputBase, showError("contact_phone") && "border-brand-500")}
                     />
                     {showError("contact_phone") && (

@@ -53,10 +53,27 @@ const createVendor = async (req, res) => {
     const vendorId = vendorRes.rows[0].id;
 
     await client.query(
-      `INSERT INTO vendor_commercials (vendor_id, currency, payment_terms)
-       VALUES ($1,$2,$3)`,
-      [vendorId, data.currency, data.payment_terms]
-    );
+  `INSERT INTO vendor_commercials (
+    vendor_id, currency, payment_terms,
+    credit_limit, lead_time_days, incoterms,
+    gst_percentage, minimum_order_qty,
+    discount_percentage, freight_terms, penalty_clause
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
+  [
+    vendorId,
+    data.currency,
+    data.payment_terms,
+    data.credit_limit || null,
+    data.lead_time_days || null,
+    data.incoterms || null,
+    data.gst_percentage || null,
+    data.minimum_order_qty || null,
+    data.discount_percentage || null,
+    data.freight_terms || null,
+    data.penalty_clause || false,
+  ]
+);
 
     await client.query(
       `INSERT INTO vendor_compliance (
@@ -113,6 +130,48 @@ const getAllVendors = async (req, res) => {
   }
 };
 
+// GET BY ID (FOR EDIT)
+const getVendorById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query(`
+      SELECT 
+        v.*,
+        vc.currency,
+        vc.payment_terms,
+        vc.credit_limit,
+        vc.lead_time_days,
+        vc.incoterms,
+        vc.minimum_order_qty,
+        vc.gst_percentage,
+        vc.discount_percentage,
+        vc.freight_terms,
+        comp.gstin,
+        comp.pan,
+        comp.bank_account_name,
+        comp.bank_account_number,
+        comp.bank_name,
+        comp.ifsc_code,
+        comp.compliance_status
+      FROM vendors v
+      LEFT JOIN vendor_commercials vc ON v.id = vc.vendor_id
+      LEFT JOIN vendor_compliance comp ON v.id = comp.vendor_id
+      WHERE v.id = $1 AND v.is_deleted = false
+    `, [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: "Vendor not found" });
+    }
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
 // DELETE
 const deleteVendor = async (req, res) => {
   const { id } = req.params;
@@ -125,8 +184,123 @@ const deleteVendor = async (req, res) => {
   res.json({ message: "Deleted Successfully" });
 };
 
+// UPDATE VENDOR
+const updateVendor = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    await client.query("BEGIN");
+
+    // 🔹 UPDATE vendors table
+    await client.query(
+      `UPDATE vendors SET
+        vendor_name=$1,
+        vendor_type=$2,
+        vendor_category=$3,
+        vendor_tier=$4,
+        contact_person_name=$5,
+        contact_phone=$6,
+        contact_email=$7,
+        alternate_phone=$8,
+        registered_address=$9,
+        city=$10,
+        state=$11,
+        country=$12,
+        postal_code=$13,
+        status=$14
+      WHERE id=$15`,
+      [
+        data.vendor_name,
+        data.vendor_type,
+        data.vendor_category,
+        data.vendor_tier,
+        data.contact_person_name,
+        data.contact_phone,
+        data.contact_email,
+        data.alternate_phone,
+        data.registered_address,
+        data.city,
+        data.state,
+        data.country,
+        data.postal_code,
+        data.status,
+        id,
+      ]
+    );
+
+    // 🔹 UPDATE commercial
+    await client.query(
+  `UPDATE vendor_commercials SET
+    currency=$1,
+    payment_terms=$2,
+    credit_limit=$3,
+    lead_time_days=$4,
+    incoterms=$5,
+    gst_percentage=$6,
+    minimum_order_qty=$7,
+    discount_percentage=$8,
+    freight_terms=$9,
+    penalty_clause=$10
+  WHERE vendor_id=$11`,
+  [
+    data.currency,
+    data.payment_terms,
+    data.credit_limit || null,
+    data.lead_time_days || null,
+    data.incoterms || null,
+    data.gst_percentage || null,
+    data.minimum_order_qty || null,
+    data.discount_percentage || null,
+    data.freight_terms || null,
+    data.penalty_clause || false,
+    id,
+  ]
+);
+
+    // 🔹 UPDATE compliance
+    await client.query(
+      `UPDATE vendor_compliance SET
+        gstin=$1,
+        pan=$2,
+        bank_account_name=$3,
+        bank_account_number=$4,
+        bank_name=$5,
+        ifsc_code=$6,
+        compliance_status=$7
+      WHERE vendor_id=$8`,
+      [
+        data.gstin,
+        data.pan,
+        data.bank_account_name,
+        data.bank_account_number,
+        data.bank_name,
+        data.ifsc_code,
+        data.compliance_status,
+        id,
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    res.json({ message: "Vendor Updated Successfully" });
+
+  } catch (err) {
+    await client.query("ROLLBACK");
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  } finally {
+    client.release();
+  }
+};
+
 module.exports = {
   createVendor,
   getAllVendors,
+  getVendorById,
   deleteVendor,
+  updateVendor, // ✅ Export update function
 };
+
