@@ -267,7 +267,7 @@
   body {
     @apply relative font-normal font-outfit z-1;
     background-color: #c9e3f4; /* soft blue-neutral background */
-    color: #C8102E; /* strong readable text */
+    color: #005F99; /* strong readable text */
   }
 }
 
@@ -796,4 +796,21 @@ span.flatpickr-weekday,
     0 1px 2px 0 rgba(16, 24, 40, 0.06);
   opacity: 0.8;
   cursor: grabbing; /* Changes the cursor to indicate dragging */
+}
+/* 🔥 FORTUNA HEADER FINAL FIX */
+table thead tr {
+  background-color: #E11D48 !important; /* same as Export button */
+}
+
+table thead th {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+/* 🔥 TABLE HEADER INPUT FIX */
+table thead input,
+table thead select {
+  color: #2f3033 !important;        /* dark text */
+  background-color: #ffffff !important;
+  border: 1px solid #e5e7eb;
 }

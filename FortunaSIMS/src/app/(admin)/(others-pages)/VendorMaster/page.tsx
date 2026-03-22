@@ -450,8 +450,7 @@ const onDelete = async (id: string) => {
                   {paginatedData.map((v, index) => (
                     <tr
                       key={index}
-                      className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
-                    >
+                    className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5 text-[#005F99] font-medium">
                       <td className="px-4 py-3">{v.code}</td>
                       <td className="px-4 py-3">{v.name}</td>
                       <td className="px-4 py-3">{v.category}</td>
