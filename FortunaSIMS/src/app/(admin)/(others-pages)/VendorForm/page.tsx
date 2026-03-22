@@ -424,6 +424,15 @@ const onSave = async () => {
   try {
     console.log("FORM DATA:", form); // 🔥 debug
 
+    const payload = {
+  ...form,
+  credit_limit: form.credit_limit ? Number(form.credit_limit) : null,
+  lead_time_days: form.lead_time_days ? Number(form.lead_time_days) : null,
+  gst_percentage: form.gst_percentage ? Number(form.gst_percentage) : null,
+  minimum_order_qty: form.minimum_order_qty ? Number(form.minimum_order_qty) : null,
+  discount_percentage: form.discount_percentage ? Number(form.discount_percentage) : null,
+};
+
     const method = id ? "PUT" : "POST";
     const url = id
       ? `http://localhost:5000/api/vendors/${id}`
@@ -483,6 +492,7 @@ const onSave = async () => {
     
       {/* Header */}
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900">
+
   {/* 🔙 Back Button */}
   <div>
     <button

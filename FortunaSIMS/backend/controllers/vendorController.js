@@ -76,22 +76,31 @@ const createVendor = async (req, res) => {
 );
 
     await client.query(
-      `INSERT INTO vendor_compliance (
-        vendor_id, gstin, pan, bank_account_name,
-        bank_account_number, bank_name, ifsc_code, compliance_status
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [
-        vendorId,
-        data.gstin,
-        data.pan,
-        data.bank_account_name,
-        data.bank_account_number,
-        data.bank_name,
-        data.ifsc_code,
-        data.compliance_status,
-      ]
-    );
+  `INSERT INTO vendor_compliance (
+    vendor_id, gstin, pan, bank_account_name,
+    bank_account_number, bank_name, ifsc_code, compliance_status
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+  ON CONFLICT (vendor_id)
+  DO UPDATE SET
+    gstin=EXCLUDED.gstin,
+    pan=EXCLUDED.pan,
+    bank_account_name=EXCLUDED.bank_account_name,
+    bank_account_number=EXCLUDED.bank_account_number,
+    bank_name=EXCLUDED.bank_name,
+    ifsc_code=EXCLUDED.ifsc_code,
+    compliance_status=EXCLUDED.compliance_status`,
+  [
+    id,
+    data.gstin,
+    data.pan,
+    data.bank_account_name,
+    data.bank_account_number,
+    data.bank_name,
+    data.ifsc_code,
+    data.compliance_status,
+  ]
+);
 
     await client.query("COMMIT");
 
@@ -194,7 +203,22 @@ const updateVendor = async (req, res) => {
 
     await client.query("BEGIN");
 
-    // 🔹 UPDATE vendors table
+    // 🔥 DUPLICATE CHECK (CRITICAL FIX)
+    const duplicateCheck = await client.query(
+      `SELECT * FROM vendor_compliance
+       WHERE (gstin = $1 OR pan = $2)
+       AND vendor_id != $3`,
+      [data.gstin, data.pan, id]
+    );
+
+    if (duplicateCheck.rows.length > 0) {
+      await client.query("ROLLBACK");
+      return res.status(400).json({
+        error: "Duplicate GSTIN or PAN already exists",
+      });
+    }
+
+    // 🔹 UPDATE vendors
     await client.query(
       `UPDATE vendors SET
         vendor_name=$1,
@@ -233,19 +257,27 @@ const updateVendor = async (req, res) => {
 
     // 🔹 UPDATE commercial
     await client.query(
-  `UPDATE vendor_commercials SET
-    currency=$1,
-    payment_terms=$2,
-    credit_limit=$3,
-    lead_time_days=$4,
-    incoterms=$5,
-    gst_percentage=$6,
-    minimum_order_qty=$7,
-    discount_percentage=$8,
-    freight_terms=$9,
-    penalty_clause=$10
-  WHERE vendor_id=$11`,
+  `INSERT INTO vendor_commercials (
+    vendor_id, currency, payment_terms,
+    credit_limit, lead_time_days, incoterms,
+    gst_percentage, minimum_order_qty,
+    discount_percentage, freight_terms, penalty_clause
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+  ON CONFLICT (vendor_id)
+  DO UPDATE SET
+    currency=EXCLUDED.currency,
+    payment_terms=EXCLUDED.payment_terms,
+    credit_limit=EXCLUDED.credit_limit,
+    lead_time_days=EXCLUDED.lead_time_days,
+    incoterms=EXCLUDED.incoterms,
+    gst_percentage=EXCLUDED.gst_percentage,
+    minimum_order_qty=EXCLUDED.minimum_order_qty,
+    discount_percentage=EXCLUDED.discount_percentage,
+    freight_terms=EXCLUDED.freight_terms,
+    penalty_clause=EXCLUDED.penalty_clause`,
   [
+    id,
     data.currency,
     data.payment_terms,
     data.credit_limit || null,
@@ -256,7 +288,6 @@ const updateVendor = async (req, res) => {
     data.discount_percentage || null,
     data.freight_terms || null,
     data.penalty_clause || false,
-    id,
   ]
 );
 
@@ -270,7 +301,8 @@ const updateVendor = async (req, res) => {
         bank_name=$5,
         ifsc_code=$6,
         compliance_status=$7
-      WHERE vendor_id=$8`,
+      WHERE vendor_id=$8
+  RETURNING *`,
       [
         data.gstin,
         data.pan,
@@ -289,8 +321,17 @@ const updateVendor = async (req, res) => {
 
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error(err);
+
+    // 🔥 HANDLE UNIQUE ERROR (EXTRA SAFETY)
+    if (err.code === "23505") {
+      return res.status(400).json({
+        error: "Duplicate GSTIN or PAN not allowed",
+      });
+    }
+
+    console.error("UPDATE ERROR:", err);
     res.status(500).json({ error: err.message });
+
   } finally {
     client.release();
   }
