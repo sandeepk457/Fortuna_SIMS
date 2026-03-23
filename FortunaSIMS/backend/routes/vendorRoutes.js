@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
-const multer = require("multer");
-const upload = multer();
+// const multer = require("multer");
+// const upload = multer();
 
 
 
@@ -11,14 +11,14 @@ const {
   getVendorById,
   deleteVendor,
   updateVendor, // ✅ Import update function
-  bulkUploadVendors, // ✅ Import bulk upload function
+  // bulkUploadVendors, // ✅ Import bulk upload function
 } = require("../controllers/vendorController");
 
 // CREATE
 router.post("/", createVendor);
 
-// BULK UPLOAD ROUTE
-router.post("/bulk-upload", upload.single("file"), bulkUploadVendors);
+// // BULK UPLOAD ROUTE
+// router.post("/bulk-upload", upload.single("file"), bulkUploadVendors);
 
 // GET ALL
 router.get("/", getAllVendors);
