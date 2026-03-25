@@ -91,7 +91,7 @@ export default function ItemMasterForm() {
     const e: Record<string, string> = {};
 
     // Required validations for Basic Info
-    if (!form.itemCode.trim()) e.itemCode = "Item Code is required";
+    // if (!form.itemCode.trim()) e.itemCode = "Item Code is required";
     if (!form.itemName.trim()) e.itemName = "Item Name is required";
     if (!form.itemType) e.itemType = "Item Type is required";
     if (!form.uom.trim()) e.uom = "UOM is required";
@@ -126,31 +126,80 @@ export default function ItemMasterForm() {
   const showError = (key: keyof ItemMasterFormState) =>
     Boolean(touched[key as string] && errors[key as string]);
 
-  const onSave = () => {
-    // mark all as touched for basic fields (later we can include other tabs)
-    const toTouch: Array<keyof ItemMasterFormState> = [
-      "itemCode",
-      "itemName",
-      "itemType",
-      "uom",
-      "altUom",
-      "conversionFactor",
-    ];
-    setTouched((p) => {
-      const next = { ...p };
-      toTouch.forEach((k) => (next[k as string] = true));
-      return next;
+  // const onSave = () => {
+  //   // mark all as touched for basic fields (later we can include other tabs)
+  //   const toTouch: Array<keyof ItemMasterFormState> = [
+  //     "itemCode",
+  //     "itemName",
+  //     "itemType",
+  //     "uom",
+  //     "altUom",
+  //     "conversionFactor",
+  //   ];
+  //   setTouched((p) => {
+  //     const next = { ...p };
+  //     toTouch.forEach((k) => (next[k as string] = true));
+  //     return next;
+  //   });
+
+  //   if (hasErrors) {
+  //     setActiveTab("basic");
+  //     return;
+  //   }
+
+  //   // TODO: API call / state store
+  //   console.log("Item Master Saved:", form);
+  //   alert("Saved (demo). Next step: connect API.");
+  // };
+
+  //   // onSave function with API call
+const onSave = async () => {
+  const toTouch = [
+    "itemCode",
+    "itemName",
+    "itemType",
+    "uom",
+    "altUom",
+    "conversionFactor",
+  ];
+
+  setTouched((p) => {
+    const next = { ...p };
+    toTouch.forEach((k) => (next[k] = true));
+    return next;
+  });
+
+  if (hasErrors) {
+    setActiveTab("basic");
+    return;
+  }
+
+  try {
+    const res = await fetch("http://localhost:5000/api/items", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(form),
     });
 
-    if (hasErrors) {
-      setActiveTab("basic");
-      return;
+    const data = await res.json();
+
+    if (res.ok) {
+      alert(`✅ Item Created: ${data.item_code}`);
+
+      // 🔥 redirect to list page
+      window.location.href = "/ItemMaster";
+    } else {
+      alert(data.error || "Failed to save item");
     }
 
-    // TODO: API call / state store
-    console.log("Item Master Saved:", form);
-    alert("Saved (demo). Next step: connect API.");
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Error saving item");
+  }
+};
+
 
   const onReset = () => {
     setForm(initialState);
@@ -234,20 +283,11 @@ export default function ItemMasterForm() {
                     <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                   </label>
                   <input
-                    value={form.itemCode}
-                    onChange={(e) => setField("itemCode", e.target.value)}
-                    onBlur={() => markTouched("itemCode")}
-                    placeholder="Ex: ITM-000123"
-                    className={classNames(
-                      inputBase,
-                      showError("itemCode") && "border-brand-500"
-                    )}
-                  />
-                  {showError("itemCode") && (
-                    <p className="mt-1 text-xs text-brand-500">
-                      {errors.itemCode}
-                    </p>
-                  )}
+                  value="Auto Generated"
+                disabled
+                className="w-full rounded-lg border border-gray-200 bg-gray-100 px-3 py-2 text-sm text-gray-500 cursor-not-allowed"
+                />
+                  
                 </div>
 
                 <div>

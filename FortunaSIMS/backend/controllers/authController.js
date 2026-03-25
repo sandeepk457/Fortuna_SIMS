@@ -2,9 +2,9 @@
 // =========================
 // SIGNUP
 // =========================
-
 const pool = require("../config/db");
 const bcrypt = require("bcrypt");
+// const { v4: uuidv4 } = require("uuid");
 exports.signup = async (req, res) => {
 
   try {
@@ -137,3 +137,4 @@ if(!isMatch){
   }
 
 };
+

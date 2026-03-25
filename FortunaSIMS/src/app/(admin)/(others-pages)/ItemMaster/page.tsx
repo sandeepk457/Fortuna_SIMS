@@ -1,9 +1,8 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo,useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
-
 
 interface Item {
   code: string;
@@ -15,40 +14,71 @@ interface Item {
 
 export default function ItemMasterPage() {
   const router = useRouter();
-  const [data] = useState<Item[]>([
-    { code: "ITM-001", name: "Industrial Pump", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-002", name: "Safety Helmet", category: "Safety Equipment", uom: "Nos", status: "Inactive" },
-    { code: "ITM-003", name: "Gear Box", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-004", name: "Hand Gloves", category: "Safety Equipment", uom: "Pairs", status: "Active" },
-    { code: "ITM-005", name: "Motor", category: "Machinery", uom: "Nos", status: "Inactive" },
-    { code: "ITM-006", name: "Hydraulic Cylinder", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-007", name: "Safety Goggles", category: "Safety Equipment", uom: "Nos", status: "Active" },
-    { code: "ITM-008", name: "Air Compressor", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-009", name: "Reflective Jacket", category: "Safety Equipment", uom: "Nos", status: "Inactive" },
-    { code: "ITM-010", name: "Conveyor Belt", category: "Machinery", uom: "Meters", status: "Active" },
-    { code: "ITM-011", name: "Fire Extinguisher", category: "Safety Equipment", uom: "Nos", status: "Active" },
-    { code: "ITM-012", name: "Lathe Machine", category: "Machinery", uom: "Nos", status: "Inactive" },
-    { code: "ITM-013", name: "Safety Shoes", category: "Safety Equipment", uom: "Pairs", status: "Active" },
-    { code: "ITM-014", name: "Drill Machine", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-015", name: "Face Shield", category: "Safety Equipment", uom: "Nos", status: "Inactive" },
-    { code: "ITM-016", name: "Welding Machine", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-017", name: "Ear Protection Plug", category: "Safety Equipment", uom: "Pairs", status: "Active" },
-    { code: "ITM-018", name: "Forklift", category: "Machinery", uom: "Nos", status: "Inactive" },
-    { code: "ITM-019", name: "Dust Mask", category: "Safety Equipment", uom: "Nos", status: "Active" },
-    { code: "ITM-020", name: "Generator", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-021", name: "Pressure Valve", category: "Machinery", uom: "Nos", status: "Inactive" },
-    { code: "ITM-022", name: "Safety Harness", category: "Safety Equipment", uom: "Nos", status: "Active" },
-    { code: "ITM-023", name: "Control Panel", category: "Machinery", uom: "Nos", status: "Active" },
-    { code: "ITM-024", name: "Industrial Ladder", category: "Safety Equipment", uom: "Nos", status: "Inactive" },
-    { code: "ITM-025", name: "Water Pump Assembly", category: "Machinery", uom: "Nos", status: "Active" },
-  ]);
-
+  const [data, setData] = useState<Item[]>([]);
+  
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  //  (FETCH FUNCTION)
+
+  const fetchItems = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/items");
+      const result = await res.json();
+
+      console.log("API DATA:", result); // 🔥 ADD THIS
+
+      setData(result);
+    } catch (err) {
+      console.error("Error fetching items:", err);
+    }
+  };
+
+  // 👉  (USE EFFECT)
+  useEffect(() => {
+    fetchItems();
+  }, []);
+
+
+
+  const handleFileUpload = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    setUploading(true);
+
+    const res = await fetch("http://localhost:5000/api/items/bulk-upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alert(`✅ Uploaded: ${data.totalInserted} items\n❌ Skipped: ${data.skipped}`);
+      window.location.reload();
+    } else {
+      alert(data.error || "Upload failed");
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Error uploading file");
+  } finally {
+    setUploading(false);
+  }
+};
+
   const [searchName, setSearchName] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
-
+  
+  
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
@@ -72,19 +102,139 @@ export default function ItemMasterPage() {
 
   // Excel Export
   const exportToExcel = () => {
-    const header = ["Item Code", "Item Name", "Category", "UOM", "Status"];
-    const rows = filteredData.map((item) =>
-      [item.code, item.name, item.category, item.uom, item.status].join(",")
-    );
+  const header = ["item_name",
+  "short_name",
+  "item_type",
+  "category",
+  "sub_category",
+  "brand",
+  "uom",
+  "alt_uom",
+  "conversion_factor",
+  "barcode",
+  "hsn_sac",
+  "description",
 
-    const csvContent = [header.join(","), ...rows].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  // Inventory
+  "inventory_controlled",
+  "batch_controlled",
+  "serial_controlled",
+  "expiry_controlled",
+  "min_stock_level",
+  "max_stock_level",
+  "reorder_qty",
 
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(blob);
-    link.download = "item-master.csv";
-    link.click();
-  };
+  // Storage
+  "storage_type",
+  "hazardous",
+  "fragile",
+  "stackable",
+  "default_warehouse",
+  "default_zone",
+  "default_bin",
+
+  // Valuation
+  "valuation_method",
+  "standard_cost",
+  "inventory_gl_code",
+
+  // Status
+  "status"];
+
+  const rows = data.map((item) => [
+    item.name,
+    item.short_name || "",
+    item.item_type || "",
+    item.category,
+    item.sub_category || "",
+    item.brand || "",
+    item.uom,
+    item.alt_uom || "",
+    item.conversion_factor || "",
+    item.barcode || "",
+    item.hsn_sac || "",
+    item.description || "",
+
+    item.inventory_controlled || false,
+    item.batch_controlled || false,
+    item.serial_controlled || false,
+    item.expiry_controlled || false,
+    item.min_stock_level || "",
+    item.max_stock_level || "",
+    item.reorder_qty || "",
+
+    item.storage_type || "",
+    item.hazardous || false,
+    item.fragile || false,
+    item.stackable || false,
+    item.default_warehouse || "",
+    item.default_zone || "",
+    item.default_bin || "",
+
+    item.valuation_method || "FIFO",
+    item.standard_cost || "",
+    item.inventory_gl_code || "",
+
+    item.status || "Active"
+  ]);
+
+  const csvContent = [header.join(","), ...rows.map(r => r.join(","))].join("\n");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "item-master-full-template.csv";
+  link.click();
+};
+
+// Template Download
+  const downloadTemplate = () => {
+  const header = [
+    "item_name",
+    "short_name",
+    "item_type",
+    "category",
+    "sub_category",
+    "brand",
+    "uom",
+    "alt_uom",
+    "conversion_factor",
+    "barcode",
+    "hsn_sac",
+    "description",
+
+    "inventory_controlled",
+    "batch_controlled",
+    "serial_controlled",
+    "expiry_controlled",
+    "min_stock_level",
+    "max_stock_level",
+    "reorder_qty",
+
+    "storage_type",
+    "hazardous",
+    "fragile",
+    "stackable",
+    "default_warehouse",
+    "default_zone",
+    "default_bin",
+
+    "valuation_method",
+    "standard_cost",
+    "inventory_gl_code",
+
+    "status"
+  ];
+
+  const csvContent = header.join(",");
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = "item-upload-template.csv";
+  link.click();
+};
 
   return (
     <div>
@@ -117,6 +267,25 @@ export default function ItemMasterPage() {
       + Add New
     </button>
 
+    {/* ✅ Upload Button (Clean UI) */}
+  <button
+    onClick={() => document.getElementById("fileInput")?.click()}
+    className="bg-green-600 hover:bg-green-700 active:scale-95 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all duration-200"
+    >
+  
+    {uploading ? "Uploading..." : "Upload Excel"}
+  </button>
+
+  {/* Hidden Input */}
+  <input
+    id="fileInput"
+    type="file"
+    accept=".xlsx, .xls"
+    onChange={handleFileUpload}
+    style={{ display: "none" }}
+  />
+
+
     {/* Excel Button */}
     <button
       onClick={exportToExcel}
@@ -124,6 +293,14 @@ export default function ItemMasterPage() {
     >
       Export to Excel
     </button>
+
+    {/* 🔥 NEW: TEMPLATE DOWNLOAD */}
+  <button
+    onClick={downloadTemplate}
+    className="bg-green-600 hover:bg-green-700 active:scale-95 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all duration-200">
+    Download Template
+  </button>
+
 
   </div>
 
