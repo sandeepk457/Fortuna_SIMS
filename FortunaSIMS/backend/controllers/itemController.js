@@ -198,7 +198,26 @@ const itemId = itemResult.rows[0].id;
     }
 
     await client.query("COMMIT");
+    // ===============================
+// 🔥 STEP-2: CREATE ERROR EXCEL (CORRECT PLACE)
+// ===============================
+let errorFilePath = null;
 
+if (skippedRows.length > 0) {
+  const errorData = skippedRows.map((item) => ({
+    ...item.row,
+    error_reason: item.reason
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(errorData);
+  const workbook = XLSX.utils.book_new();
+
+  XLSX.utils.book_append_sheet(workbook, worksheet, "Errors");
+
+  errorFilePath = `uploads/error_${Date.now()}.xlsx`;
+
+  XLSX.writeFile(workbook, errorFilePath);
+}
     res.json({
       message: "Bulk upload completed",
       totalInserted: insertedCount,

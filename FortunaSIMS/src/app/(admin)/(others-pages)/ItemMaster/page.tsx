@@ -42,7 +42,7 @@ export default function ItemMasterPage() {
 
 
 
-  const handleFileUpload = async (e) => {
+const handleFileUpload = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -61,7 +61,18 @@ export default function ItemMasterPage() {
 
     if (res.ok) {
       alert(`✅ Uploaded: ${data.totalInserted} items\n❌ Skipped: ${data.skipped}`);
+
+      // 🔥 DOWNLOAD ERROR FILE (FIXED)
+      if (data.errorFile) {
+        const link = document.createElement("a");
+        link.href = `http://localhost:5000/${data.errorFile}`;
+        link.download = "Error_Report.xlsx";
+        link.click();
+      }
+
+      // 🔥 RELOAD AFTER SUCCESS
       window.location.reload();
+
     } else {
       alert(data.error || "Upload failed");
     }
@@ -73,6 +84,7 @@ export default function ItemMasterPage() {
     setUploading(false);
   }
 };
+
 
   const [searchName, setSearchName] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
