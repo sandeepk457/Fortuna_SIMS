@@ -43,7 +43,24 @@ export default function ItemMasterPage() {
     fetchItems();
   }, []);
 
+  //stub for delete function//
 
+  const handleDelete = async (id) => {
+  if (!confirm("Are you sure to delete?")) return;
+
+  const res = await fetch(`http://localhost:5000/api/items/${id}`, {
+    method: "DELETE"
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    alert("Deleted successfully");
+    fetchItems(); // refresh
+  } else {
+    alert(data.error);
+  }
+};
 
 const handleFileUpload = async (e) => {
   const file = e.target.files[0];
@@ -415,7 +432,12 @@ const handleFileUpload = async (e) => {
                   className="cursor-pointer text-blue-600">
                   Edit
                   </span>
-                    <span className="text-red-500">Delete</span>
+                    <span
+                    className="text-red-500 cursor-pointer"
+                    onClick={() => handleDelete(item.id)}
+                  >
+                   Delete
+                  </span>
                   </td>
                 </tr>
               ))}

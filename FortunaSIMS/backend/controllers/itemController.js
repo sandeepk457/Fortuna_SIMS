@@ -665,27 +665,21 @@ exports.updateItem = async (req, res) => {
 // ===============================
 // ❌ SOFT DELETE
 // ===============================
-const handleDelete = async (id) => {
-  const confirmDelete = confirm("Are you sure to delete this item?");
-
-  if (!confirmDelete) return;
-
+exports.deleteItem = async (req, res) => {
   try {
-    const res = await fetch(`http://localhost:5000/api/items/${id}`, {
-      method: "DELETE"
-    });
+    const { id } = req.params;
 
-    const data = await res.json();
+    await pool.query(
+      `UPDATE items 
+       SET status = 'Inactive', updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
 
-    if (res.ok) {
-      alert("Item deleted successfully");
-      fetchItems(); // 🔄 refresh list
-    } else {
-      alert(data.error || "Delete failed");
-    }
+    res.json({ message: "Item soft deleted successfully" });
 
   } catch (err) {
-    console.error(err);
-    alert("Error deleting item");
+    console.error("Delete Error:", err);
+    res.status(500).json({ error: "Delete failed" });
   }
 };

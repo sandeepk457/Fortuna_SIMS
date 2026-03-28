@@ -2,7 +2,6 @@ const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/itemController");
 
-
 // 🔥 File Upload (Multer)
 const multer = require("multer");
 
@@ -16,6 +15,8 @@ const storage = multer.diskStorage({
     cb(null, uniqueName);
   },
 });
+
+
 
 const upload = multer({ storage });
 
@@ -55,8 +56,10 @@ router.put("/:id", controller.updateItem);
 // ===============================
 // ❌ DELETE ITEM (SOFT)
 // ===============================
-router.delete("/:id", controller.deleteItem);
 
+
+
+// router.delete("/:id", controller.deleteItem); 
 
 
 module.exports = router;
