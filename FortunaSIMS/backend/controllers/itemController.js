@@ -1,7 +1,10 @@
 const pool = require("../config/db");
 const XLSX = require("xlsx");
 const fs = require("fs");
-
+const toNumberOrNull = (val) => {
+  if (val === "" || val === undefined || val === null) return null;
+  return Number(val);
+};
   
 
 // ===============================
@@ -120,7 +123,7 @@ const itemResult = await client.query(
     brand,
     uom,
     altUom,
-    conversionFactor || null,
+    conversionFactor,
     barcode,
     hsnSac,
     description,
@@ -146,9 +149,9 @@ const itemId = itemResult.rows[0].id;
             row.batch_controlled === "true",
             row.serial_controlled === "true",
             row.expiry_controlled === "true",
-            row.min_stock_level || null,
-            row.max_stock_level || null,
-            row.reorder_qty || null
+            toNumberOrNull(row.min_stock_level),
+            toNumberOrNull(row.max_stock_level),
+            toNumberOrNull(row.reorder_qty)
           ]
         );
 
@@ -184,7 +187,7 @@ const itemId = itemResult.rows[0].id;
           [
             itemId,
             row.valuation_method || "FIFO",
-            row.standard_cost || null,
+            toNumberOrNull(row.standard_cost),
             row.inventory_gl_code
           ]
         );
@@ -342,7 +345,7 @@ exports.createItem = async (req, res) => {
         brand,
         uom,
         altUom,
-        conversionFactor || null,
+        toNumberOrNull(conversionFactor),
         barcode,
         hsnSac,
         description,
@@ -369,9 +372,9 @@ exports.createItem = async (req, res) => {
         batch_controlled || false,
         serial_controlled || false,
         expiry_controlled || false,
-        min_stock_level || null,
-        max_stock_level || null,
-        reorder_qty || null
+        toNumberOrNull(min_stock_level),
+        toNumberOrNull(max_stock_level),
+        toNumberOrNull(reorder_qty),
       ]
     );
 
@@ -407,7 +410,7 @@ exports.createItem = async (req, res) => {
       [
         itemId,
         valuation_method || "FIFO",
-        standard_cost || null,
+        toNumberOrNull(standard_cost),
         inventory_gl_code || null
       ]
     );
@@ -443,6 +446,8 @@ exports.createItem = async (req, res) => {
 // ===============================
 exports.getItems = async (req, res) => {
   try {
+
+    res.set("Cache-Control", "no-store");
     const result = await pool.query(`
       SELECT 
         id,
@@ -500,7 +505,7 @@ exports.getItemById = async (req, res) => {
 
 
 // ===============================
-// ✏️ UPDATE ITEM (BASIC)
+// ✏️ UPDATE ITEM
 // ===============================
 exports.updateItem = async (req, res) => {
   const client = await pool.connect();
@@ -509,17 +514,139 @@ exports.updateItem = async (req, res) => {
     await client.query("BEGIN");
 
     const { id } = req.params;
-    const { itemName, category, uom, status } = req.body;
 
+    const {
+      itemName,
+      shortName,
+      itemType,
+      category,
+      subCategory,
+      brand,
+      uom,
+      altUom,
+      conversionFactor,
+      barcode,
+      hsnSac,
+      description,
+
+      inventory_controlled,
+      batch_controlled,
+      serial_controlled,
+      expiry_controlled,
+      min_stock_level,
+      max_stock_level,
+      reorder_qty,
+
+      storage_type,
+      hazardous,
+      fragile,
+      stackable,
+      default_warehouse,
+      default_zone,
+      default_bin,
+
+      valuation_method,
+      standard_cost,
+      inventory_gl_code,
+
+      status
+    } = req.body;
+
+    // ITEMS
     await client.query(
       `UPDATE items SET
-        item_name = $1,
-        category = $2,
-        uom = $3,
-        status = $4,
-        updated_at = NOW()
-      WHERE id = $5`,
-      [itemName, category, uom, status, id]
+        item_name=$1,
+        short_name=$2,
+        item_type=$3,
+        category=$4,
+        sub_category=$5,
+        brand=$6,
+        uom=$7,
+        alt_uom=$8,
+        conversion_factor=$9,
+        barcode=$10,
+        hsn_sac=$11,
+        description=$12,
+        status=$13,
+        updated_at=NOW()
+      WHERE id=$14`,
+      [
+        itemName,
+        shortName,
+        itemType,
+        category,
+        subCategory,
+        brand,
+        uom,
+        altUom,
+        toNumberOrNull(conversionFactor),
+        barcode,
+        hsnSac,
+        description,
+        status,
+        id
+      ]
+    );
+
+    // INVENTORY
+    await client.query(
+      `UPDATE item_inventory SET
+        inventory_controlled=$1,
+        batch_controlled=$2,
+        serial_controlled=$3,
+        expiry_controlled=$4,
+        min_stock_level=$5,
+        max_stock_level=$6,
+        reorder_qty=$7
+      WHERE item_id=$8`,
+      [
+        inventory_controlled,
+        batch_controlled,
+        serial_controlled,
+        expiry_controlled,
+        toNumberOrNull(min_stock_level),
+        toNumberOrNull(max_stock_level),
+        toNumberOrNull(reorder_qty),
+        id
+      ]
+    );
+
+    // STORAGE
+    await client.query(
+      `UPDATE item_storage SET
+        storage_type=$1,
+        hazardous=$2,
+        fragile=$3,
+        stackable=$4,
+        default_warehouse=$5,
+        default_zone=$6,
+        default_bin=$7
+      WHERE item_id=$8`,
+      [
+        storage_type,
+        hazardous,
+        fragile,
+        stackable,
+        default_warehouse,
+        default_zone,
+        default_bin,
+        id
+      ]
+    );
+
+    // VALUATION
+    await client.query(
+      `UPDATE item_valuation SET
+        valuation_method=$1,
+        standard_cost=$2,
+        inventory_gl_code=$3
+      WHERE item_id=$4`,
+      [
+        valuation_method,
+        toNumberOrNull(standard_cost),
+        inventory_gl_code,
+        id
+      ]
     );
 
     await client.query("COMMIT");
@@ -528,31 +655,37 @@ exports.updateItem = async (req, res) => {
 
   } catch (err) {
     await client.query("ROLLBACK");
-    console.error(err);
-    res.status(500).json({ error: "Update failed" });
+    console.error("Update Error:", err);
+    res.status(500).json({ error: err.message });
   } finally {
     client.release();
   }
 };
 
-
-
 // ===============================
-// ❌ DELETE (SOFT)
+// ❌ SOFT DELETE
 // ===============================
-exports.deleteItem = async (req, res) => {
+const handleDelete = async (id) => {
+  const confirmDelete = confirm("Are you sure to delete this item?");
+
+  if (!confirmDelete) return;
+
   try {
-    const { id } = req.params;
+    const res = await fetch(`http://localhost:5000/api/items/${id}`, {
+      method: "DELETE"
+    });
 
-    await pool.query(
-      `UPDATE items SET status = 'Inactive' WHERE id = $1`,
-      [id]
-    );
+    const data = await res.json();
 
-    res.json({ message: "Item deactivated" });
+    if (res.ok) {
+      alert("Item deleted successfully");
+      fetchItems(); // 🔄 refresh list
+    } else {
+      alert(data.error || "Delete failed");
+    }
 
   } catch (err) {
     console.error(err);
-    res.status(500).json({ error: "Delete failed" });
+    alert("Error deleting item");
   }
 };

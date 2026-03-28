@@ -25,6 +25,8 @@ const upload = multer({ storage });
 // ===============================
 router.post("/bulk-upload", upload.single("file"), controller.bulkUploadItems);
 
+router.get("/:id", controller.getItemById);
+router.put("/:id", controller.updateItem);
 
 // ===============================
 // ✅ CREATE ITEM
@@ -54,6 +56,7 @@ router.put("/:id", controller.updateItem);
 // ❌ DELETE ITEM (SOFT)
 // ===============================
 router.delete("/:id", controller.deleteItem);
+
 
 
 module.exports = router;

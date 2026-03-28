@@ -3,6 +3,7 @@
 import React, { useState, useMemo,useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 interface Item {
   code: string;
@@ -21,7 +22,9 @@ export default function ItemMasterPage() {
   const [uploading, setUploading] = useState(false);
 
   //  (FETCH FUNCTION)
+  const searchParams = useSearchParams();
 
+  const id = searchParams.get("id");
   const fetchItems = async () => {
     try {
       const res = await fetch("http://localhost:5000/api/items");
@@ -407,7 +410,11 @@ const handleFileUpload = async (e) => {
                     </span>
                   </td>
                   <td className="px-4 py-3 space-x-3 text-blue-600 cursor-pointer">
-                    <span>Edit</span>
+                   <span
+                  onClick={() => router.push(`/ItemMasterForm?id=${item.id}`)}
+                  className="cursor-pointer text-blue-600">
+                  Edit
+                  </span>
                     <span className="text-red-500">Delete</span>
                   </td>
                 </tr>

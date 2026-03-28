@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -83,9 +85,70 @@ function classNames(...v: Array<string | false | undefined | null>) {
 }
 
 export default function ItemMasterForm() {
+  const searchParams = useSearchParams();
+  const id = searchParams.get("id");
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<ItemMasterFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+
+useEffect(() => {
+  if (id) {
+    fetch(`http://localhost:5000/api/items/${id}`)
+      .then(res => {
+        if (!res.ok) throw new Error("Failed to fetch item");
+        return res.json();
+      })
+      .then(data => {
+        setForm((prev: any) => ({
+          ...prev,
+
+          itemCode: data.item_code ?? "",
+          itemName: data.item_name ?? "",
+          shortName: data.short_name ?? "",
+          itemType: data.item_type ?? "",
+          category: data.category ?? "",
+          subCategory: data.sub_category ?? "",
+          brand: data.brand ?? "",
+          uom: data.uom ?? "",
+          altUom: data.alt_uom ?? "",
+          conversionFactor: data.conversion_factor?.toString() ?? "",
+          barcode: data.barcode ?? "",
+          hsnSac: data.hsn_sac ?? "",
+          description: data.description ?? "",
+
+          inventory_controlled: data.inventory_controlled ?? false,
+          batch_controlled: data.batch_controlled ?? false,
+          serial_controlled: data.serial_controlled ?? false,
+          expiry_controlled: data.expiry_controlled ?? false,
+          min_stock_level: data.min_stock_level?.toString() ?? "",
+          max_stock_level: data.max_stock_level?.toString() ?? "",
+          reorder_qty: data.reorder_qty?.toString() ?? "",
+
+          storage_type: data.storage_type ?? "",
+          hazardous: data.hazardous ?? false,
+          fragile: data.fragile ?? false,
+          stackable: data.stackable ?? false,
+          default_warehouse: data.default_warehouse ?? "",
+          default_zone: data.default_zone ?? "",
+          default_bin: data.default_bin ?? "",
+
+          valuation_method: data.valuation_method ?? "",
+          standard_cost: data.standard_cost?.toString() ?? "",
+          inventory_gl_code: data.inventory_gl_code ?? "",
+
+          status: data.status ?? "Active"
+        }));
+      })
+      .catch(err => {
+        console.error("Fetch Error:", err);
+        alert("Failed to load item data");
+      });
+  }
+}, [id]);
+
+
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -99,7 +162,7 @@ export default function ItemMasterForm() {
     // Conversion factor validation (only if alt uom is filled)
     if (form.altUom.trim()) {
       const num = Number(form.conversionFactor);
-      if (!form.conversionFactor.trim()) {
+      if (!form.conversionFactor || !form.conversionFactor.toString().trim()) {
         e.conversionFactor =
           "Conversion Factor is required when Alt UOM is provided";
       } else if (Number.isNaN(num) || num <= 0) {
@@ -152,51 +215,47 @@ export default function ItemMasterForm() {
   //   alert("Saved (demo). Next step: connect API.");
   // };
 
-  //   // onSave function with API call
 const onSave = async () => {
-  const toTouch = [
-    "itemCode",
-    "itemName",
-    "itemType",
-    "uom",
-    "altUom",
-    "conversionFactor",
-  ];
-
-  setTouched((p) => {
-    const next = { ...p };
-    toTouch.forEach((k) => (next[k] = true));
-    return next;
-  });
-
-  if (hasErrors) {
-    setActiveTab("basic");
-    return;
-  }
-
   try {
-    const res = await fetch("http://localhost:5000/api/items", {
-      method: "POST",
+    const isEdit = !!id;
+
+    const url = isEdit
+      ? `http://localhost:5000/api/items/${id}`
+      : `http://localhost:5000/api/items`;
+
+    const method = isEdit ? "PUT" : "POST";
+
+    // 🔥 Clean payload (avoid undefined/null issues)
+    const payload = {
+      ...form,
+      conversionFactor: form.conversionFactor || null,
+      standard_cost: form.standard_cost || null
+    };
+
+    const res = await fetch(url, {
+      method,
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": "application/json"
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload)
     });
 
     const data = await res.json();
 
     if (res.ok) {
-      alert(`✅ Item Created: ${data.item_code}`);
+      alert(isEdit ? "✅ Item Updated Successfully" : "✅ Item Created Successfully");
 
-      // 🔥 redirect to list page
+      // 🔥 Better UX (no reload)
       window.location.href = "/ItemMaster";
+
     } else {
-      alert(data.error || "Failed to save item");
+      console.error("API Error:", data);
+      alert(data.error || "❌ Something went wrong");
     }
 
   } catch (err) {
-    console.error(err);
-    alert("Error saving item");
+    console.error("Save Error:", err);
+    alert("❌ Error saving item");
   }
 };
 
