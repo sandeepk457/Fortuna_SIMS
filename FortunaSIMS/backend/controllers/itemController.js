@@ -457,6 +457,7 @@ exports.getItems = async (req, res) => {
         uom,
         status
       FROM items
+      where status = 'Active'
       ORDER BY created_at DESC
     `);
 
