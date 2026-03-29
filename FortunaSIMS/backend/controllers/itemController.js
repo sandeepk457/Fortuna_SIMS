@@ -662,24 +662,40 @@ exports.updateItem = async (req, res) => {
   }
 };
 
+
 // ===============================
-// ❌ SOFT DELETE
+// ❌ SOFT DELETE ITEM
 // ===============================
 exports.deleteItem = async (req, res) => {
+  const client = await pool.connect();
+
   try {
     const { id } = req.params;
 
-    await pool.query(
+    await client.query("BEGIN");
+
+    // Soft delete → status change
+    await client.query(
       `UPDATE items 
        SET status = 'Inactive', updated_at = NOW()
        WHERE id = $1`,
       [id]
     );
 
-    res.json({ message: "Item soft deleted successfully" });
+    await client.query("COMMIT");
+
+    res.json({
+      message: "Item deleted (soft) successfully"
+    });
 
   } catch (err) {
+    await client.query("ROLLBACK");
     console.error("Delete Error:", err);
-    res.status(500).json({ error: "Delete failed" });
+
+    res.status(500).json({
+      error: "Failed to delete item"
+    });
+  } finally {
+    client.release();
   }
 };

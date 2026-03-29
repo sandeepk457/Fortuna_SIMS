@@ -52,14 +52,7 @@ router.get("/:id", controller.getItemById);
 // ===============================
 router.put("/:id", controller.updateItem);
 
-
-// ===============================
-// ❌ DELETE ITEM (SOFT)
-// ===============================
-
-
-
-// router.delete("/:id", controller.deleteItem); 
-
+// DELETE (SOFT)
+router.delete("/:id", controller.deleteItem);
 
 module.exports = router;
