@@ -2,6 +2,8 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import axios from "axios";
+import { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -221,6 +223,8 @@ type SelectedBinCtx = {
 const modalOverlay = "fixed inset-0 z-[999] flex items-center justify-center bg-black/40 p-4";
 
 export default function WarehouseMasterForm() {
+const router = useRouter();
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<WarehouseFormState>(initialForm);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -294,30 +298,112 @@ export default function WarehouseMasterForm() {
     setSelectedRackId(freshZones[0]?.aisles[0]?.racks[0]?.id ?? "");
   };
 
-  const onSave = () => {
-    const toTouch: Array<keyof WarehouseFormState> = [
-      "warehouseCode",
-      "warehouseName",
-      "warehouseType",
-      "city",
-      "state",
-      "pincode",
-    ];
-    setTouched((p) => {
-      const next = { ...p };
-      toTouch.forEach((k) => (next[k as string] = true));
-      return next;
-    });
+// =========================
+// 🔥 FORMAT LAYOUT FUNCTION
+// =========================
+const formatLayout = (zones: Zone[]) => {
+  if (!zones || zones.length === 0) return [];
 
-    if (hasErrors) {
-      setActiveTab("basic");
-      return;
+  return zones.map((zone, zIndex) => ({
+    zone_name: zone?.name || `Zone-${zIndex + 1}`,
+    zone_type: zone?.type || "Storage",
+
+    aisles: (zone?.aisles || []).map((aisle, aIndex) => ({
+      aisle_name: aisle?.name || `Aisle-${aIndex + 1}`,
+
+      racks: (aisle?.racks || []).map((rack, rIndex) => ({
+        rack_name: rack?.name || `Rack-${rIndex + 1}`,
+
+        // 🔥 SP expects numbers
+        levels: Number(rack?.levels ?? 1),
+        bins_per_level: Number(rack?.binsPerLevel ?? 1),
+      })),
+    })),
+  }));
+};
+
+
+// =========================
+// 🔥 SAVE WAREHOUSE
+// =========================
+const onSave = async () => {
+
+  const toTouch = [
+    "warehouseCode",
+    "warehouseName",
+    "warehouseType",
+    "city",
+    "state",
+    "pincode",
+  ];
+
+  setTouched((p) => {
+    const next = { ...p };
+    toTouch.forEach((k) => (next[k] = true));
+    return next;
+  });
+
+  if (hasErrors) {
+    setActiveTab("basic");
+    return;
+  }
+
+  try {
+
+    const payload = {
+      warehouse: {
+        warehouse_code: form.warehouseCode,
+        warehouse_name: form.warehouseName,
+        warehouse_type: form.warehouseType,
+        city: form.city,
+        state: form.state,
+        status: form.status || "Active",
+      },
+
+      settings: {
+        allow_negative_stock: form.allowNegativeStock,
+        enable_bin_tracking: form.enableBinTracking,
+        storage_type: form.storageType || "Ambient",
+        hazardous_allowed: form.hazardousAllowed,
+        costing_method: form.costingMethod || "FIFO",
+      },
+
+      layout: formatLayout(zones), // 🔥 important
+    };
+
+    console.log("FINAL PAYLOAD:", JSON.stringify(payload, null, 2));
+
+    const res = await axios.post(
+      "http://localhost:5000/api/warehouses/full-create",
+      payload
+    );
+
+    console.log("API RESPONSE:", res.data);
+
+    // ✅ SUCCESS CHECK
+    if (res.data?.success) {
+
+      alert("Warehouse Created Successfully 🔥");
+
+      // 🔥 CORRECT ROUTE
+      router.push("/WarehouseMaster");
+
+    } else {
+      throw new Error("API returned failure");
     }
 
-    console.log("Warehouse Saved:", { form, zones });
-    alert("Saved (demo). Next: API connect + persist zones/layout JSON.");
-  };
+  } catch (err: any) {
 
+    console.error("Save error FULL:", err);
+
+    if (err.response) {
+      console.error("Backend Error:", err.response.data);
+      alert(err.response.data?.error || "Backend error ❌");
+    } else {
+      alert("Something went wrong ❌");
+    }
+  }
+};
   /** ====== Selected references ====== */
   const selectedZone = useMemo(() => zones.find((z) => z.id === selectedZoneId) ?? zones[0], [zones, selectedZoneId]);
 

@@ -3,7 +3,29 @@
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import axios from "axios";
 
+
+const StatRow = ({ label, value, badge }: any) => {
+  const badgeColor: any = {
+    gray: "bg-gray-200 text-gray-700",
+    green: "bg-green-100 text-green-700",
+    red: "bg-red-100 text-red-700",
+    blue: "bg-blue-100 text-blue-700",
+    amber: "bg-amber-100 text-amber-700",
+    purple: "bg-purple-100 text-purple-700",
+  };
+
+  return (
+    <div className="flex items-center justify-between">
+      <span>{label}</span>
+      <span className={`px-2 py-0.5 rounded text-xs font-medium ${badgeColor[badge] || ""}`}>
+        {value}
+      </span>
+    </div>
+  );
+};
 
 interface Warehouse {
   code: string;
@@ -19,28 +41,7 @@ export default function WarehouseMasterPage() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  const [data] = useState<Warehouse[]>([
-    { code: "WH-001", name: "Fortuna Central DC", warehouseType: "DC", city: "Hyderabad", state: "Telangana", capacitySqft: 250000, status: "Active" },
-    { code: "WH-002", name: "Vizag Logistics Hub", warehouseType: "Hub", city: "Visakhapatnam", state: "Andhra Pradesh", capacitySqft: 120000, status: "Active" },
-    { code: "WH-003", name: "Chennai Distribution Center", warehouseType: "DC", city: "Chennai", state: "Tamil Nadu", capacitySqft: 220000, status: "Inactive" },
-    { code: "WH-004", name: "Bengaluru Spare Parts DC", warehouseType: "DC", city: "Bengaluru", state: "Karnataka", capacitySqft: 180000, status: "Active" },
-    { code: "WH-005", name: "Pune Regional Hub", warehouseType: "Hub", city: "Pune", state: "Maharashtra", capacitySqft: 140000, status: "Active" },
-    { code: "WH-006", name: "Mumbai Port Storehouse", warehouseType: "Store", city: "Mumbai", state: "Maharashtra", capacitySqft: 90000, status: "Inactive" },
-    { code: "WH-007", name: "Kolkata East DC", warehouseType: "DC", city: "Kolkata", state: "West Bengal", capacitySqft: 160000, status: "Active" },
-    { code: "WH-008", name: "Delhi NCR Central DC", warehouseType: "DC", city: "Gurugram", state: "Haryana", capacitySqft: 300000, status: "Active" },
-    { code: "WH-009", name: "Jaipur Regional Hub", warehouseType: "Hub", city: "Jaipur", state: "Rajasthan", capacitySqft: 110000, status: "Active" },
-    { code: "WH-010", name: "Ahmedabad Plant Warehouse", warehouseType: "Plant", city: "Ahmedabad", state: "Gujarat", capacitySqft: 200000, status: "Inactive" },
-    { code: "WH-011", name: "Indore Spare Parts Hub", warehouseType: "Hub", city: "Indore", state: "Madhya Pradesh", capacitySqft: 100000, status: "Active" },
-    { code: "WH-012", name: "Nagpur Crossdock Hub", warehouseType: "Hub", city: "Nagpur", state: "Maharashtra", capacitySqft: 95000, status: "Active" },
-    { code: "WH-013", name: "Lucknow Regional DC", warehouseType: "DC", city: "Lucknow", state: "Uttar Pradesh", capacitySqft: 150000, status: "Inactive" },
-    { code: "WH-014", name: "Bhubaneswar City Store", warehouseType: "Store", city: "Bhubaneswar", state: "Odisha", capacitySqft: 65000, status: "Active" },
-    { code: "WH-015", name: "Cochin Coastal Hub", warehouseType: "Hub", city: "Kochi", state: "Kerala", capacitySqft: 105000, status: "Active" },
-    { code: "WH-016", name: "Coimbatore Plant Warehouse", warehouseType: "Plant", city: "Coimbatore", state: "Tamil Nadu", capacitySqft: 175000, status: "Active" },
-    { code: "WH-017", name: "Patna Regional Store", warehouseType: "Store", city: "Patna", state: "Bihar", capacitySqft: 70000, status: "Inactive" },
-    { code: "WH-018", name: "Surat Textile DC", warehouseType: "DC", city: "Surat", state: "Gujarat", capacitySqft: 190000, status: "Active" },
-    { code: "WH-019", name: "Vijayawada City Hub", warehouseType: "Hub", city: "Vijayawada", state: "Andhra Pradesh", capacitySqft: 98000, status: "Active" },
-    { code: "WH-020", name: "Nellore Regional Store", warehouseType: "Store", city: "Nellore", state: "Andhra Pradesh", capacitySqft: 60000, status: "Active" },
-  ]);
+  const [data, setData] = useState<Warehouse[]>([]);
 
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
@@ -50,10 +51,61 @@ export default function WarehouseMasterPage() {
   const [stateFilter, setStateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   
+  // =========================
+//  QUICK STATS CALCULATION
+// =========================
+const stats = useMemo(() => {
+  const total = data.length;
+
+  const active = data.filter((w) => w.status === "Active").length;
+  const inactive = data.filter((w) => w.status === "Inactive").length;
+
+  const dcCount = data.filter((w) => w.warehouseType === "General DC").length;
+
+  const cities = new Set(data.map((w) => w.city));
+  const states = new Set(data.map((w) => w.state));
+
+  return {
+    total,
+    active,
+    inactive,
+    dcCount,
+    cityCount: cities.size,
+    stateCount: states.size,
+  };
+}, [data]);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+
+useEffect(() => {
+  fetchWarehouses();
+}, []);
+
+const fetchWarehouses = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/warehouses");
+
+    console.log("API DATA:", res.data);
+
+    // 🔥 MAP backend → frontend structure
+    const mapped = res.data.map((item) => ({
+      code: item.warehouse_code,
+      name: item.warehouse_name,
+      warehouseType: item.warehouse_type,
+      city: item.city,
+      state: item.state,
+      capacitySqft: item.capacity_sqft || 0,
+      status: item.status,
+    }));
+
+    setData(mapped);
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+  }
+};
 
   // Filtering Logic
  const filteredData = useMemo(() => {
@@ -97,6 +149,9 @@ export default function WarehouseMasterPage() {
 
       <div className="min-h-screen rounded-2xl border border-gray-200 bg-white p-6">
 
+        {/* 🔥 Quick Stats */}
+
+
         {/* Header */}
         <div className="flex justify-between items-center mb-6">
           {/* Left Side */}
@@ -127,8 +182,12 @@ export default function WarehouseMasterPage() {
           </div>
         </div>
 
+
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6"></div>
+        
+
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto xl:col-span-3" style={{display:"flex", flexDirection:"row"}}>
           <table className="w-full border-collapse text-sm">
             <thead className="bg-gray-100">
               <tr>
@@ -298,6 +357,32 @@ export default function WarehouseMasterPage() {
               )}
             </tbody>
           </table>
+          <div className="grid grid-cols-1 gap-4 mb-6">
+  
+
+  {/* Stats Card */}
+  <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm col-span-1">
+    <div className="flex items-center justify-between">
+      <h3 className="text-base font-semibold text-gray-800">Quick Stats</h3>
+      <span className="h-2 w-2 rounded-full bg-red-600" />
+    </div>
+
+    <div className="mt-4 space-y-3 text-sm">
+      <StatRow label="Total Warehouses" value={stats.total} />
+      <StatRow label="Active" value={stats.active} badge="green" />
+      <StatRow label="Inactive" value={stats.inactive} badge="red" />
+      <StatRow label="DC Count" value={stats.dcCount} badge="blue" />
+      <div className="my-3 border-t" />
+      <StatRow label="Cities Covered" value={stats.cityCount} badge="amber" />
+      <StatRow label="States Covered" value={stats.stateCount} badge="purple" />
+    </div>
+
+    <div className="mt-4 text-xs text-gray-500">
+      Tip: Filters apply to both table & stats.
+    </div>
+  </div>
+
+</div>
         </div>
 
         {/* Bottom Controls */}
@@ -395,6 +480,8 @@ export default function WarehouseMasterPage() {
         )}
 
       </div>
+
+      
     </div>
   );
 }
