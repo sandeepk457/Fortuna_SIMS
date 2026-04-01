@@ -60,7 +60,10 @@ const stats = useMemo(() => {
   const active = data.filter((w) => w.status === "Active").length;
   const inactive = data.filter((w) => w.status === "Inactive").length;
 
-  const dcCount = data.filter((w) => w.warehouseType === "General DC").length;
+  const generalDC = data.filter((w) => w.warehouseType === "General DC").length;
+  const manufacturing = data.filter((w) => w.warehouseType === "Manufacturing Store").length;
+  const coldChain = data.filter((w) => w.warehouseType === "Cold Chain").length;
+  const yard = data.filter((w) => w.warehouseType === "Yard").length;
 
   const cities = new Set(data.map((w) => w.city));
   const states = new Set(data.map((w) => w.state));
@@ -69,7 +72,10 @@ const stats = useMemo(() => {
     total,
     active,
     inactive,
-    dcCount,
+    generalDC,
+    manufacturing,
+    coldChain,
+    yard,
     cityCount: cities.size,
     stateCount: states.size,
   };
@@ -371,7 +377,10 @@ const fetchWarehouses = async () => {
       <StatRow label="Total Warehouses" value={stats.total} />
       <StatRow label="Active" value={stats.active} badge="green" />
       <StatRow label="Inactive" value={stats.inactive} badge="red" />
-      <StatRow label="DC Count" value={stats.dcCount} badge="blue" />
+      <StatRow label="General DC" value={stats.generalDC} badge="blue" />
+      <StatRow label="Manufacturing Store" value={stats.manufacturing} badge="purple" />
+      <StatRow label="Cold Chain" value={stats.coldChain} badge="cyan" />
+      <StatRow label="Yard" value={stats.yard} badge="amber" />
       <div className="my-3 border-t" />
       <StatRow label="Cities Covered" value={stats.cityCount} badge="amber" />
       <StatRow label="States Covered" value={stats.stateCount} badge="purple" />
