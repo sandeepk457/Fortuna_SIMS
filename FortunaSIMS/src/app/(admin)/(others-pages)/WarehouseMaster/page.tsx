@@ -118,9 +118,9 @@ const fetchWarehouses = async () => {
   return data.filter((wh) =>
     wh.code.toLowerCase().includes(searchCode.toLowerCase()) &&
     wh.name.toLowerCase().includes(searchName.toLowerCase()) &&
-    (typeFilter ? wh.warehouseType === typeFilter : true) &&
-    (cityFilter ? wh.city === cityFilter : true) &&
-    (stateFilter ? wh.state === stateFilter : true) &&
+    wh.warehouseType.toLowerCase().includes(typeFilter.toLowerCase()) &&
+    wh.city.toLowerCase().includes(cityFilter.toLowerCase()) &&
+    wh.state.toLowerCase().includes(stateFilter.toLowerCase()) &&
     (statusFilter ? wh.status === statusFilter : true)
   );
 }, [data, searchCode, searchName, typeFilter, cityFilter, stateFilter, statusFilter]);
@@ -224,84 +224,42 @@ const fetchWarehouses = async () => {
                 </th>
 
                 <th className="px-4 py-3 text-left">
-                  Type
-                  <select
-                    className="mt-2 w-full border rounded px-2 py-1 text-xs"
-                    value={typeFilter}
-                    onChange={(e) => {
-                      setTypeFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All</option>
-                    <option value="DC">DC</option>
-                    <option value="Plant">Plant</option>
-                    <option value="Hub">Hub</option>
-                    <option value="Store">Store</option>
-                  </select>
-                </th>
+                Type
+                <input
+                  className="mt-2 w-full border rounded px-2 py-1 text-xs"
+                  placeholder="Search Type"
+                  value={typeFilter}
+                  onChange={(e) => {
+                    setTypeFilter(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                />
+              </th>
 
                 <th className="px-4 py-3 text-left">
-                  City
-                  <select
-                    className="mt-2 w-full border rounded px-2 py-1 text-xs"
-                    value={cityFilter}
-                    onChange={(e) => {
-                      setCityFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All</option>
-                    {/* Keep cities minimal; can be dynamic later */}
-                    <option value="Hyderabad">Hyderabad</option>
-                    <option value="Visakhapatnam">Visakhapatnam</option>
-                    <option value="Chennai">Chennai</option>
-                    <option value="Bengaluru">Bengaluru</option>
-                    <option value="Pune">Pune</option>
-                    <option value="Mumbai">Mumbai</option>
-                    <option value="Kolkata">Kolkata</option>
-                    <option value="Gurugram">Gurugram</option>
-                    <option value="Jaipur">Jaipur</option>
-                    <option value="Ahmedabad">Ahmedabad</option>
-                    <option value="Indore">Indore</option>
-                    <option value="Nagpur">Nagpur</option>
-                    <option value="Lucknow">Lucknow</option>
-                    <option value="Bhubaneswar">Bhubaneswar</option>
-                    <option value="Kochi">Kochi</option>
-                    <option value="Coimbatore">Coimbatore</option>
-                    <option value="Patna">Patna</option>
-                    <option value="Surat">Surat</option>
-                    <option value="Vijayawada">Vijayawada</option>
-                    <option value="Nellore">Nellore</option>
-                  </select>
-                </th>
+  City
+  <input
+    className="mt-2 w-full border rounded px-2 py-1 text-xs"
+    placeholder="Search City"
+    value={cityFilter}
+    onChange={(e) => {
+      setCityFilter(e.target.value);
+      setCurrentPage(1);
+    }}
+  />
+</th>
 
                 <th className="px-4 py-3 text-left">
   State
-  <select
+  <input
     className="mt-2 w-full border rounded px-2 py-1 text-xs"
+    placeholder="Search State"
     value={stateFilter}
     onChange={(e) => {
       setStateFilter(e.target.value);
       setCurrentPage(1);
     }}
-  >
-    <option value="">All</option>
-    <option value="Telangana">Telangana</option>
-    <option value="Andhra Pradesh">Andhra Pradesh</option>
-    <option value="Tamil Nadu">Tamil Nadu</option>
-    <option value="Karnataka">Karnataka</option>
-    <option value="Maharashtra">Maharashtra</option>
-    <option value="West Bengal">West Bengal</option>
-    <option value="Haryana">Haryana</option>
-    <option value="Rajasthan">Rajasthan</option>
-    <option value="Gujarat">Gujarat</option>
-    <option value="Madhya Pradesh">Madhya Pradesh</option>
-    <option value="Uttar Pradesh">Uttar Pradesh</option>
-    <option value="Odisha">Odisha</option>
-    <option value="Kerala">Kerala</option>
-    <option value="Bihar">Bihar</option>
-  </select>
+  />
 </th>
 
 
