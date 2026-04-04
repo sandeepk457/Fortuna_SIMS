@@ -234,6 +234,12 @@ const isEdit = !!code;
 const mode = searchParams.get("mode");
 const isView = mode === "view"; // View mode if mode=view in query   //
 const isDisabled = isView;
+
+// 🔥 GLOBAL VIEW GUARD (REUSABLE)
+const allowAction = (fn?: () => void) => {
+  if (isView) return;
+  fn && fn();
+};
 const hasFetched = useRef(false);
 
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
@@ -1015,14 +1021,23 @@ if (isEdit) {
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <button type="button" className={outlineBtn} onClick={onReset}>
-            Reset
-          </button>
-          <button type="button" className={primaryBtn} style={{ backgroundColor: FORTUNA_PRIMARY_RED }} onClick={onSave}>
-            Save Warehouse
-          </button>
-        </div>
+        {!isView && (
+  <div className="flex flex-wrap gap-2">
+    <button type="button" className={outlineBtn} onClick={onReset}>
+      Reset
+    </button>
+
+    <button
+      type="button"
+      className={primaryBtn}
+      style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+      onClick={onSave}
+    >
+      Save Warehouse
+    </button>
+  </div>
+)}
+
       </div>
 
       {/* Tabs */}
@@ -1961,14 +1976,22 @@ if (isEdit) {
       </div>
 
       {/* Footer actions */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" className={outlineBtn} onClick={onReset}>
-          Reset
-        </button>
-        <button type="button" className={primaryBtn} style={{ backgroundColor: FORTUNA_PRIMARY_RED }} onClick={onSave}>
-          Save Warehouse
-        </button>
-      </div>
+      {!isView && (
+  <div className="flex flex-wrap items-center justify-end gap-2">
+    <button type="button" className={outlineBtn} onClick={onReset}>
+      Reset
+    </button>
+
+    <button
+      type="button"
+      className={primaryBtn}
+      style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+      onClick={onSave}
+    >
+      Save Warehouse
+    </button>
+  </div>
+)}
     </div>
   );
 }
