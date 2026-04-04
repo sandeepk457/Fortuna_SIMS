@@ -1,15 +1,17 @@
 "use client";
-
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useRef, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
-import axios from "axios";
 import { useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
+import axios from "axios";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
 
 type TabKey = "basic" | "inventory" | "storage" | "valuation" | "status" | "layout";
+
+
 
 /** ====== WAREHOUSE FORM STATE ====== */
 type WarehouseFormState = {
@@ -225,6 +227,15 @@ const modalOverlay = "fixed inset-0 z-[999] flex items-center justify-center bg-
 export default function WarehouseMasterForm() {
 const router = useRouter();
 
+const searchParams = useSearchParams();
+const code = searchParams.get("code");
+
+const isEdit = !!code;
+const mode = searchParams.get("mode");
+const isView = mode === "view"; // View mode if mode=view in query   //
+const isDisabled = isView;
+const hasFetched = useRef(false);
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<WarehouseFormState>(initialForm);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -297,6 +308,100 @@ const router = useRouter();
     setSelectedAisleId(freshZones[0]?.aisles[0]?.id ?? "");
     setSelectedRackId(freshZones[0]?.aisles[0]?.racks[0]?.id ?? "");
   };
+//edit: Fetch existing warehouse details if in edit mode//
+
+const fetchWarehouseByCode = async () => {
+  try {
+    const res = await axios.get(
+  `http://localhost:5000/api/warehouses/full/${code}`
+  );
+
+    const { warehouse, settings, zones, aisles, racks, bins } = res.data;
+
+    // 🟦 BASIC TAB
+    setForm((prev) => ({
+      ...prev,
+      warehouseCode: warehouse.warehouse_code,
+      warehouseName: warehouse.warehouse_name,
+      warehouseType: warehouse.warehouse_type,
+      addressLine1: warehouse.address_line1 || "",
+      city: warehouse.city,
+      state: warehouse.state,
+      pincode: warehouse.pincode || "",
+      status: warehouse.status,
+
+      // 🟩 INVENTORY TAB
+      allowNegativeStock: settings?.allow_negative_stock || false,
+      enableBinTracking: settings?.enable_bin_tracking || false,
+
+      // 🟨 STORAGE TAB
+      storageType: settings?.storage_type || "",
+      hazardousAllowed: settings?.hazardous_allowed || false,
+
+      // 🟪 VALUATION TAB
+      costingMethod: settings?.costing_method || "",
+    }));
+
+    // 🟥 LAYOUT (IMPORTANT)
+    const transformedZones = transformDBToUI(zones, aisles, racks, bins);
+    setZones(transformedZones);
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+  }
+};
+
+// Trigger fetch on mount if edit mode//
+useEffect(() => {
+  if (isEdit && code && !hasFetched.current) {
+    fetchWarehouseByCode();
+    hasFetched.current = true;
+  }
+}, [code]);
+
+//transform backend data to UI format//
+
+const transformDBToUI = (zones, aisles, racks, bins) => {
+  return zones.map((zone) => {
+    const zoneAisles = aisles
+      .filter((a) => a.zone_id === zone.zone_id)
+      .map((aisle) => {
+        const aisleRacks = racks
+          .filter((r) => r.aisle_id === aisle.aisle_id)
+          .map((rack) => {
+            const rackBins = bins.filter((b) => b.rack_id === rack.rack_id);
+
+            return {
+              id: rack.rack_id,
+              name: rack.rack_name,
+              levels: rack.levels,
+              binsPerLevel: rack.bins_per_level,
+              bins: rackBins.map((b) => ({
+                id: b.bin_id,
+                code: b.bin_code,
+                level: b.level,
+                position: b.position,
+                status: b.status,
+              })),
+            };
+          });
+
+        return {
+          id: aisle.aisle_id,
+          name: aisle.aisle_name,
+          racks: aisleRacks,
+        };
+      });
+
+    return {
+      id: zone.zone_id,
+      name: zone.zone_name,
+      type: zone.zone_type,
+      aisles: zoneAisles,
+    };
+  });
+};
+
 
 // =========================
 // 🔥 FORMAT LAYOUT FUNCTION
@@ -355,8 +460,10 @@ const onSave = async () => {
         warehouse_code: form.warehouseCode,
         warehouse_name: form.warehouseName,
         warehouse_type: form.warehouseType,
+        address_line1: form.addressLine1,
         city: form.city,
         state: form.state,
+        pincode: form.pincode,
         status: form.status || "Active",
       },
 
@@ -373,17 +480,28 @@ const onSave = async () => {
 
     console.log("FINAL PAYLOAD:", JSON.stringify(payload, null, 2));
 
-    const res = await axios.post(
-      "http://localhost:5000/api/warehouses/full-create",
-      payload
-    );
+    let res;
+
+if (isEdit) {
+  // 🔥 UPDATE
+  res = await axios.put(
+    `http://localhost:5000/api/warehouses/full-update/${code}`,
+    payload
+  );
+} else {
+  // 🔥 CREATE
+  res = await axios.post(
+    "http://localhost:5000/api/warehouses/full-create",
+    payload
+  );
+}
 
     console.log("API RESPONSE:", res.data);
 
     // ✅ SUCCESS CHECK
     if (res.data?.success) {
 
-      alert("Warehouse Created Successfully 🔥");
+      alert("Warehouse Created/updated Successfully  ✅");
 
       // 🔥 CORRECT ROUTE
       router.push("/WarehouseMaster");

@@ -39,6 +39,12 @@ interface Warehouse {
 
 export default function WarehouseMasterPage() {
   const router = useRouter();
+
+  const handleview = (code) => {
+    router.push(`/WarehouseForm?code=${code}&mode=view`);
+  }
+
+
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [data, setData] = useState<Warehouse[]>([]);
@@ -227,7 +233,7 @@ const fetchWarehouses = async () => {
                 Type
                 <input
                   className="mt-2 w-full border rounded px-2 py-1 text-xs"
-                  placeholder="Search Type"
+                  placeholder="Search"
                   value={typeFilter}
                   onChange={(e) => {
                     setTypeFilter(e.target.value);
@@ -306,11 +312,22 @@ const fetchWarehouses = async () => {
                     </span>
                   </td>
                   <td className="px-4 py-3 space-x-3 text-blue-600 cursor-pointer">
-                    <span>Edit</span>
-                    <span className="text-red-500">View</span>
-                  </td>
+              <span
+                onClick={() => router.push(`/WarehouseForm?code=${wh.code}`)}
+                className="hover:underline"
+              >
+                Edit
+              </span>
+
+              <span 
+              
+                onClick={() => handleview(wh.code)}
+
+              className="text-red-500">View</span>
+              </td>
                 </tr>
               ))}
+
 
               {paginatedData.length === 0 && (
                 <tr>
