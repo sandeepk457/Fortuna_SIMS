@@ -310,11 +310,11 @@ export default function WarehouseLayoutPage() {
 
             {/* KPI strip */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
-              <KPI title="Total Bins" value={totals.total} accent={FORTUNA_RED} />
-              <KPI title="Available" value={totals.available} accent={FORTUNA_BLUE} />
-              <KPI title="Reserved" value={totals.reserved} accent={FORTUNA_BLUE} />
-              <KPI title="Occupied" value={totals.occupied} accent={FORTUNA_RED} />
-              <KPI title="Blocked" value={totals.blocked} accent={FORTUNA_RED} />
+              <KPI title="Total Bins" value={totals.total} variant="red" />
+              <KPI title="Available" value={totals.available} variant="blue" />
+              <KPI title="Reserved" value={totals.reserved} variant="blue" />
+              <KPI title="Occupied" value={totals.occupied} variant="red" />
+              <KPI title="Blocked" value={totals.blocked} variant="red" />
             </div>
 
             {/* Main grid */}
@@ -585,14 +585,39 @@ export default function WarehouseLayoutPage() {
   );
 }
 
-function KPI({ title, value, accent }: { title: string; value: string | number; accent: string }) {
+function KPI({
+  title,
+  value,
+  variant,
+}: {
+  title: string;
+  value: string | number;
+  variant: "red" | "blue";
+}) {
+  const isRed = variant === "red";
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+    <div
+      className="relative overflow-hidden rounded-2xl p-4 shadow-md border transition-all hover:scale-[1.02]"
+      style={{
+        background: isRed
+          ? "linear-gradient(135deg, #C8102E 0%, #a50d26 100%)"
+          : "linear-gradient(135deg, #005F99 0%, #004b7a 100%)",
+        color: "white",
+        border: "none",
+      }}
+    >
+      {/* Glow effect */}
+      <div className="absolute -top-6 -right-6 h-16 w-16 rounded-full bg-white/10 blur-xl" />
+
       <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">{title}</div>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
+        <div className="text-sm font-semibold opacity-90">{title}</div>
+        <span className="h-2 w-2 rounded-full bg-white/80" />
       </div>
-      <div className="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{value}</div>
+
+      <div className="mt-2 text-3xl font-bold tracking-wide">
+        {value}
+      </div>
     </div>
   );
 }

@@ -1,33 +1,36 @@
 "use client";
-
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
+import axios from "axios";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 type Status = "Active" | "Inactive";
 type UomCategory = "Count" | "Weight" | "Length" | "Volume" | "Pack" | "Other";
 
 interface Uom {
+  id: number; 
   code: string;
   name: string;
   category: UomCategory;
   status: Status;
 }
 
-const DEFAULT_UOMS: Uom[] = [
-  { code: "NOS", name: "Numbers", category: "Count", status: "Active" },
-  { code: "PCS", name: "Pieces", category: "Count", status: "Active" },
-  { code: "KG", name: "Kilogram", category: "Weight", status: "Active" },
-  { code: "GM", name: "Gram", category: "Weight", status: "Active" },
-  { code: "LTR", name: "Litre", category: "Volume", status: "Active" },
-  { code: "ML", name: "Milli Litre", category: "Volume", status: "Active" },
-  { code: "MTR", name: "Meter", category: "Length", status: "Active" },
-  { code: "CM", name: "Centimeter", category: "Length", status: "Inactive" },
-  { code: "BOX", name: "Box", category: "Pack", status: "Active" },
-];
 
 export default function UomMasterPage() {
   // Data (in-memory)
-  const [data, setData] = useState<Uom[]>(DEFAULT_UOMS);
+ const [data, setData] = useState<Uom[]>([]);
+
+  useEffect(() => {
+  fetchUoms();
+}, []);
+
+const fetchUoms = async () => {
+  try {
+    const res = await axios.get("http://localhost:5000/api/uoms");
+    setData(res.data);
+  } catch (err) {
+    console.error("Error fetching UOMs:", err);
+  }
+};
 
   // Filters
   const [searchCode, setSearchCode] = useState("");
@@ -43,15 +46,15 @@ export default function UomMasterPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Form state
-  const [form, setForm] = useState<Uom>({
-    code: "",
-    name: "",
-    category: "Count",
-    status: "Active",
-  });
+  interface UomForm {
+  code: string;
+  name: string;
+  category: UomCategory;
+  status: Status;
+}
 
   // Edit state
-  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   const filteredData = useMemo(() => {
     return data.filter((u) => {
@@ -72,7 +75,7 @@ export default function UomMasterPage() {
 
   const resetForm = () => {
     setForm({ code: "", name: "", category: "Count", status: "Active" });
-    setEditingCode(null);
+    setEditingId(null);
   };
 
   const openAdd = () => {
@@ -82,7 +85,7 @@ export default function UomMasterPage() {
 
   const openEdit = (u: Uom) => {
     setForm(u);
-    setEditingCode(u.code);
+    setEditingId(u.id);
     setIsModalOpen(true);
   };
 
@@ -91,7 +94,8 @@ export default function UomMasterPage() {
     resetForm();
   };
 
-  const onSave = () => {
+  const onSave = async () => {
+  try {
     const code = form.code.trim().toUpperCase();
     const name = form.name.trim();
 
@@ -100,34 +104,42 @@ export default function UomMasterPage() {
       return;
     }
 
-    // Duplicate code check (for add mode)
-    const exists = data.some(
-      (u) => u.code.toUpperCase() === code && u.code !== editingCode
-    );
-    if (exists) {
-      alert("UOM Code already exists. Please use a unique code.");
-      return;
-    }
+    const payload = {
+      ...form,
+      code,
+      name,
+    };
 
-    if (editingCode) {
-      // Update
-      setData((prev) =>
-        prev.map((u) => (u.code === editingCode ? { ...form, code } : u))
-      );
+    if (editingId) {
+      // ✅ UPDATE API
+      await axios.put(`http://localhost:5000/api/uoms/${editingId}`, payload);
     } else {
-      // Add
-      setData((prev) => [{ ...form, code }, ...prev]);
+      // ✅ CREATE API
+      await axios.post("http://localhost:5000/api/uoms", payload);
     }
 
-    setIsModalOpen(false);
-    resetForm();
-  };
+    alert("Saved successfully ✅");
 
-  const onDelete = (code: string) => {
-    const ok = confirm(`Delete UOM "${code}"?`);
-    if (!ok) return;
-    setData((prev) => prev.filter((u) => u.code !== code));
-  };
+    fetchUoms(); // 🔥 reload from DB
+    closeModal();
+  } catch (err) {
+    console.error("Save error:", err);
+    alert("Error saving UOM ❌");
+  }
+};
+
+  const onDelete = async (id: number) => {
+  const ok = confirm("Delete UOM?");
+  if (!ok) return;
+
+  try {
+    await axios.delete(`http://localhost:5000/api/uoms/${id}`);
+    fetchUoms(); // reload from DB
+  } catch (err) {
+    console.error("Delete error:", err);
+    alert("Error deleting UOM ❌");
+  }
+};
 
   const exportToCSV = () => {
     const header = ["UOM Code", "UOM Name", "Category", "Status"];
@@ -247,7 +259,7 @@ export default function UomMasterPage() {
 
             <tbody>
               {paginatedData.map((u) => (
-                <tr key={u.code} className="border-b hover:bg-gray-50">
+                <tr key={u.id} className="border-b hover:bg-gray-50">
                   <td className="px-4 py-3 font-medium text-gray-800">
                     {u.code}
                   </td>
@@ -272,7 +284,7 @@ export default function UomMasterPage() {
                       Edit
                     </button>
                     <button
-                      onClick={() => onDelete(u.code)}
+                      onClick={() => onDelete(u.id)}
                       className="text-red-500 hover:underline"
                     >
                       Delete
@@ -346,7 +358,7 @@ export default function UomMasterPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b">
                 <div>
                   <h3 className="text-lg font-semibold text-gray-800">
-                    {editingCode ? "Edit UOM" : "Add New UOM"}
+                    {editingId ? "Edit UOM" : "Add New UOM"}
                   </h3>
                   <p className="text-xs text-gray-500">
                     Create/Update unit of measure.
@@ -451,7 +463,7 @@ export default function UomMasterPage() {
                   onClick={onSave}
                   className="bg-[#005F99] hover:bg-[#004a7a] active:scale-95 text-white px-5 py-2 rounded-xl text-sm font-semibold shadow-md transition-all duration-200"
                 >
-                  {editingCode ? "Update" : "Save"}
+                  {editingId ? "Update" : "Save"}
                 </button>
               </div>
             </div>
