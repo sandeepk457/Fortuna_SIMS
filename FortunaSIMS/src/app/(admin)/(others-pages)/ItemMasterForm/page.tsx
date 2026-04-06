@@ -85,13 +85,15 @@ function classNames(...v: Array<string | false | undefined | null>) {
 }
 
 export default function ItemMasterForm() {
+
+  const [uoms, setUoms] = useState<any[]>([]);
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
 
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<ItemMasterFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
-
+  
 
 useEffect(() => {
   if (id) {
@@ -148,7 +150,22 @@ useEffect(() => {
   }
 }, [id]);
 
+//UOM Fetch for dropdowns
 
+
+useEffect(() => {
+  fetchUoms();
+}, []);
+
+const fetchUoms = async () => {
+  try {
+    const res = await fetch("http://localhost:5000/api/uoms");
+    const data = await res.json();
+    setUoms(data);
+  } catch (err) {
+    console.error("UOM fetch error:", err);
+  }
+};
 
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
@@ -455,16 +472,23 @@ const onSave = async () => {
                     <label className={labelBase}>
                       UOM <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                     </label>
-                    <input
-                      value={form.uom}
-                      onChange={(e) => setField("uom", e.target.value)}
-                      onBlur={() => markTouched("uom")}
-                      placeholder="Ex: Nos / Kg"
-                      className={classNames(
-                        inputBase,
-                        showError("uom") && "border-brand-500"
-                      )}
-                    />
+                   <select
+  value={form.uom}
+  onChange={(e) => setField("uom", e.target.value)}
+  onBlur={() => markTouched("uom")}
+  className={classNames(
+    inputBase,
+    showError("uom") && "border-brand-500"
+  )}
+>
+  <option value="">Select UOM</option>
+
+  {uoms.map((u) => (
+    <option key={u.id} value={u.code}>
+      {u.code} - {u.name}
+    </option>
+  ))}
+</select>
                     {showError("uom") && (
                       <p className="mt-1 text-xs text-brand-500">
                         {errors.uom}
@@ -474,13 +498,19 @@ const onSave = async () => {
 
                   <div>
                     <label className={labelBase}>Alt UOM</label>
-                    <input
-                      value={form.altUom}
-                      onChange={(e) => setField("altUom", e.target.value)}
-                      onBlur={() => markTouched("altUom")}
-                      placeholder="Ex: Box"
-                      className={inputBase}
-                    />
+                    <select
+  value={form.altUom}
+  onChange={(e) => setField("altUom", e.target.value)}
+  className={inputBase}
+>
+  <option value="">Select Alt UOM</option>
+
+  {uoms.map((u) => (
+    <option key={u.id} value={u.code}>
+      {u.code} - {u.name}
+    </option>
+  ))}
+</select>
                   </div>
                 </div>
 
