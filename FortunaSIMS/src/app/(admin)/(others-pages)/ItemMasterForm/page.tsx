@@ -1,9 +1,12 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import axios from "axios";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+
+import Select from "react-select";
+
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -86,6 +89,15 @@ function classNames(...v: Array<string | false | undefined | null>) {
 
 export default function ItemMasterForm() {
 
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
+  const [bins, setBins] = useState<any[]>([]);
+
+  const [allAisles, setAllAisles] = useState<any[]>([]);
+  const [allRacks, setAllRacks] = useState<any[]>([]);
+  const [allBins, setAllBins] = useState<any[]>([]);
+
+
   const [uoms, setUoms] = useState<any[]>([]);
   const searchParams = useSearchParams();
   const id = searchParams.get("id");
@@ -94,6 +106,18 @@ export default function ItemMasterForm() {
   const [form, setForm] = useState<ItemMasterFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   
+
+const binOptions = bins
+  .filter((b: any) => b.status === "Available")
+  .map((b: any) => ({
+    value: b.bin_code,
+    label: b.bin_code,
+  }));
+
+  console.log("bins:", bins);
+  console.log("binOptions:", binOptions);
+
+
 
 useEffect(() => {
   if (id) {
@@ -165,6 +189,127 @@ const fetchUoms = async () => {
   } catch (err) {
     console.error("UOM fetch error:", err);
   }
+};
+
+
+//fetch warehouses for dropdowns//
+//fetch zones dropdown based on selected warehouse //
+//fetch bins based on zone selection for dropdowns //
+
+useEffect(() => {
+  fetchWarehouses();
+}, []);
+
+useEffect(() => {
+  if ((form as any).default_warehouse && warehouses.length > 0) {
+    handleWarehouseChange((form as any).default_warehouse);
+  }
+}, [(form as any).default_warehouse, warehouses]);
+
+
+//Zone and Bin fetching is now handled in handleWarehouseChange and handleZoneChange respectively, which are triggered on dropdown changes. No need for separate useEffect for zones/bins as they depend on warehouse/zone selection.
+
+useEffect(() => {
+  if ((form as any).default_zone && zones.length > 0) {
+    console.log("Zone Trigger:", (form as any).default_zone);
+    handleZoneChange((form as any).default_zone);
+  }
+}, [(form as any).default_zone, zones]);
+
+
+
+
+
+const fetchWarehouses = async () => {
+  try {
+    const res = await fetch("http://localhost:5000/api/warehouses");
+    const data = await res.json();
+
+    // only active
+    const active = data.filter((w: any) => w.status === "Active");
+
+    setWarehouses(active);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+//warehouse handling//
+
+const handleWarehouseChange = async (code: string) => {
+  setField("default_warehouse", code);
+
+  setZones([]);
+  setBins([]);
+
+  // ✅ ONLY reset when empty
+  if (!code) {
+    setField("default_zone", "");
+    setField("default_bin", "");
+  }
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/warehouses/full/${code}`
+    );
+    const data = await res.json();
+
+    setZones(data.zones || []);
+    setAllAisles(data.aisles || []);
+    setAllRacks(data.racks || []);
+    setAllBins(data.bins || []);
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+  //zone handling//
+
+  const handleZoneChange = (zoneId: string) => {
+  setForm((p: any) => ({
+    ...p,
+    default_zone: zoneId,
+    default_bin: p.default_zone === zoneId ? p.default_bin : "",
+  }));
+
+  if (!zoneId) {
+    setBins([]);
+    return;
+  }
+
+  // 🔥 Step-1: aisles by zone_id
+  const zoneAisles = allAisles.filter(
+    (a: any) => a.zone_id === zoneId
+  );
+
+  const aisleIds = zoneAisles.map((a: any) => a.aisle_id);
+
+  // 🔥 Step-2: racks
+  const zoneRacks = allRacks.filter((r: any) =>
+    aisleIds.includes(r.aisle_id)
+  );
+
+  const rackIds = zoneRacks.map((r: any) => r.rack_id);
+
+  // 🔥 Step-3: bins
+  const zoneBins = allBins.filter((b: any) =>
+    rackIds.includes(b.rack_id)
+  );
+
+  console.log("Zone Bins:", zoneBins);
+
+  setBins(zoneBins);
+};
+  
+
+
+//bin handling//
+
+  const handleBinChange = (binCode: string) => {
+  setForm((p: any) => ({
+    ...p,
+    default_bin: binCode,
+  }));
 };
 
   const errors = useMemo(() => {
@@ -282,6 +427,8 @@ const onSave = async () => {
     setTouched({});
     setActiveTab("basic");
   };
+
+   console.log("Warehouses:", warehouses);
 
   return (
     <div className="space-y-6">
@@ -900,61 +1047,86 @@ const onSave = async () => {
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* default_warehouse */}
-          <div className="sm:col-span-2">
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Default Warehouse
-            </label>
-            <input
-              value={(form as any).default_warehouse ?? ""}
-              onChange={(e) =>
-                setForm((p: any) => ({
-                  ...p,
-                  default_warehouse: e.target.value,
-                }))
-              }
-              placeholder="Ex: WH-HYD-01"
-              className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-theme-xs focus:outline-none focus:ring-3 focus:ring-brand-500/10 focus:border-brand-300 dark:bg-gray-900 dark:border-gray-800 dark:text-white/90"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Preferred warehouse code/name (optional).
-            </p>
-          </div>
+          {/* default_warehouse */}
+          
+         <div className="sm:col-span-2">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+    Default Warehouse
+  </label>
+
+  <select
+    value={(form as any).default_warehouse ?? ""}
+    onChange={(e) => handleWarehouseChange(e.target.value)}
+    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-theme-xs focus:outline-none focus:ring-3 focus:ring-brand-500/10 focus:border-brand-300 dark:bg-gray-900 dark:border-gray-800 dark:text-white/90"
+  >
+    <option value="">Select Warehouse</option>
+
+    {warehouses.map((w, index) => (
+      <option key={index} value={w.warehouse_code}>
+        {w.warehouse_code} - {w.warehouse_name}
+      </option>
+    ))}
+  </select>
+
+  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+    Select preferred warehouse.
+  </p>
+</div>
 
           {/* default_zone */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Default Zone
-            </label>
-            <input
-              value={(form as any).default_zone ?? ""}
-              onChange={(e) =>
-                setForm((p: any) => ({ ...p, default_zone: e.target.value }))
-              }
-              placeholder="Ex: ZONE-A"
-              className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-theme-xs focus:outline-none focus:ring-3 focus:ring-brand-500/10 focus:border-brand-300 dark:bg-gray-900 dark:border-gray-800 dark:text-white/90"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Zone mapping (optional).
-            </p>
-          </div>
+          {/* default_zone */}
+<div className="sm:col-span-1">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+    Default Zone
+  </label>
 
-          {/* default_bin */}
-          <div>
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
-              Default Bin
-            </label>
-            <input
-              value={(form as any).default_bin ?? ""}
-              onChange={(e) =>
-                setForm((p: any) => ({ ...p, default_bin: e.target.value }))
-              }
-              placeholder="Ex: BIN-12"
-              className="mt-2 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-theme-xs focus:outline-none focus:ring-3 focus:ring-brand-500/10 focus:border-brand-300 dark:bg-gray-900 dark:border-gray-800 dark:text-white/90"
-            />
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-              Bin mapping (optional).
-            </p>
-          </div>
+  <select
+    value={(form as any).default_zone ?? ""}
+    onChange={(e) => handleZoneChange(e.target.value)}
+    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 shadow-theme-xs focus:outline-none focus:ring-3 focus:ring-brand-500/10 focus:border-brand-300 dark:bg-gray-900 dark:border-gray-800 dark:text-white/90"
+  >
+    <option value="">Select Zone</option>
+
+    {zones.map((z: any) => (
+      <option key={z.zone_id} value={z.zone_id}>
+        {z.zone_name}
+      </option>
+    ))}
+  </select>
+
+  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+    Zone mapping (optional).
+  </p>
+</div>
+
+         
+         {/* default_bin */}
+<div className="sm:col-span-1">
+  <label className="block text-sm font-medium text-gray-700 dark:text-gray-200 mb-1">
+    Default Bin
+  </label>
+
+  <Select
+    options={binOptions}
+    value={
+      binOptions.find(
+        (opt) => opt.value === form.default_bin
+      ) || null
+    }
+    onChange={(selected: any) =>
+      handleBinChange(selected?.value || "")
+      
+    }
+    
+   placeholder="Search Bins"
+  />
+  <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+    Search and select bin under selected zone.
+  </p>
+</div>
+
+
+
         </div>
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
@@ -1170,13 +1342,13 @@ const onSave = async () => {
         <h4 className="text-base font-semibold text-gray-900 dark:text-white">
           Audit Details
         </h4>
-        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+        {/* <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
           System generated fields (read-only).
-        </p>
+        </p> */}
 
         <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {/* created_by */}
-          <div>
+          {/* <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Created By <span className="text-xs text-gray-400">(System)</span>
             </label>
@@ -1185,10 +1357,10 @@ const onSave = async () => {
               readOnly
               className="mt-2 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 shadow-theme-xs dark:border-gray-800 dark:bg-white/5 dark:text-gray-300"
             />
-          </div>
+          </div> */}
 
           {/* created_date */}
-          <div>
+          {/* <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Created Date <span className="text-xs text-gray-400">(System)</span>
             </label>
@@ -1197,10 +1369,10 @@ const onSave = async () => {
               readOnly
               className="mt-2 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 shadow-theme-xs dark:border-gray-800 dark:bg-white/5 dark:text-gray-300"
             />
-          </div>
+          </div> */}
 
           {/* modified_by */}
-          <div>
+          {/* <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Modified By <span className="text-xs text-gray-400">(System)</span>
             </label>
@@ -1209,10 +1381,10 @@ const onSave = async () => {
               readOnly
               className="mt-2 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 shadow-theme-xs dark:border-gray-800 dark:bg-white/5 dark:text-gray-300"
             />
-          </div>
+          </div> */}
 
           {/* modified_date */}
-          <div>
+          {/* <div>
             <label className="text-sm font-medium text-gray-700 dark:text-gray-200">
               Modified Date <span className="text-xs text-gray-400">(System)</span>
             </label>
@@ -1221,7 +1393,7 @@ const onSave = async () => {
               readOnly
               className="mt-2 w-full cursor-not-allowed rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 shadow-theme-xs dark:border-gray-800 dark:bg-white/5 dark:text-gray-300"
             />
-          </div>
+          </div> */}
         </div>
 
         <div className="mt-4 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
