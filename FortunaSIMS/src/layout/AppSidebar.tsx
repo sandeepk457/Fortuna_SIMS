@@ -118,9 +118,10 @@ const navItems: NavItem[] = [
       },
 
       {
-        name: "AI Forecasting",
+        name: "Fortuna SIMS AI",
         subItems: [
-          { name: "Demand Forecast", path: "sims/ai/forecast" },
+          { name: "Fortuna IntelliAI", path: "/ai-forecasting/demand-forecast" },
+          { name: "Demand Forecast", path: "/DemandForecast" },
           { name: "Auto Replenishment", path: "sims/ai/replenishment" },
           { name: "Trend Analytics", path: "sims/ai/trends" },
           { name: "Multi-Warehouse Balancing", path: "sims/ai/balancing" },
