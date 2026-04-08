@@ -37,6 +37,12 @@ export default function DemandForecastPage() {
 
   const [kpi, setKpi] = useState<any>({});
   const [trend, setTrend] = useState<any[]>([]);
+
+  const maxValue = Math.max(
+  ...trend.map((t) => Math.max(t.demand || 0, t.forecast || 0)),
+  1
+);
+
   const [tableData, setTableData] = useState<any[]>([]);
 
   const months = useMemo(() => {
@@ -79,9 +85,9 @@ const validateRange = () => {
   ========================= */
   const runForecast = () => {
     const demand = Math.floor(Math.random() * 800) + 400;
-    const forecast = demand * 1.1;
+    const forecast = Number((demand * 1.1).toFixed(2));
     const stock = Math.floor(Math.random() * 700) + 200;
-    const reorder = Math.max(forecast - stock, 0);
+    const reorder = Number(Math.max(forecast - stock, 0).toFixed(2));
     const mape = Math.floor(Math.random() * 20) + 5;
 
     const risk =
@@ -90,22 +96,39 @@ const validateRange = () => {
     setKpi({ demand, forecast, stock, reorder, mape, risk });
 
     /* TREND */
-    const data = Array.from({ length: 10 }).map((_, i) => ({
-      demand: Math.random() * 100,
-      forecast: Math.random() * 100,
-    }));
-    setTrend(data);
+    let filteredMonths = months;
 
-    /* TABLE */
-    setTableData(
-      ITEMS.map((i) => ({
-        sku: i,
-        demand: Math.floor(Math.random() * 400),
-        forecast: Math.floor(Math.random() * 400),
-        stock: Math.floor(Math.random() * 300),
-        variance: Math.floor(Math.random() * 50),
-      }))
-    );
+if (fromMonth && toMonth) {
+  const fromIndex = months.indexOf(fromMonth);
+  const toIndex = months.indexOf(toMonth);
+
+  filteredMonths = months.slice(fromIndex, toIndex + 1);
+}
+
+const data = filteredMonths.map((m) => ({
+  month: m, // 🔥 THIS IS KEY
+  demand: Math.floor(Math.random() * 100) + 20,
+  forecast: Math.floor(Math.random() * 100) + 20,
+}));
+
+setTrend(data);
+
+/* TABLE */
+setTableData(
+  ITEMS.map((i) => {
+    const demand = Math.floor(Math.random() * 400);
+    const forecast = Math.floor(Math.random() * 400);
+    const stock = Math.floor(Math.random() * 300);
+
+    return {
+      sku: i,
+      demand,
+      forecast,
+      stock,
+      variance: forecast - stock, // ✅ FIXED
+    };
+  })
+);
   };
 
   useEffect(() => {
@@ -229,7 +252,7 @@ const validateRange = () => {
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
 
           {/* TREND */}
-          <div className="xl:col-span-8 border rounded-2xl p-5">
+          <div className="xl:col-span-8 border rounded-2xl p-5 overflow-visible">
             <h3 className="text-base font-semibold" style={{ color: "#005F99" }}>
              Demand vs Forecast Trend
             </h3>
@@ -256,7 +279,7 @@ const validateRange = () => {
   </div>
 
   {/* CHART AREA */}
-  <div className="relative h-44 flex items-end gap-3 border-l border-b border-gray-300 pl-4 pb-2">
+  <div className="relative h-48 pt-4 flex items-end gap-6 justify-between w-full border-l border-b border-gray-300 pl-10 pb-2">
 
     {/* GRID LINES ✅ */}
     <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
@@ -265,29 +288,55 @@ const validateRange = () => {
       ))}
     </div>
 
-    {/* BARS */}
-    {trend.map((t, i) => (
-      <div key={i} className="flex flex-col items-center gap-1 z-10">
-        
-        {/* DEMAND */}
-        <div
-          className="w-2 rounded"
-          style={{
-            height: `${t.demand * 1.2}px`,
-            background: "#C8102E",
-          }}
-        />
+      {/* Y-AXIS LABELS */}
+<div className="absolute left-0 top-0 h-full flex flex-col justify-between text-[10px] text-gray-500">
+  {[...Array(5)].map((_, i) => {
+    const value = Math.round((maxValue / 4) * (4 - i));
+    return <span key={i}>{value}</span>;
+  })}
+</div>
 
-        {/* FORECAST */}
-        <div
-          className="w-2 rounded"
-          style={{
-            height: `${t.forecast * 1.2}px`,
-            background: "#005F99",
-          }}
-        />
+
+  {/* BARS */}
+{trend.map((t, i) => {
+  return (
+    <div
+      key={i}
+      className="flex flex-col items-center justify-end h-full gap-1 relative group cursor-pointer"
+    >
+
+      {/* TOOLTIP */}
+      <div className="absolute -top-12 z-50 hidden group-hover:block bg-black text-white text-xs px-2 py-1 rounded shadow">
+        <div>Demand: {t.demand}</div>
+        <div>Forecast: {t.forecast}</div>
       </div>
-    ))}
+
+      {/* DEMAND */}
+      <div
+        className="w-4 md:w-5 rounded"
+        style={{
+          height: `${(t.demand / maxValue) * 100}%`,
+          background: "#C8102E",
+        }}
+      />
+
+      {/* FORECAST */}
+      <div
+        className="w-4 md:w-5 rounded mt-1"
+        style={{
+          height: `${(t.forecast / maxValue) * 100}%`,
+          background: "#005F99",
+        }}
+      />
+
+      {/* MONTH */}
+      <span className="text-[10px] text-gray-500 mt-1">
+        {t?.month?.split(" ")[0]}
+      </span>
+
+    </div>
+  );
+})}
   </div>
 </div>
           </div>
