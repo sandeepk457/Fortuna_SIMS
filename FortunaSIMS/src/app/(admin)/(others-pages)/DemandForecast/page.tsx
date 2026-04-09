@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 /* =========================
    FORTUNA THEME
@@ -28,6 +29,9 @@ const WAREHOUSES = ["Vizag WH", "Hyderabad WH", "Chennai WH"];
    MAIN COMPONENT
 ========================= */
 export default function DemandForecastPage() {
+
+  const router = useRouter();
+
   const [item, setItem] = useState("Industrial Pump");
   const [warehouse, setWarehouse] = useState("Vizag WH");
 
@@ -421,7 +425,81 @@ setTableData(
         )}
       </tbody>
     </table>
+
   </div>
+
+{/* QUICK ACTIONS */}
+<div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+
+  <h3 className="text-base font-semibold mb-4" style={{ color: "#005F99" }}>
+    Quick Actions
+  </h3>
+
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+
+    {/* RFQ */}
+    <button
+  className="p-4 rounded-xl border border-gray-200 bg-white hover:shadow-md transition text-left w-full"
+  onClick={() => {
+    localStorage.setItem(
+      "FORTUNA_RFQ_FROM_DEMAND",
+      JSON.stringify({
+        items: tableData, // your demand table data
+      })
+    );
+
+    router.push("/RFQForm");
+  }}
+>
+  <div className="text-sm font-semibold text-gray-700 flex items-center gap-2">
+    📄 Raise RFQ
+  </div>
+  <div className="text-xs text-gray-500">Request vendor quotes</div>
+</button>
+
+    {/* PO */}
+    <button
+      className="p-4 rounded-xl border hover:shadow-md transition text-left"
+      onClick={() => {
+    localStorage.setItem(
+      "FORTUNA_PO_FROM_DEMAND",
+      JSON.stringify({
+        items: tableData,
+      })
+    );
+
+    router.push("/PurchaseOrderForm"); // 🔥 update based on your route
+  }}
+>
+    
+      <div className="text-sm font-semibold text-gray-700">🛒 Create PO</div>
+      <div className="text-xs text-gray-500">Convert to purchase order</div>
+    </button>
+
+    {/* TRANSFER */}
+    <button
+      className="p-4 rounded-xl border hover:shadow-md transition text-left"
+      onClick={() => console.log("Stock Transfer")}
+    >
+      <div className="text-sm font-semibold text-gray-700">🔄 Stock Transfer</div>
+      <div className="text-xs text-gray-500">Move between warehouses</div>
+    </button>
+
+    {/* REPLENISH */}
+    <button
+      className="p-4 rounded-xl border hover:shadow-md transition text-left"
+      onClick={() => console.log("Auto Replenishment")}
+    >
+      <div className="text-sm font-semibold text-gray-700">📦 Replenish</div>
+      <div className="text-xs text-gray-500">Trigger stock refill</div>
+    </button>
+
+  </div>
+
+</div>
+
+
+
 </div>
 
       </div>
@@ -463,3 +541,5 @@ function KPI({
     </div>
   );
 }
+
+
