@@ -461,6 +461,8 @@ setTableData(
     <button
       className="p-4 rounded-xl border hover:shadow-md transition text-left"
       onClick={() => {
+        const filteredItems = tableData.filter((i) => i.variance > 50);
+        const finalItems = filteredItems.length > 0 ? filteredItems : tableData;
     localStorage.setItem(
       "FORTUNA_PO_FROM_DEMAND",
       JSON.stringify({
