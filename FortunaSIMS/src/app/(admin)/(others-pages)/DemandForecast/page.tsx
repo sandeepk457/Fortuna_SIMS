@@ -162,7 +162,12 @@ const filteredItems = items.filter((i: any) =>
   //close dropdown on outside click
 
   useEffect(() => {
-  const close = () => setShowDropdown(false);
+  const close = (e: any) => {
+    // only close if clicked outside dropdown
+    if (!e.target.closest(".sku-dropdown")) {
+      setShowDropdown(false);
+    }
+  };
 
   window.addEventListener("click", close);
 
@@ -171,24 +176,57 @@ const filteredItems = items.filter((i: any) =>
 
 const sendForecast = async () => {
   try {
-    await fetch("http://localhost:5000/api/demand/forecast", {
+    if (!selectedItems.length || !warehouse) return;
+
+    const payload = selectedItems.map((id) => ({
+      item_id: id,
+      warehouse_id: warehouse,
+      from_month: formatToDate(fromMonth),
+      to_month: formatToDate(toMonth),
+
+      // ✅ FLAT KPI (IMPORTANT)
+      demand: kpi.demand,
+      forecast: kpi.forecast,
+      stock: kpi.stock,
+      reorder: kpi.reorder,
+      mape: kpi.mape,
+      risk: kpi.risk,
+
+      // ✅ TREND TABLE
+      trend: trend.map((t) => ({
+        month: formatToDate(t.month),
+        demand: t.demand,
+        forecast: t.forecast,
+      })),
+
+      // ✅ SKU TABLE
+      sku: tableData.map((s, index) => ({
+        item_id: selectedItems[index] || id,
+        demand: s.demand,
+        forecast: s.forecast,
+        stock: s.stock,
+        variance: s.variance,
+      })),
+
+      // ✅ ACTIONS TABLE
+      actions: actions.map((a) => ({
+        action: a,
+      })),
+    }));
+
+    console.log("🔥 FINAL PAYLOAD:", payload);
+
+    const res = await fetch("http://localhost:5000/api/demand/forecast", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        item_id: selectedItems[0], // or loop later
-        warehouse_id: warehouse,
-        from_month: fromMonth,
-        to_month: toMonth,
-        kpi,
-        trend,
-        sku: tableData,
-        actions,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    console.log("✅ Forecast Saved");
+    const data = await res.json();
+    console.log("✅ Saved:", data);
+
   } catch (err) {
     console.error("❌ Error saving forecast", err);
   }
@@ -269,6 +307,7 @@ const runForecast = () => {
     const stock = Math.floor(Math.random() * 300);
 
     return {
+      item_id: id,
       sku: itemObj?.name,
       demand,
       forecast,
@@ -281,12 +320,15 @@ const runForecast = () => {
 };
 
 useEffect(() => {
-
-
-  if (tableData.length > 0) {
+  if (
+    tableData.length > 0 &&
+    trend.length > 0 &&
+    kpi?.forecast &&
+    selectedItems.length > 0
+  ) {
     sendForecast();
   }
-}, [item, warehouse, kpi, trend, tableData]);
+}, [tableData, trend]);
 
   /* =========================
      RECOMMENDED ACTIONS 🔥
@@ -339,47 +381,30 @@ useEffect(() => {
         {/* FILTER BAR */}
 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5 mb-6">
 
-{/* SKU */}
+{/* SKU - SINGLE SELECT SEARCH */}
 <div
-  className="relative w-full max-w-[320px]"
+  className="relative w-full max-w-[320px] z-50 sku-dropdown"
   onClick={(e) => e.stopPropagation()}
 >
-  {/* Selected Chips */}
+
+  {/* Selected Item */}
   <div
     onClick={() => setShowDropdown(!showDropdown)}
-    className="h-[56px] flex items-center gap-2 px-3 border rounded-xl bg-white cursor-pointer shadow-sm overflow-x-auto whitespace-nowrap"
+    className="h-[56px] flex items-center px-3 border rounded-xl bg-white cursor-pointer shadow-sm"
   >
-    {selectedItems.length === 0 && (
-      <span className="text-gray-400">Select Items</span>
+    {selectedItems.length === 0 ? (
+      <span className="text-gray-400">Select Item</span>
+    ) : (
+      <span className="text-sm font-medium text-gray-800">
+        {items.find((i: any) => i.id === selectedItems[0])?.name || "Selected"}
+      </span>
     )}
-
-    {selectedItems.map((id) => {
-      const item = items.find((i: any) => i.id === id);
-      return (
-        <span
-  key={id}
-  className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full border border-blue-200"
->
-  {item?.name}
-
-  <button
-    onClick={(e) => {
-      e.stopPropagation();
-      removeItem(id);
-    }}
-    className="text-red-500 hover:text-red-700 text-xs"
-  >
-    ✕
-  </button>
-</span>
-      );
-    })}
   </div>
 
   {/* Dropdown */}
   {showDropdown && (
-    <div className="absolute left-0 top-full z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl">
-      
+    <div className="absolute left-0 top-full mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl">
+
       {/* Search */}
       <input
         type="text"
@@ -391,23 +416,24 @@ useEffect(() => {
 
       {/* List */}
       <div className="max-h-52 overflow-y-auto">
-        {filteredItems.map((item: any) => (
-          <div
-            key={item.id}
-            onClick={() => toggleItem(item.id)}
-            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 flex justify-between ${
-              selectedItems.includes(item.id)
-                ? "bg-blue-100 text-blue-700"
-                : ""
-            }`}
-          >
-            {item.name}
-
-            {selectedItems.includes(item.id) && (
-              <span className="text-blue-600">✔</span>
-            )}
-          </div>
-        ))}
+        {(items || [])
+          .filter((i: any) =>
+            (i.name || "")
+              .toLowerCase()
+              .includes((search || "").toLowerCase())
+          )
+          .map((item: any) => (
+            <div
+              key={item.id}
+              onClick={() => {
+                setSelectedItems([item.id]); // ✅ ONLY ONE
+                setShowDropdown(false);      // ✅ close dropdown
+              }}
+              className="px-3 py-2 cursor-pointer hover:bg-blue-50"
+            >
+              {item.name}
+            </div>
+          ))}
       </div>
     </div>
   )}
