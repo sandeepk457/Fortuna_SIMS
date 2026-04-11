@@ -5,6 +5,7 @@ const authRoutes = require("./routes/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes"); // ✅ Add vendor routes
 const itemRoutes = require("./routes/itemRoutes");  // ✅ Add Items routes
 const uomRoutes = require("./routes/uom.routes.js"); // ✅ Add UOM routes
+const demandRoutes = require("./routes/demand.routes.js"); // ✅ Add demand forecast routes
 
 const warehouseRoutes = require("./routes/warehouse.routes.js"); // ✅ Add  warehouse routes
 
@@ -23,10 +24,13 @@ app.use("/api/vendors", vendorRoutes); // 👈 this is  vendor api
 app.use("/api/items", itemRoutes); // 👈 this is  Item Master api
 
 //  Warehouse APIs
-app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/warehouses", warehouseRoutes); // 👈 this is  warehouse api 
 
 // UOM APIs
-app.use("/api/uoms", uomRoutes);
+app.use("/api/uoms", uomRoutes); // 👈 this is  UOM api
+
+// Demand Forecast APIs
+app.use("/api/demand", demandRoutes); // 👈 this is  demand forecast api
 
 app.listen(5000, () => {
   console.log("SIMS backend running on port 5000");

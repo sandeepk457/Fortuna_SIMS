@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
+import Select from "react-select";
 
 /* =========================
    FORTUNA THEME
@@ -20,146 +21,303 @@ const inputBase =
 /* =========================
    MOCK DATA
 ========================= */
-const ITEMS = ["Industrial Pump", "Safety Helmet", "Gear Box"];
-const WAREHOUSES = ["Vizag WH", "Hyderabad WH", "Chennai WH"];
 
-
-
-/* =========================
-   MAIN COMPONENT
-========================= */
 export default function DemandForecastPage() {
-
   const router = useRouter();
 
-  const [item, setItem] = useState("Industrial Pump");
-  const [warehouse, setWarehouse] = useState("Vizag WH");
+  // =========================
+  // STATES
+  // =========================
+  const [items, setItems] = useState<any[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
+
+  const [item, setItem] = useState(""); // UUID
+  const [warehouse, setWarehouse] = useState(""); // UUID
 
   const [fromMonth, setFromMonth] = useState("");
   const [toMonth, setToMonth] = useState("");
 
-
   const [kpi, setKpi] = useState<any>({});
   const [trend, setTrend] = useState<any[]>([]);
-
-  const maxValue = Math.max(
-  ...trend.map((t) => Math.max(t.demand || 0, t.forecast || 0)),
-  1
-);
-
   const [tableData, setTableData] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
 
-  const months = useMemo(() => {
-  const list: string[] = [];
-  const today = new Date();
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [search, setSearch] = useState(""); 
 
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
 
-    const label = d.toLocaleString("default", {
-      month: "short",
-      year: "numeric",
-    });
-
-    list.push(label);
+  const toggleItem = (id: string) => {
+  if (selectedItems.includes(id)) {
+    setSelectedItems(selectedItems.filter((i) => i !== id));
+  } else {
+    setSelectedItems([...selectedItems, id]);
   }
-
-  return list;
-}, []);
-
-
-//date range validation//
-
-const validateRange = () => {
-  if (!fromMonth || !toMonth) return true;
-
-  const fromIndex = months.indexOf(fromMonth);
-  const toIndex = months.indexOf(toMonth);
-
-  if (toIndex < fromIndex) {
-    alert("To Month should be after From Month");
-    return false;
-  }
-
-  return true;
 };
 
-  /* =========================
-     AI FORECAST ENGINE
-  ========================= */
-  const runForecast = () => {
-    const demand = Math.floor(Math.random() * 800) + 400;
-    const forecast = Number((demand * 1.1).toFixed(2));
-    const stock = Math.floor(Math.random() * 700) + 200;
-    const reorder = Number(Math.max(forecast - stock, 0).toFixed(2));
-    const mape = Math.floor(Math.random() * 20) + 5;
+const removeItem = (id: string) => {
+  setSelectedItems(selectedItems.filter((i) => i !== id));
+};
 
-    const risk =
-      stock < forecast ? "High" : stock < forecast * 1.2 ? "Medium" : "Low";
+const filteredItems = items.filter((i: any) =>
+  i.name?.toLowerCase().includes(search.toLowerCase())
+);
 
-    setKpi({ demand, forecast, stock, reorder, mape, risk });
 
-    /* TREND */
-    let filteredMonths = months;
+  // =========================
+  // MONTH LIST
+  // =========================
+  const months = useMemo(() => {
+    const list: string[] = [];
+    const today = new Date();
 
-if (fromMonth && toMonth) {
-  const fromIndex = months.indexOf(fromMonth);
-  const toIndex = months.indexOf(toMonth);
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(today.getFullYear(), today.getMonth() + i, 1);
 
-  filteredMonths = months.slice(fromIndex, toIndex + 1);
-}
+      const label = d.toLocaleString("default", {
+        month: "short",
+        year: "numeric",
+      });
 
-const data = filteredMonths.map((m) => ({
-  month: m, // 🔥 THIS IS KEY
-  demand: Math.floor(Math.random() * 100) + 20,
-  forecast: Math.floor(Math.random() * 100) + 20,
-}));
+      list.push(label);
+    }
 
-setTrend(data);
+    return list;
+  }, []);
 
-/* TABLE */
-setTableData(
-  ITEMS.map((i) => {
+  // =========================
+  // MAX VALUE (for chart)
+  // =========================
+  const maxValue = useMemo(() => {
+    return Math.max(
+      ...trend.map((t) => Math.max(t.demand || 0, t.forecast || 0)),
+      1
+    );
+  }, [trend]);
+
+  // =========================
+  // DATE FORMAT (IMPORTANT 🔥)
+  // =========================
+  const formatToDate = (label: string) => {
+    const date = new Date(label);
+    return date.toISOString().split("T")[0]; // YYYY-MM-DD
+  };
+
+  // =========================
+  // VALIDATION
+  // =========================
+  const validateRange = () => {
+    if (!fromMonth || !toMonth) return true;
+
+    const fromIndex = months.indexOf(fromMonth);
+    const toIndex = months.indexOf(toMonth);
+
+    if (fromIndex === -1 || toIndex === -1) return false;
+
+    if (toIndex < fromIndex) {
+      alert("To Month should be after From Month");
+      return false;
+    }
+
+    return true;
+  };
+
+    // =========================
+  // FETCH ITEMS & WAREHOUSES
+  // =========================
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const itemRes = await fetch("http://localhost:5000/api/items");
+        const itemData = await itemRes.json();
+
+        const whRes = await fetch("http://localhost:5000/api/warehouses");
+        const whData = await whRes.json();
+
+        setItems(itemData);
+        setWarehouses(whData);
+
+        // ✅ Default selections (VERY IMPORTANT)
+        if (itemData.length > 0) {
+          setItem(itemData[0].id);
+        }
+
+        if (whData.length > 0) {
+          setWarehouse(whData[0].warehouse_id);
+        }
+
+        // ✅ Default months
+        if (months.length > 0) {
+          setFromMonth(months[0]);
+          setToMonth(months[2] || months[0]);
+        }
+
+      } catch (err) {
+        console.error("Error fetching dropdown data", err);
+      }
+    };
+
+    fetchData();
+  }, [months]);
+
+  //close dropdown on outside click
+
+  useEffect(() => {
+  const close = () => setShowDropdown(false);
+
+  window.addEventListener("click", close);
+
+  return () => window.removeEventListener("click", close);
+}, []);
+
+const sendForecast = async () => {
+  try {
+    await fetch("http://localhost:5000/api/demand/forecast", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        item_id: selectedItems[0], // or loop later
+        warehouse_id: warehouse,
+        from_month: fromMonth,
+        to_month: toMonth,
+        kpi,
+        trend,
+        sku: tableData,
+        actions,
+      }),
+    });
+
+    console.log("✅ Forecast Saved");
+  } catch (err) {
+    console.error("❌ Error saving forecast", err);
+  }
+};
+
+
+
+
+
+/* =========================
+   AI FORECAST ENGINE
+========================= */
+const runForecast = () => {
+  // =========================
+  // KPI (AI DEMAND ENGINE)
+  // =========================
+  if (selectedItems.length === 0) return;
+
+  // ✅ Base from selected items count
+  const baseDemand = selectedItems.length * 120;
+
+  // ✅ Stable variation using item ids
+  const variation =
+    selectedItems.reduce((acc, id) => acc + id.charCodeAt(0), 0) % 50;
+
+  const demand = baseDemand + variation;
+
+  const forecast = Math.round(demand * 1.1);
+
+  // ✅ Stock derived logically
+  const stock = forecast - selectedItems.length * 30;
+
+  const safetyStock = forecast * 0.2;
+  const reorder = Math.max(forecast + safetyStock - stock, 0);
+
+  const mape = 5 + (variation % 5);
+
+  let risk = "Low";
+  if (stock < forecast * 0.8) risk = "High";
+  else if (stock < forecast) risk = "Medium";
+
+  setKpi({
+    demand,
+    forecast,
+    stock,
+    reorder,
+    mape,
+    risk,
+  });
+
+  // =========================
+  // TREND
+  // =========================
+  let filteredMonths = months;
+
+  if (fromMonth && toMonth) {
+    const fromIndex = months.indexOf(fromMonth);
+    const toIndex = months.indexOf(toMonth);
+    filteredMonths = months.slice(fromIndex, toIndex + 1);
+  }
+
+  const trendData = filteredMonths.map((m) => ({
+    month: m,
+    demand: Math.floor(Math.random() * 100) + 20,
+    forecast: Math.floor(Math.random() * 100) + 20,
+  }));
+
+  setTrend(trendData);
+
+  // =========================
+  // TABLE (Selected Items Only)
+  // =========================
+  const rows = selectedItems.map((id: string) => {
+    const itemObj = items.find((i: any) => i.id === id);
+
     const demand = Math.floor(Math.random() * 400);
     const forecast = Math.floor(Math.random() * 400);
     const stock = Math.floor(Math.random() * 300);
 
     return {
-      sku: i,
+      sku: itemObj?.name,
       demand,
       forecast,
       stock,
-      variance: forecast - stock, // ✅ FIXED
+      variance: forecast - demand,
     };
-  })
-);
-  };
+  });
 
-  useEffect(() => {
-    runForecast();
-  }, [item, warehouse]);
+  setTableData(rows);
+};
+
+useEffect(() => {
+
+
+  if (tableData.length > 0) {
+    sendForecast();
+  }
+}, [item, warehouse, kpi, trend, tableData]);
 
   /* =========================
      RECOMMENDED ACTIONS 🔥
   ========================= */
   const actions = useMemo(() => {
-    const list = [];
+  const list = [];
 
-    if (kpi.risk === "High") {
-      list.push("⚠️ Immediate replenishment required");
-    }
-    if (kpi.mape > 15) {
-      list.push("📉 Forecast accuracy low – review model");
-    }
-    if (kpi.stock > kpi.forecast * 1.3) {
-      list.push("📦 Overstock risk – slow down procurement");
-    }
-    if (list.length === 0) {
-      list.push("✅ Inventory balanced");
-    }
+  if (kpi.risk === "High") {
+    list.push("⚠️ Immediate replenishment required");
+  }
 
-    return list;
-  }, [kpi]);
+  if (kpi.risk === "Medium") {
+    list.push("⚡ Monitor stock closely");
+  }
+
+  if (kpi.stock > kpi.forecast * 1.3) {
+    list.push("📦 Overstock risk – slow down procurement");
+  }
+
+  if (kpi.mape > 8) {
+    list.push("📉 Forecast accuracy needs improvement");
+  }
+
+  if (list.length === 0) {
+    list.push("✅ Inventory balanced based on current demand pattern");
+  }
+
+  return list;
+}, [kpi]);
+
+
 
   return (
     <div className="space-y-4">
@@ -181,51 +339,119 @@ setTableData(
         {/* FILTER BAR */}
 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5 mb-6">
 
-  {/* SKU */}
-  <select
-    className={inputBase}
-    value={item}
-    onChange={(e) => setItem(e.target.value)}
+{/* SKU */}
+<div
+  className="relative w-full max-w-[320px]"
+  onClick={(e) => e.stopPropagation()}
+>
+  {/* Selected Chips */}
+  <div
+    onClick={() => setShowDropdown(!showDropdown)}
+    className="h-[56px] flex items-center gap-2 px-3 border rounded-xl bg-white cursor-pointer shadow-sm overflow-x-auto whitespace-nowrap"
   >
-    {ITEMS.map((i) => (
-      <option key={i}>{i}</option>
-    ))}
-  </select>
+    {selectedItems.length === 0 && (
+      <span className="text-gray-400">Select Items</span>
+    )}
+
+    {selectedItems.map((id) => {
+      const item = items.find((i: any) => i.id === id);
+      return (
+        <span
+  key={id}
+  className="flex items-center gap-1 px-3 py-1 text-xs font-medium bg-blue-50 text-blue-700 rounded-full border border-blue-200"
+>
+  {item?.name}
+
+  <button
+    onClick={(e) => {
+      e.stopPropagation();
+      removeItem(id);
+    }}
+    className="text-red-500 hover:text-red-700 text-xs"
+  >
+    ✕
+  </button>
+</span>
+      );
+    })}
+  </div>
+
+  {/* Dropdown */}
+  {showDropdown && (
+    <div className="absolute left-0 top-full z-50 mt-2 w-full bg-white border border-gray-200 rounded-xl shadow-xl">
+      
+      {/* Search */}
+      <input
+        type="text"
+        placeholder="Search item..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full p-2 border-b outline-none"
+      />
+
+      {/* List */}
+      <div className="max-h-52 overflow-y-auto">
+        {filteredItems.map((item: any) => (
+          <div
+            key={item.id}
+            onClick={() => toggleItem(item.id)}
+            className={`px-3 py-2 cursor-pointer hover:bg-blue-50 flex justify-between ${
+              selectedItems.includes(item.id)
+                ? "bg-blue-100 text-blue-700"
+                : ""
+            }`}
+          >
+            {item.name}
+
+            {selectedItems.includes(item.id) && (
+              <span className="text-blue-600">✔</span>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+</div>
 
   {/* WAREHOUSE */}
   <select
-    className={inputBase}
-    value={warehouse}
-    onChange={(e) => setWarehouse(e.target.value)}
-  >
-    {WAREHOUSES.map((w) => (
-      <option key={w}>{w}</option>
-    ))}
-  </select>
+  value={warehouse}
+  onChange={(e) => setWarehouse(e.target.value)}
+  className="px-4 py-3 rounded-xl border bg-white shadow-sm focus:ring-2 focus:ring-blue-400"
+>
+  {warehouses.map((w: any) => (
+    <option key={w.warehouse_id} value={w.warehouse_id}>
+      {w.warehouse_name}
+    </option>
+  ))}
+</select>
+
 
   {/* FROM MONTH */}
   <select
-    className={inputBase}
-    value={fromMonth}
-    onChange={(e) => setFromMonth(e.target.value)}
-  >
-    <option value="">From Month</option>
-    {months.map((m) => (
-      <option key={m}>{m}</option>
-    ))}
-  </select>
+  className="p-3 rounded-xl border w-full"
+  value={fromMonth}
+  onChange={(e) => setFromMonth(e.target.value)}
+>
+  {months.map((m) => (
+    <option key={m} value={m}>
+      {m}
+    </option>
+  ))}
+</select>
 
   {/* TO MONTH */}
-  <select
-    className={inputBase}
-    value={toMonth}
-    onChange={(e) => setToMonth(e.target.value)}
-  >
-    <option value="">To Month</option>
-    {months.map((m) => (
-      <option key={m}>{m}</option>
-    ))}
-  </select>
+ <select
+  className="p-3 rounded-xl border w-full"
+  value={toMonth}
+  onChange={(e) => setToMonth(e.target.value)}
+>
+  {months.map((m) => (
+    <option key={m} value={m}>
+      {m}
+    </option>
+  ))}
+</select>
 
   {/* BUTTON */}
   <button
@@ -244,7 +470,12 @@ setTableData(
         {/* KPI */}
 
         <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6 mb-6">
-        <KPI title="Demand" value={kpi.demand} bg="#005F99" />
+        <KPI
+  title="Demand"
+  value={kpi.demand}
+  bg="#005F99"
+  confidence={95 - selectedItems.length}
+/>
         <KPI title="Forecast" value={kpi.forecast} bg="#005F99" />
         <KPI title="Stock" value={kpi.stock} bg="#C8102E" />
         <KPI title="Reorder" value={kpi.reorder} bg="#C8102E" />
@@ -516,10 +747,12 @@ function KPI({
   title,
   value,
   bg,
+  confidence,
 }: {
   title: string;
   value: string | number;
   bg: string;
+  confidence?: number;
 }) {
   return (
     <div
@@ -540,6 +773,11 @@ function KPI({
       <div className="mt-2 text-3xl font-bold tracking-wide">
         {value}
       </div>
+
+
+<div className="mt-1 text-[10px] opacity-80">
+  AI Confidence: {confidence || 90}%
+</div>
     </div>
   );
 }
