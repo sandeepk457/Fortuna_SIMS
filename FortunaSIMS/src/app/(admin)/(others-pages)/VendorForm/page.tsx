@@ -76,7 +76,7 @@ type VendorFormState = {
 
 const initialState: VendorFormState = {
   vendor_id: "Auto-generated",
-  // vendor_code: "",
+  vendor_code: "",
   vendor_name: "",
   vendor_type: "",
   vendor_category: "",
@@ -228,6 +228,11 @@ useEffect(() => {
       .catch((err) => console.error(err));
   }
 }, [id]);
+
+
+
+  
+
 
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<VendorFormState>(initialState);
@@ -443,7 +448,7 @@ const onSave = async () => {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(form),
+      body: JSON.stringify(payload),
     });
 
     // 🔥 SAFE JSON PARSE (important fix)
@@ -569,12 +574,21 @@ const onSave = async () => {
                 </div>
 
               <div>
-  <label className={labelBase}>Vendor Code</label>
+  <label className={labelBase}>
+    Vendor Code <span className="text-xs text-gray-400">(System)</span>
+  </label>
 
-  <div className="mt-2 inline-flex items-center rounded-lg bg-gray-100 px-3 py-2 text-sm font-semibold text-gray-700 dark:bg-white/10 dark:text-white">
-    AUTO GENERATED
-  </div>
+  <input
+  readOnly
+  value={form.vendor_code || ""}
+  className={classNames(
+    inputBase,
+    "cursor-not-allowed bg-gray-50 dark:bg-white/5 font-semibold"
+  )}
+/>
 </div>
+
+  
 
                 <div>
                   <label className={labelBase}>

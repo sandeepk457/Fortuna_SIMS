@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 
@@ -14,6 +14,7 @@ type CustomerTier = "Key Account" | "Standard" | "Small";
 type PaymentTerms = "Advance" | "Net 7" | "Net 15" | "Net 30" | "Net 45" | "Custom";
 
 interface Customer {
+  customer_id: number; 
   code: string;
   name: string;
   tier: CustomerTier;
@@ -42,108 +43,7 @@ function formatINR(value: number) {
 
 export default function CustomerMasterListPage() {
   const router = useRouter();
-  const [data, setData] = useState<Customer[]>([
-    {
-      code: "CUST-001",
-      name: "Sri Sai Retail Mart",
-      tier: "Key Account",
-      phone: "9000011111",
-      city: "Vizag",
-      paymentTerms: "Net 30",
-      creditLimit: 250000,
-      status: "Active",
-    },
-    {
-      code: "CUST-002",
-      name: "Aparna Traders",
-      tier: "Standard",
-      phone: "9000022222",
-      city: "Hyderabad",
-      paymentTerms: "Net 15",
-      creditLimit: 150000,
-      status: "Active",
-    },
-    {
-      code: "CUST-003",
-      name: "FastBuy Wholesale",
-      tier: "Standard",
-      phone: "9000033333",
-      city: "Vijayawada",
-      paymentTerms: "Net 7",
-      creditLimit: 100000,
-      status: "Inactive",
-    },
-    {
-      code: "CUST-004",
-      name: "Prime Distributors",
-      tier: "Key Account",
-      phone: "9000044444",
-      city: "Chennai",
-      paymentTerms: "Net 45",
-      creditLimit: 500000,
-      status: "Active",
-    },
-    {
-      code: "CUST-005",
-      name: "Local Kirana Hub",
-      tier: "Small",
-      phone: "9000055555",
-      city: "Anakapalli",
-      paymentTerms: "Advance",
-      creditLimit: 25000,
-      status: "Blocked",
-    },
-    {
-      code: "CUST-006",
-      name: "Omni Stores",
-      tier: "Standard",
-      phone: "9000066666",
-      city: "Hyderabad",
-      paymentTerms: "Net 30",
-      creditLimit: 200000,
-      status: "Active",
-    },
-    {
-      code: "CUST-007",
-      name: "BoxPro Retailers",
-      tier: "Small",
-      phone: "9000077777",
-      city: "Pune",
-      paymentTerms: "Net 15",
-      creditLimit: 50000,
-      status: "Active",
-    },
-    {
-      code: "CUST-008",
-      name: "SkyRoute Buyers",
-      tier: "Standard",
-      phone: "9000088888",
-      city: "Delhi",
-      paymentTerms: "Custom",
-      creditLimit: 120000,
-      status: "Active",
-    },
-    {
-      code: "CUST-009",
-      name: "ColdChain Clients",
-      tier: "Key Account",
-      phone: "9000099999",
-      city: "Mumbai",
-      paymentTerms: "Net 30",
-      creditLimit: 350000,
-      status: "Inactive",
-    },
-    {
-      code: "CUST-010",
-      name: "General Super Market",
-      tier: "Standard",
-      phone: "9000000000",
-      city: "Hyderabad",
-      paymentTerms: "Net 30",
-      creditLimit: 180000,
-      status: "Active",
-    },
-  ]);
+  const [data, setData] = useState<Customer[]>([]);
 
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
@@ -157,6 +57,25 @@ export default function CustomerMasterListPage() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+  //useEffect to fetch data from backend API
+ useEffect(() => {
+  fetch("http://localhost:5000/api/customers")
+    .then((res) => res.json())
+    .then((resData) => {
+      console.log("API RESPONSE:", resData);
+
+      // 🔥 HANDLE ALL CASES SAFELY
+      if (Array.isArray(resData)) {
+        setData(resData);
+      } else if (Array.isArray(resData.data)) {
+        setData(resData.data);
+      } else {
+        setData([]); // fallback
+      }
+    })
+    .catch((err) => console.error("Error fetching customers:", err));
+}, []);
 
   // Modal (demo)
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -174,27 +93,29 @@ export default function CustomerMasterListPage() {
   });
 
   // Filtering Logic
-  const filteredData = useMemo(() => {
-    return data.filter(
-      (c) =>
-        c.code.toLowerCase().includes(searchCode.toLowerCase()) &&
-        c.name.toLowerCase().includes(searchName.toLowerCase()) &&
-        c.phone.toLowerCase().includes(searchPhone.toLowerCase()) &&
-        c.city.toLowerCase().includes(searchCity.toLowerCase()) &&
-        (tierFilter ? c.tier === tierFilter : true) &&
-        (termsFilter ? c.paymentTerms === termsFilter : true) &&
-        (statusFilter ? c.status === statusFilter : true)
-    );
-  }, [
-    data,
-    searchCode,
-    searchName,
-    searchPhone,
-    searchCity,
-    tierFilter,
-    termsFilter,
-    statusFilter,
-  ]);
+const filteredData = useMemo(() => {
+  if (!Array.isArray(data)) return []; // 🔥 safety
+
+  return data.filter(
+    (c) =>
+      c.code?.toLowerCase().includes(searchCode.toLowerCase()) &&
+      c.name?.toLowerCase().includes(searchName.toLowerCase()) &&
+      c.phone?.toLowerCase().includes(searchPhone.toLowerCase()) &&
+      c.city?.toLowerCase().includes(searchCity.toLowerCase()) &&
+      (tierFilter ? c.tier === tierFilter : true) &&
+      (termsFilter ? c.paymentTerms === termsFilter : true) &&
+      (statusFilter ? c.status === statusFilter : true)
+  );
+}, [
+  data,
+  searchCode,
+  searchName,
+  searchPhone,
+  searchCity,
+  tierFilter,
+  termsFilter,
+  statusFilter,
+]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
@@ -246,11 +167,24 @@ export default function CustomerMasterListPage() {
   };
 
   // Actions
-  const onDelete = (code: string) => {
-    const ok = confirm(`Delete customer ${code}?`);
-    if (!ok) return;
-    setData((p) => p.filter((x) => x.code !== code));
-  };
+  const onDelete = async (id: number) => {
+  const ok = confirm("Delete this customer?");
+  if (!ok) return;
+
+  try {
+    await fetch(`http://localhost:5000/api/customers/${id}`, {
+      method: "DELETE",
+    });
+
+    // refresh data
+    const res = await fetch("http://localhost:5000/api/customers");
+    const updated = await res.json();
+    setData(updated);
+
+  } catch (err) {
+    console.error("Delete error:", err);
+  }
+};
 
   const onAddCustomer = () => {
     const code = newCustomer.code.trim();
@@ -462,7 +396,7 @@ export default function CustomerMasterListPage() {
                 <tbody className="dark:text-gray-200">
                   {paginatedData.map((c) => (
                     <tr
-                      key={c.code}
+                      key={c.customer_id}
                       className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
                     >
                       <td className="px-4 py-3">{c.code}</td>
@@ -497,7 +431,7 @@ export default function CustomerMasterListPage() {
                         </button>
                         <button
                           className="font-semibold text-rose-600 hover:underline"
-                          onClick={() => onDelete(c.code)}
+                          onClick={() => onDelete(c.customer_id)}
                         >
                           Delete
                         </button>

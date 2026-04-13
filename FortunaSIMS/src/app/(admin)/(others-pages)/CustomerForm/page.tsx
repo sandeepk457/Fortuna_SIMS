@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 /** Fortuna Theme Colors */
@@ -170,8 +170,26 @@ export default function CustomerMasterCreatePage() {
   const [form, setForm] = useState<CustomerFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+      //auto generate customer code if empty (for demo, in real app backend should handle this)
+useEffect(() => {
+  fetch("http://localhost:5000/api/customers/next-code")
+    .then((res) => res.json())
+    .then((data) => {
+      if (data.success) {
+        setForm((prev) => ({
+          ...prev,
+          customer_code: data.code,
+        }));
+      }
+    })
+    .catch((err) => console.error("Code fetch error:", err));
+}, []);
+
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
+
+
+
 
     /** BASIC REQUIRED */
     if (!form.customer_code.trim()) e.customer_code = "Customer Code is required";
@@ -335,27 +353,93 @@ export default function CustomerMasterCreatePage() {
     return "basic";
   };
 
-  const onSave = () => {
-    const allKeys = Object.keys(initialState) as Array<keyof CustomerFormState>;
-    setTouched((p) => {
-      const next = { ...p };
-      allKeys.forEach((k) => (next[k as string] = true));
-      return next;
+ const onSave = async () => {
+  const allKeys = Object.keys(initialState) as Array<keyof CustomerFormState>;
+
+  setTouched((p) => {
+    const next = { ...p };
+    allKeys.forEach((k) => (next[k as string] = true));
+    return next;
+  });
+
+  if (hasErrors) {
+    setActiveTab(firstErrorTab());
+    return;
+  }
+
+  // 🔥 Build payload for backend
+  const payload = {
+    customer_code: form.customer_code,
+    customer_name: form.customer_name,
+    customer_type: form.customer_type,
+    customer_tier: form.customer_tier,
+
+    contact_person_name: form.contact_person_name,
+    contact_phone: form.contact_phone,
+    contact_email: form.contact_email,
+    alternate_phone: form.alternate_phone,
+
+    billing_address: form.billing_address,
+    shipping_address: form.shipping_address_same_as_billing
+      ? form.billing_address
+      : form.shipping_address,
+
+    city: form.city,
+    state: form.state,
+    country: form.country,
+    postal_code: form.postal_code,
+
+    currency: form.currency,
+    payment_terms: form.payment_terms,
+    credit_limit: Number(form.credit_limit || 0),
+    credit_days: Number(form.credit_days || 0),
+    price_list_ref: form.price_list_ref,
+
+    tax_applicable: form.tax_applicable,
+    gst_percentage: Number(form.gst_percentage || 0),
+    discount_percentage: Number(form.discount_percentage || 0),
+
+    gstin: form.gstin,
+    pan: form.pan,
+    msme_registered: form.msme_registered,
+    msme_number: form.msme_number,
+
+    bank_account_name: form.bank_account_name,
+    bank_account_number: form.bank_account_number,
+    bank_name: form.bank_name,
+    ifsc_code: form.ifsc_code,
+
+    compliance_status: form.compliance_status,
+    status: form.status,
+  };
+
+  try {
+    const res = await fetch("http://localhost:5000/api/customers", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
     });
 
-    if (hasErrors) {
-      setActiveTab(firstErrorTab());
-      return;
+    const result = await res.json();
+
+    if (result.success) {
+      alert("Customer saved successfully ✅");
+
+      // 🔥 RESET FORM
+      setForm(initialState);
+
+      // 🔥 OPTIONAL: redirect to list page
+      window.location.href = "/CustomerMaster"; // adjust if route different
+    } else {
+      alert("Error: " + result.message);
     }
-
-    const payload = {
-      ...form,
-      shipping_address: form.shipping_address_same_as_billing ? form.billing_address : form.shipping_address,
-    };
-
-    console.log("Customer Saved:", payload);
-    alert("Saved (demo). Next step: connect API.");
-  };
+  } catch (err) {
+    console.error("Save error:", err);
+    alert("Failed to save customer");
+  }
+};
 
   const onReset = () => {
     setForm(initialState);
@@ -438,9 +522,7 @@ export default function CustomerMasterCreatePage() {
                   </label>
                   <input
                     value={form.customer_code}
-                    onChange={(e) => setField("customer_code", e.target.value)}
-                    onBlur={() => markTouched("customer_code")}
-                    placeholder="Ex: CUS-000123"
+                    disabled
                     className={classNames(inputBase, showError("customer_code") && "border-brand-500")}
                   />
                   {showError("customer_code") && (

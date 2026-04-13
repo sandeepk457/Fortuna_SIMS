@@ -24,31 +24,31 @@ const createVendor = async (req, res) => {
     console.log("Vendor Code:", vendorCode);
 
     const vendorRes = await client.query(
-      `INSERT INTO vendors (
-        vendor_code, vendor_name, vendor_type, vendor_category, vendor_tier,
-        contact_person_name, contact_phone, contact_email, alternate_phone,
-        registered_address, city, state, country, postal_code, status
-      )
-      VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-      RETURNING id`,
-      [
-        vendorCode,
-        data.vendor_name,
-        data.vendor_type,
-        data.vendor_category,
-        data.vendor_tier,
-        data.contact_person_name,
-        data.contact_phone,
-        data.contact_email,
-        data.alternate_phone,
-        data.registered_address,
-        data.city,
-        data.state,
-        data.country,
-        data.postal_code,
-        data.status,
-      ]
-    );
+  `INSERT INTO vendors (
+    vendor_code, vendor_name, vendor_type, vendor_category, vendor_tier,
+    contact_person_name, contact_phone, contact_email, alternate_phone,
+    registered_address, city, state, country, postal_code, status
+  )
+  VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+  RETURNING id, vendor_code`,
+  [
+    vendorCode,
+    data.vendor_name,
+    data.vendor_type,
+    data.vendor_category,
+    data.vendor_tier,
+    data.contact_person_name,
+    data.contact_phone,
+    data.contact_email,
+    data.alternate_phone,
+    data.registered_address,
+    data.city,
+    data.state,
+    data.country,
+    data.postal_code,
+    data.status,
+  ]
+);
 
     const vendorId = vendorRes.rows[0].id;
 
@@ -91,7 +91,7 @@ const createVendor = async (req, res) => {
     ifsc_code=EXCLUDED.ifsc_code,
     compliance_status=EXCLUDED.compliance_status`,
   [
-    id,
+    vendorId,
     data.gstin,
     data.pan,
     data.bank_account_name,
@@ -104,7 +104,11 @@ const createVendor = async (req, res) => {
 
     await client.query("COMMIT");
 
-    res.json({ message: "Vendor Created Successfully" });
+    res.json({
+  message: "Vendor Created Successfully",
+  vendor_id: vendorId,
+  vendor_code: vendorCode,
+});
 
   } catch (err) {
     await client.query("ROLLBACK");
