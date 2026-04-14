@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useSearchParams } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -170,19 +171,93 @@ export default function CustomerMasterCreatePage() {
   const [form, setForm] = useState<CustomerFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  //edit mode - load existing customer data
+
+  useEffect(() => {
+  const id = new URLSearchParams(window.location.search).get("id");
+
+  if (id) {
+    console.log("Edit ID:", id);
+
+    fetch(`http://localhost:5000/api/customers/${id}`)
+      .then((res) => res.json())
+      .then((data) => {
+        console.log("EDIT DATA:", data);
+
+        setForm((prev) => ({
+          ...prev,
+          //customer_id: data.customer_id || prev.customer_id,
+          customer_id: data.customer_id || prev.customer_id,
+  customer_code: data.customer_code || prev.customer_code,
+  customer_name: data.customer_name || prev.customer_name,
+  customer_type: data.customer_type || prev.customer_type,
+  customer_tier: data.customer_tier || prev.customer_tier,
+
+  contact_person_name: data.contact_person_name || prev.contact_person_name,
+  contact_phone: data.contact_phone || prev.contact_phone,
+  contact_email: data.contact_email || prev.contact_email,
+  alternate_phone: data.alternate_phone || prev.alternate_phone,
+
+  billing_address: data.billing_address || prev.billing_address,
+  
+  shipping_address_same_as_billing:
+    data.shipping_address === data.billing_address,
+
+  shipping_address: data.shipping_address || prev.shipping_address,
+
+  city: data.city || prev.city,
+  state: data.state || prev.state,
+  country: data.country || prev.country,
+  postal_code: data.postal_code || prev.postal_code,
+
+  currency: data.currency || prev.currency,
+  payment_terms: data.payment_terms || prev.payment_terms,
+  credit_limit: data.credit_limit?.toString() || prev.credit_limit,
+  credit_days: data.credit_days?.toString() || prev.credit_days,
+  price_list_ref: data.price_list_ref || prev.price_list_ref,
+
+  tax_applicable: data.tax_applicable ?? prev.tax_applicable,
+  gst_percentage: data.gst_percentage?.toString() || prev.gst_percentage,
+  discount_percentage: data.discount_percentage?.toString() || prev.discount_percentage,
+
+  gstin: data.gstin || prev.gstin,
+  pan: data.pan || prev.pan,
+
+  msme_registered: data.msme_registered ?? prev.msme_registered,
+  msme_number: data.msme_number || prev.msme_number,
+
+  bank_account_name: data.bank_account_name || prev.bank_account_name,
+  bank_account_number: data.bank_account_number || prev.bank_account_number,
+  bank_name: data.bank_name || prev.bank_name,
+  ifsc_code: data.ifsc_code || prev.ifsc_code,
+
+  compliance_status: data.compliance_status || prev.compliance_status,
+  status: data.status || prev.status,
+
+  onboarded_date: data.onboarded_date || prev.onboarded_date,
+        }));
+      })
+      .catch((err) => console.error(err));
+  }
+}, []);
+
+
+
+
       //auto generate customer code if empty (for demo, in real app backend should handle this)
 useEffect(() => {
+  const id = new URLSearchParams(window.location.search).get("id");
+
   fetch("http://localhost:5000/api/customers/next-code")
     .then((res) => res.json())
     .then((data) => {
-      if (data.success) {
+      if (data.success && !id) {   // ✅ FIX
         setForm((prev) => ({
           ...prev,
           customer_code: data.code,
         }));
       }
-    })
-    .catch((err) => console.error("Code fetch error:", err));
+    });
 }, []);
 
   const errors = useMemo(() => {
@@ -369,6 +444,10 @@ useEffect(() => {
 
   // 🔥 Build payload for backend
   const payload = {
+    customer_id:
+  form.customer_id && form.customer_id !== "Auto-generated"
+    ? Number(form.customer_id)
+    : null,
     customer_code: form.customer_code,
     customer_name: form.customer_name,
     customer_type: form.customer_type,
@@ -416,16 +495,23 @@ useEffect(() => {
   try {
     const res = await fetch("http://localhost:5000/api/customers", {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
 
+
+
     const result = await res.json();
 
     if (result.success) {
-      alert("Customer saved successfully ✅");
+      alert(
+  payload.customer_id
+    ? "Customer Updated Successfully ✅"
+    : "Customer Created Successfully ✅"
+);
 
       // 🔥 RESET FORM
       setForm(initialState);

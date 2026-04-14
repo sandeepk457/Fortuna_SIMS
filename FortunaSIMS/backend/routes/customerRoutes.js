@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const controller = require("../controllers/customerController");
+
 const multer = require("multer");
 
 // 🔥 multer config
@@ -16,6 +17,12 @@ router.post("/bulk-upload", upload.single("file"), controller.bulkUploadCustomer
 // Other routes
 router.post("/", controller.saveCustomer);
 router.get("/", controller.getCustomers);
+// ✅ Get by ID should be before delete (to avoid route conflicts)
+
+// 🔥 Dynamic routes LAST
+router.get("/:id", controller.getCustomerById);
 router.delete("/:id", controller.deleteCustomer);
+
+router.put("/:id", controller.updateCustomer);
 
 module.exports = router;

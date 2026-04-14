@@ -44,6 +44,38 @@ function formatINR(value: number) {
 export default function CustomerMasterListPage() {
   const router = useRouter();
   const [data, setData] = useState<Customer[]>([]);
+   const activeCustomers = data.filter(c => c.status === "Active");
+
+  // delete function //
+  const handleDelete = async (id: number) => {
+  const confirmDelete = confirm("Are you sure to deactivate this customer?");
+
+  if (!confirmDelete) return;
+
+  try {
+    const res = await fetch(
+      `http://localhost:5000/api/customers/${id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Customer deactivated successfully 🚫");
+
+      // 🔥 Refresh list
+      fetchCustomers();
+    } else {
+      alert("Error: " + data.message);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Delete failed ❌");
+  }
+};
+
 
   // Column Filters
   const [searchCode, setSearchCode] = useState("");
@@ -184,18 +216,20 @@ const downloadCustomerTemplate = () => {
 
   // Filtering Logic
 const filteredData = useMemo(() => {
-  if (!Array.isArray(data)) return []; // 🔥 safety
+  if (!Array.isArray(data)) return [];
 
-  return data.filter(
-    (c) =>
-      c.code?.toLowerCase().includes(searchCode.toLowerCase()) &&
-      c.name?.toLowerCase().includes(searchName.toLowerCase()) &&
-      c.phone?.toLowerCase().includes(searchPhone.toLowerCase()) &&
-      c.city?.toLowerCase().includes(searchCity.toLowerCase()) &&
-      (tierFilter ? c.tier === tierFilter : true) &&
-      (termsFilter ? c.paymentTerms === termsFilter : true) &&
-      (statusFilter ? c.status === statusFilter : true)
-  );
+  return data
+    .filter((c) => c.status === "Active")   // 🔥 ADD THIS LINE
+    .filter(
+      (c) =>
+        c.code?.toLowerCase().includes(searchCode.toLowerCase()) &&
+        c.name?.toLowerCase().includes(searchName.toLowerCase()) &&
+        c.phone?.toLowerCase().includes(searchPhone.toLowerCase()) &&
+        c.city?.toLowerCase().includes(searchCity.toLowerCase()) &&
+        (tierFilter ? c.tier === tierFilter : true) &&
+        (termsFilter ? c.paymentTerms === termsFilter : true) &&
+        (statusFilter ? c.status === statusFilter : true)
+    );
 }, [
   data,
   searchCode,
@@ -544,7 +578,7 @@ const filteredData = useMemo(() => {
                       <td className="px-4 py-3 space-x-3">
                         <button
                           className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => alert(`Edit flow: open Customer Form for ${c.code}`)}
+                          onClick={() => router.push(`/CustomerForm?id=${c.customer_id}`)}
                         >
                           Edit
                         </button>

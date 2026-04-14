@@ -37,16 +37,43 @@ const saveCustomer = async (req, res) => {
     const data = req.body;
 
     await db.query(
-      `SELECT upsert_customer(
-        NULL,$1,$2,$3,$4,$5,$6,$7,$8,
-        $9,$10,$11,$12,$13,$14,
-        $15,$16,$17,$18,$19,
-        $20,$21,$22,
-        $23,$24,$25,$26,
-        $27,$28,$29,$30,
-        $31,$32
-      )`,
+  `SELECT upsert_customer(
+    $1::INT,
+    $2::TEXT,
+    $3::TEXT,
+    $4::TEXT,
+    $5::TEXT,
+    $6::TEXT,
+    $7::TEXT,
+    $8::TEXT,
+    $9::TEXT,
+    $10::TEXT,
+    $11::TEXT,
+    $12::TEXT,
+    $13::TEXT,
+    $14::TEXT,
+    $15::TEXT,
+    $16::TEXT,
+    $17::TEXT,
+    $18::NUMERIC,
+    $19::INT,
+    $20::TEXT,
+    $21::BOOLEAN,
+    $22::NUMERIC,
+    $23::NUMERIC,
+    $24::TEXT,
+    $25::TEXT,
+    $26::BOOLEAN,
+    $27::TEXT,
+    $28::TEXT,
+    $29::TEXT,
+    $30::TEXT,
+    $31::TEXT,
+    $32::TEXT,
+    $33::TEXT
+  )`,
       [
+        data.customer_id || null,
         data.customer_code,
         data.customer_name,
         data.customer_type,
@@ -196,7 +223,7 @@ const bulkUploadCustomers = async (req, res) => {
             $20,$21,$22,
             $23,$24,$25,$26,
             $27,$28,$29,$30,
-            $31,$32
+            $31,$32,$33
           )`,
           [
             r.customer_code,
@@ -272,10 +299,92 @@ const bulkUploadCustomers = async (req, res) => {
   }
 };
 
-module.exports = {
+//upsert customer (used for both create and update)
+const getCustomerById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await db.query(
+            `SELECT * FROM customers WHERE customer_id = $1`,
+      [id]
+    );
+
+    res.json(result.rows[0]);
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+//update customer//
+
+const updateCustomer = async (req, res) => {
+  try {
+    const data = req.body;
+    const id = req.params.id;
+
+    await db.query(
+      `SELECT upsert_customer(
+        $1,$2,$3,$4,$5,$6,$7,$8,$9,
+        $10,$11,$12,$13,$14,$15,
+        $16,$17,$18,$19,$20,
+        $21,$22,$23,
+        $24,$25,$26,$27,
+        $28,$29,$30,$31,
+        $32,$33
+      )`,
+      [
+        id,
+        data.customer_code,
+        data.customer_name,
+        data.customer_type,
+        data.customer_tier,
+        data.contact_person_name,
+        data.contact_phone,
+        data.contact_email,
+        data.alternate_phone,
+        data.billing_address,
+        data.shipping_address,
+        data.city,
+        data.state,
+        data.country,
+        data.postal_code,
+        data.currency,
+        data.payment_terms,
+        data.credit_limit,
+        data.credit_days,
+        data.price_list_ref,
+        data.tax_applicable,
+        data.gst_percentage,
+        data.discount_percentage,
+        data.gstin,
+        data.pan,
+        data.msme_registered,
+        data.msme_number,
+        data.bank_account_name,
+        data.bank_account_number,
+        data.bank_name,
+        data.ifsc_code,
+        data.compliance_status,
+        data.status,
+      ]
+    );
+
+    res.json({ success: true, message: "Customer updated successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+  module.exports = {
   getCustomers,
   saveCustomer,
   deleteCustomer,
   getNextCustomerCode,
   bulkUploadCustomers,
+  getCustomerById,
+  updateCustomer,   // 🔥 ADD THIS
 };
