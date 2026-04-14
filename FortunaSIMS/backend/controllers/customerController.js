@@ -152,9 +152,130 @@ const getNextCustomerCode = async (req, res) => {
   }
 };
 
+//bulk upload customers
+const XLSX = require("xlsx");
+const fs = require("fs");
+
+const bulkUploadCustomers = async (req, res) => {
+  try {
+    const workbook = XLSX.readFile(req.file.path);
+    const sheet = workbook.SheetNames[0];
+    const rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheet]);
+
+    let inserted = 0;
+    let skipped = 0;
+    const errors = [];
+
+    for (const r of rows) {
+      try {
+        // 🔴 VALIDATIONS
+        if (!r.customer_name) throw new Error("Customer Name missing");
+        if (!r.customer_type) throw new Error("Customer Type missing");
+        if (!r.customer_tier) throw new Error("Customer Tier missing");
+        if (!r.contact_person_name) throw new Error("Contact Person Name missing");
+        if (!r.billing_address) throw new Error("Billing Address missing");
+        if (!r.contact_phone) throw new Error("Phone missing");
+        if (!r.contact_email) throw new Error("Email missing");
+        if (!r.city) throw new Error("City missing");
+        if (!r.state) throw new Error("State missing");
+        if (!r.country) throw new Error("Country missing");
+        if (!r.payment_terms) throw new Error("Payment Terms missing");
+        if (!r.tax_applicable === undefined) throw new Error("Tax Applicable missing");
+        if (!r.tax_applicable && !r.gst_percentage) throw new Error("GST Percentage missing");
+        if (!r.gstin) throw new Error("GSTIN missing");
+        if (!r.pan) throw new Error("PAN missing");
+        if (!r.credit_limit) throw new Error("Credit Limit missing");
+        if (!r.status) throw new Error("Status missing");
+        
+
+        await db.query(
+          `SELECT upsert_customer(
+            NULL,$1,$2,$3,$4,$5,$6,$7,$8,
+            $9,$10,$11,$12,$13,$14,
+            $15,$16,$17,$18,$19,
+            $20,$21,$22,
+            $23,$24,$25,$26,
+            $27,$28,$29,$30,
+            $31,$32
+          )`,
+          [
+            r.customer_code,
+            r.customer_name,
+            r.customer_type,
+            r.customer_tier,
+            r.contact_person_name,
+            r.contact_phone,
+            r.contact_email,
+            r.alternate_phone,
+            r.billing_address,
+            r.shipping_address,
+            r.city,
+            r.state,
+            r.country,
+            r.postal_code,
+            r.currency,
+            r.payment_terms,
+            r.credit_limit,
+            r.credit_days,
+            null,
+            r.tax_applicable,
+            r.gst_percentage,
+            r.discount_percentage,
+            r.gstin,
+            r.pan,
+            r.msme_registered,
+            r.msme_number,
+            r.bank_account_name,
+            r.bank_account_number,
+            r.bank_name,
+            r.ifsc_code,
+            r.compliance_status,
+            r.status,
+          ]
+        );
+
+        inserted++;
+
+      } catch (err) {
+        skipped++;
+
+        // 🔥 store error row
+        errors.push({
+          ...r,
+          error_message: err.message,
+        });
+      }
+    }
+
+    // 🔥 GENERATE ERROR FILE
+    let errorFile = null;
+
+    if (errors.length > 0) {
+      const ws = XLSX.utils.json_to_sheet(errors);
+      const wb = XLSX.utils.book_new();
+
+      XLSX.utils.book_append_sheet(wb, ws, "Errors");
+
+      errorFile = `uploads/customer-errors-${Date.now()}.xlsx`;
+
+      XLSX.writeFile(wb, errorFile);
+    }
+
+    res.json({
+      inserted,
+      skipped,
+      errorFile, // 🔥 send path
+    });
+
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 module.exports = {
   getCustomers,
   saveCustomer,
   deleteCustomer,
   getNextCustomerCode,
+  bulkUploadCustomers,
 };

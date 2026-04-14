@@ -53,10 +53,100 @@ export default function CustomerMasterListPage() {
   const [searchCity, setSearchCity] = useState("");
   const [termsFilter, setTermsFilter] = useState<PaymentTerms | "">("");
   const [statusFilter, setStatusFilter] = useState<CustomerStatus | "">("");
+  const [uploading, setUploading] = useState(false);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+
+
+  //upload state for bulk upload (demo)
+  const handleCustomerUpload = async (e: any) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  try {
+    setUploading(true);
+
+    const res = await fetch("http://localhost:5000/api/customers/bulk-upload", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      alert(`✅ Uploaded: ${data.inserted}\n❌ Skipped: ${data.skipped}`);
+
+      // 🔥 error file download
+      if (data.errorFile) {
+        const link = document.createElement("a");
+        link.href = `http://localhost:5000/${data.errorFile}`;
+        link.download = "Customer_Error_Report.xlsx";
+        link.click();
+      }
+
+      // refresh list
+      window.location.reload();
+
+    } else {
+      alert(data.message || "Upload failed");
+    }
+
+  } catch (err) {
+    console.error(err);
+    alert("Upload error");
+  } finally {
+    setUploading(false);
+  }
+};
+
+//Add template for bulk upload
+
+const downloadCustomerTemplate = () => {
+  const header = [
+    "customer_code",
+    "customer_name",
+    "customer_type",
+    "customer_tier",
+    "contact_person_name",
+    "contact_phone",
+    "contact_email",
+    "billing_address",
+    "shipping_address",
+    "city",
+    "state",
+    "country",
+    "postal_code",
+    "currency",
+    "payment_terms",
+    "credit_limit",
+    "credit_days",
+    "tax_applicable",
+    "gst_percentage",
+    "discount_percentage",
+    "gstin",
+    "pan",
+    "msme_registered",
+    "bank_account_name",
+    "bank_account_number",
+    "bank_name",
+    "ifsc_code",
+    "status"
+  ];
+
+  const csv = header.join(",");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const link = document.createElement("a");
+
+  link.href = URL.createObjectURL(blob);
+  link.download = "customer-template.csv";
+  link.click();
+};
 
   //useEffect to fetch data from backend API
  useEffect(() => {
@@ -265,6 +355,34 @@ const filteredData = useMemo(() => {
               Export to Excel
             </button>
 
+          {/* 🔥 NEW: Upload Excel */}
+  <button
+    onClick={() => document.getElementById("customerFile")?.click()}
+    className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md"
+  >
+    {uploading ? "Uploading..." : "Upload Excel"}
+  </button>
+
+  {/* Hidden Input */}
+  <input
+    id="customerFile"
+    type="file"
+    accept=".xlsx, .xls"
+    onChange={handleCustomerUpload}
+    style={{ display: "none" }}
+  />
+
+  {/* 🔥 NEW: Download Template */}
+  <button
+    onClick={downloadCustomerTemplate}
+    className="bg-green-600 hover:bg-green-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-md"
+  >
+    Download Template
+  </button>
+
+
+
+
             <button
               onClick={resetFilters}
               className="active:scale-95 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-md transition-all duration-200 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
@@ -272,6 +390,7 @@ const filteredData = useMemo(() => {
               Reset Filters
             </button>
           </div>
+
         </div>
 
         <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">

@@ -1,0 +1,2 @@
+customer_code,customer_name,customer_type,customer_tier,contact_person_name,contact_phone,contact_email,billing_address,shipping_address,city,state,country,postal_code,currency,payment_terms,credit_limit,credit_days,tax_applicable,gst_percentage,discount_percentage,gstin,pan,msme_registered,bank_account_name,bank_account_number,bank_name,ifsc_code,status
+CUST-0015,vijaya Wholesale mart,Wholesale,,,,,,,Visakhapatnam,,India,,,,15000,15,Yes,18,0,,,,,,,,
