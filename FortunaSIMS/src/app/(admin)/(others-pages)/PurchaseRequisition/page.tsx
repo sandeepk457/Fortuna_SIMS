@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import  { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -25,13 +26,9 @@ type AttachmentType = "Quotation" | "Spec" | "Drawing" | "Other";
 /** Basic master sample data */
 const DEPARTMENTS = ["Stores", "Maintenance", "Production", "IT", "Finance", "Admin"] as const;
 
-const WAREHOUSES = [
-  { id: "WH-001", name: "Vizag Central WH", address: "Vizag, Andhra Pradesh, India" },
-  { id: "WH-002", name: "Hyderabad WH", address: "Hyderabad, Telangana, India" },
-  { id: "WH-003", name: "Chennai WH", address: "Chennai, Tamil Nadu, India" },
-];
 
-const VENDORS = ["Sri Lakshmi Suppliers", "Aparna Packaging", "FastLine Transport", "Prime 3PL"];
+
+
 
 /** Form Types */
 type PRItemLine = {
@@ -187,9 +184,72 @@ const initialState: PRFormState = {
 };
 
 export default function PurchaseRequisitionCreatePage() {
+  const router = useRouter(); 
+
   const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<PRFormState>(initialState);
+
+const [itemsMaster, setItemsMaster] = useState<any[]>([]);
+useEffect(() => {
+  fetch("http://localhost:5000/api/items")
+    .then(res => res.json())
+    .then(data => {
+      setItemsMaster(data); // ✅ correct for your current API
+    })
+    .catch(err => console.error(err));
+}, []);
+
+const [vendors, setVendors] = useState([]);
+useEffect(() => {
+  fetch("http://localhost:5000/api/vendors")
+    .then(res => res.json())
+    .then(data => {
+      console.log("VENDORS API:", data); // 🔥 CHECK THIS
+      setVendors(data);// 🔥 check your API format
+    })
+    .catch(err => console.error(err));
+}, []);
+
+const [warehouses, setWarehouses] = useState<typeof WAREHOUSES>([]);
+useEffect(() => {
+  fetch("http://localhost:5000/api/warehouses")
+    .then(res => res.json())
+    .then(data => {
+      console.log("WAREHOUSE OBJECT:", warehouses[0]);
+      setWarehouses(data.data || data);
+    })
+    .catch(err => console.error(err));
+}, []);
+
+//  //(Search dropdown states)//
+//   const [showItemDropdown, setShowItemDropdown] = useState<Record<number, boolean>>({});
+//   const [itemSearch, setItemSearch] = useState<Record<number, string>>({});
+
+//   useEffect(() => {
+//   const close = (e) => {
+//     if (!e.target.closest(".item-dropdown")) {
+//       setShowItemDropdown({});
+//     }
+//   };
+
+//   window.addEventListener("click", close);
+//   return () => window.removeEventListener("click", close);
+// }, []);
+
+//item search popup states
+const [showItemModal, setShowItemModal] = useState(false);
+const [activeIndex, setActiveIndex] = useState(null);
+const [itemSearch, setItemSearch] = useState("");
+
+const [showVendorModal, setShowVendorModal] = useState(false);
+const [activeVendorIndex, setActiveVendorIndex] = useState(null);
+const [vendorSearch, setVendorSearch] = useState("");
+
+const [showWarehouseModal, setShowWarehouseModal] = useState(false);
+const [warehouseSearch, setWarehouseSearch] = useState("");
+
+
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   /** ✅ Lock editing after leaving Draft */
@@ -286,7 +346,7 @@ export default function PurchaseRequisitionCreatePage() {
     form.items.forEach((line, idx) => {
       const prefix = `item_${idx}_`;
 
-      if (!line.item_type) e[prefix + "item_type"] = "Item Type is required";
+      // if (!line.item_type) e[prefix + "item_type"] = "Item Type is required";
 
       if (line.item_type === "Inventory" && !line.item_id.trim()) {
         e[prefix + "item_id"] = "Item ID required for Inventory";
@@ -371,6 +431,8 @@ export default function PurchaseRequisitionCreatePage() {
   const updateItem = (idx: number, patch: Partial<PRItemLine>) => {
     if (isLocked) return;
 
+
+
     setForm((p) => {
       const next = [...p.items];
       const merged = { ...next[idx], ...patch };
@@ -380,15 +442,28 @@ export default function PurchaseRequisitionCreatePage() {
     });
   };
 
-  const removeItem = (idx: number) => {
-    if (isLocked) return;
-    setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
-  };
+
+const removeItem = (idx: number) => {
+  if (isLocked) return;
+  setForm((p) => ({ ...p, items: p.items.filter((_, i) => i !== idx) }));
+};
+
+const handleItemSelect = (idx: number, itemCode: string) => {
+  if (isLocked) return;
+  const selectedItem = itemsMaster.find((it: any) => it.code === itemCode);
+  if (selectedItem) {
+    updateItem(idx, { 
+      item_id: itemCode,
+      item_description: selectedItem.name,
+      uom: selectedItem.uom || ""
+    });
+  }
+};
 
   /** Delivery location -> address auto */
   const onSelectWarehouse = (warehouseId: string) => {
     if (isLocked) return;
-    const wh = WAREHOUSES.find((w) => w.id === warehouseId);
+    const wh = warehouses.find((w) => (w.warehouse_id || w.id) === warehouseId);
     setForm((p) => ({
       ...p,
       delivery_location: warehouseId,
@@ -449,10 +524,107 @@ export default function PurchaseRequisitionCreatePage() {
     setActiveTab("basic");
   };
 
-  const onSaveDraft = () => {
-    console.log("Save Draft:", form);
-    alert("Saved Draft (demo). Next: connect API.");
-  };
+  const onSaveDraft = async () => {
+  try {
+
+    console.log("FORM ATTACHMENTS:", form.attachments);
+
+    // 🔴 VALIDATION
+    if (form.items.length === 0) {
+      alert("Add at least one item");
+      setActiveTab("items");
+      return;
+    }
+
+    // 🔥 PREPARE PAYLOAD
+   const payload = {
+  department: form.department || null,
+  cost_center: form.cost_center || null,
+  project_code: form.project_code || null,
+  priority: form.priority || null,
+  pr_type: form.pr_type || null,
+  justification: form.justification || null,
+
+  delivery_location: form.delivery_location,
+  delivery_address: form.delivery_address,
+  currency: form.currency,
+  tax_estimate: form.tax_estimate,
+
+  // 🔥 ITEMS
+  items: form.items.map((item) => ({
+    item_type: item.item_type,
+    item_id: item.item_id,
+    item_description: item.item_description,
+    uom: item.uom,
+    requested_qty: item.requested_qty,
+    estimated_unit_price: item.estimated_unit_price,
+    required_by_date: item.required_by_date,
+    preferred_vendor: item.preferred_vendor,
+  })),
+
+  
+ 
+
+
+
+  // 🔥 ADD THIS (IMPORTANT)
+  attachments: form.attachments.map((a) => ({
+    file_name: a.attachment_file?.name || "",
+    file_url: "" // later we handle file upload
+  }))
+};
+
+    console.log("FINAL PAYLOAD:", payload);
+
+    //formdata is needed to send files
+
+    // 🔥 CREATE FORMDATA
+const formData = new FormData();
+
+// 🔹 Add normal fields
+Object.keys(payload).forEach((key) => {
+  if (key !== "attachments" && key !== "items") {
+    formData.append(key, String((payload as Record<string, any>)[key] ?? ""));
+  }
+});
+
+formData.append("items", JSON.stringify(payload.items || []));
+// 🔹 Add files
+form.attachments.forEach((a) => {
+  if (a.attachment_file) {
+    formData.append("attachments", a.attachment_file);
+  }
+});
+
+  
+
+    // 🔥 API CALL
+    const res = await fetch("http://localhost:5000/api/pr/create", {
+      method: "POST",
+      
+      body: formData,
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("PR Saved Successfully");
+
+       
+
+      // 🔥 RESET FORM
+      setForm(initialState);
+
+      // 🔥 REDIRECT TO LIST
+    router.push("/PurchaseRequisitionList");
+    } else {
+      alert(data.message);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error saving PR");
+  }
+};
 
   /** ✅ NEW: Send for Approval (does validations) */
   const onSendForApproval = () => {
@@ -785,20 +957,20 @@ export default function PurchaseRequisitionCreatePage() {
               </div>
 
               {/* ✅ H-scroll ONLY inside this box (bottom scrollbar) */}
-              <div className="w-full min-w-0 max-w-full overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-                <table className="min-w-[1500px] w-full border-collapse text-sm whitespace-nowrap">
+              <div className="w-full overflow-x-auto overflow-visible relative">
+                <table className="w-full border-collapse text-sm whitespace-nowrap">
                   <thead className="bg-gray-100 dark:bg-gray-800">
                     <tr>
-                      <th className="px-4 py-3 text-left">Item Type *</th>
-                      <th className="px-4 py-3 text-left">Item ID</th>
-                      <th className="px-4 py-3 text-left">Description *</th>
-                      <th className="px-4 py-3 text-left">UOM *</th>
-                      <th className="px-4 py-3 text-left">Qty *</th>
-                      <th className="px-4 py-3 text-left">Unit Price</th>
-                      <th className="px-4 py-3 text-left">Total</th>
-                      <th className="px-4 py-3 text-left">Required By *</th>
-                      <th className="px-4 py-3 text-left">Preferred Vendor</th>
-                      <th className="px-4 py-3 text-left">Action</th>
+                      {/* <th className="px-4 py-3 text-left">Item Type *</th> */}
+                      <th className="px-4 py-3 text-left w-[180px]">Item Code *</th>
+                      <th className="px-4 py-3 text-left w-[260px]">Description *</th>
+                      <th className="px-4 py-3 text-left w-[120px]">UOM *</th>
+                      <th className="px-4 py-3 text-left w-[100px]">Qty *</th>
+                      <th className="px-4 py-3 text-left w-[120px]">Unit Price</th>
+                      <th className="px-4 py-3 text-left w-[120px]">Total</th>
+                      <th className="px-4 py-3 text-left w-[160px]">Required By *</th>
+                      <th className="px-4 py-3 text-left w-[200px]">Preferred Vendor</th>
+                      <th className="px-4 py-3 text-left w-[100px]">Action</th>
                     </tr>
                   </thead>
 
@@ -811,46 +983,52 @@ export default function PurchaseRequisitionCreatePage() {
                           key={line.pr_item_id}
                           className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
                         >
-                          <td className="px-4 py-3">
+                          {/* <td className="px-4 py-3">
                             <select
-                              value={line.item_type}
+                              value={line.item_type || ""}
                               disabled={isLocked}
-                              onChange={(e) => updateItem(idx, { item_type: e.target.value as ItemType })}
+                              onChange={(e) =>
+                                updateItem(idx, { item_type: e.target.value as ItemType })
+                              }
                               onBlur={() => markTouched(k("item_type"))}
                               className={classNames(
                                 inputBase,
                                 "min-w-[160px]",
                                 isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
-                                showError(k("item_type")) && "border-brand-500"
+                                  showError(k("item_type")) && "border-brand-500"
                               )}
-                            >
-                              <option value="Inventory">Inventory</option>
-                              <option value="Non-inventory">Non-inventory</option>
+                              >
+                              <option value="">Select type</option>
+                              <option value="Raw Material">Raw Material</option>
+                              <option value="Finished Goods">Finished Goods</option>
+                              <option value="Semi-Finished">Semi-Finished</option>
+                              <option value="Consumable">Consumable</option>
                               <option value="Service">Service</option>
                             </select>
                             {showError(k("item_type")) && (
                               <p className="mt-1 text-xs text-brand-500">{errors[k("item_type")]}</p>
                             )}
-                          </td>
+                          </td> */}
 
-                          <td className="px-4 py-3">
-                            <input
-                              value={line.item_id}
-                              disabled={isLocked}
-                              onChange={(e) => updateItem(idx, { item_id: e.target.value })}
-                              onBlur={() => markTouched(k("item_id"))}
-                              placeholder="SKU ID"
-                              className={classNames(
-                                inputBase,
-                                "min-w-[140px]",
-                                isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
-                                showError(k("item_id")) && "border-brand-500"
-                              )}
-                            />
-                            {showError(k("item_id")) && (
-                              <p className="mt-1 text-xs text-brand-500">{errors[k("item_id")]}</p>
-                            )}
-                          </td>
+                   
+
+                        <td className="px-4 py-3">
+  <div
+    onClick={() => {
+      setShowItemModal(true);
+      setActiveIndex(idx);
+    }}
+    className={classNames(
+      inputBase,
+      "cursor-pointer flex items-center"
+    )}
+  >
+    {itemsMaster.find((i) => i.code === line.item_id)?.name || (
+      <span className="text-gray-400">Select Item</span>
+    )}
+  </div>
+</td>
+
 
                           <td className="px-4 py-3">
                             <input
@@ -953,25 +1131,22 @@ export default function PurchaseRequisitionCreatePage() {
                             )}
                           </td>
 
-                          <td className="px-4 py-3">
-                            <select
-                              value={line.preferred_vendor}
-                              disabled={isLocked}
-                              onChange={(e) => updateItem(idx, { preferred_vendor: e.target.value })}
-                              className={classNames(
-                                inputBase,
-                                "min-w-[190px]",
-                                isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5"
-                              )}
-                            >
-                              <option value="">Optional</option>
-                              {VENDORS.map((v) => (
-                                <option key={v} value={v}>
-                                  {v}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
+                         <td className="px-4 py-3">
+  <div
+    onClick={() => {
+      setShowVendorModal(true);
+      setActiveVendorIndex(idx);
+    }}
+    className={classNames(
+      inputBase,
+      "cursor-pointer flex items-center"
+    )}
+  >
+    {vendors.find((v) => (v.id || v.vendor_id) === line.preferred_vendor)?.name || (
+      <span className="text-gray-400">Select Vendor</span>
+    )}
+  </div>
+</td>
 
                           <td className="px-4 py-3">
                             <button
@@ -1002,6 +1177,8 @@ export default function PurchaseRequisitionCreatePage() {
                     )}
                   </tbody>
                 </table>
+                
+
               </div>
 
               <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
@@ -1027,24 +1204,14 @@ export default function PurchaseRequisitionCreatePage() {
                   <label className={labelBase}>
                     Delivery Location <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                   </label>
-                  <select
-                    value={form.delivery_location}
-                    disabled={isLocked}
-                    onChange={(e) => onSelectWarehouse(e.target.value)}
-                    onBlur={() => markTouched("delivery_location")}
-                    className={classNames(
-                      inputBase,
-                      isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
-                      showError("delivery_location") && "border-brand-500"
-                    )}
-                  >
-                    <option value="">Select</option>
-                    {WAREHOUSES.map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({w.id})
-                      </option>
-                    ))}
-                  </select>
+                  <div
+  onClick={() => setShowWarehouseModal(true)}
+  className={classNames(inputBase, "cursor-pointer flex items-center")}
+>
+  {warehouses.find(w => (w.warehouse_id || w.id) === form.delivery_location)?.warehouse_name || (
+    <span className="text-gray-400">Select</span>
+  )}
+</div>
                   {showError("delivery_location") && (
                     <p className="mt-1 text-xs text-brand-500">{errors.delivery_location}</p>
                   )}
@@ -1375,6 +1542,203 @@ export default function PurchaseRequisitionCreatePage() {
           Send for Approval
         </button>
       </div>
+
+        
+          {/* 🔥 ADD ITEM MODAL HERE */}
+      {showItemModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+    
+    <div className="bg-white w-[500px] rounded-xl shadow-lg overflow-hidden">
+
+      {/* 🔴 HEADER */}
+      <div
+        className="px-4 py-3 text-white font-semibold text-lg"
+        style={{ backgroundColor: "#C8102E" }}
+      >
+        Select Item
+      </div>
+
+      {/* ⚪ BODY */}
+      <div className="p-4">
+
+        <input
+          type="text"
+          placeholder="Search item..."
+          value={itemSearch}
+          onChange={(e) => setItemSearch(e.target.value)}
+          className="w-full p-2 border rounded mb-3"
+        />
+
+        <div className="max-h-[300px] overflow-y-auto border rounded">
+          {itemsMaster
+            .filter((i) =>
+              (i.name || "")
+                .toLowerCase()
+                .includes(itemSearch.toLowerCase())
+            )
+            .map((i) => (
+              <div
+                key={i.code}
+                onClick={() => {
+                  handleItemSelect(activeIndex, i.code);
+                  setShowItemModal(false);
+                  setItemSearch("");
+                }}
+                className="px-3 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition"
+              >
+                {i.name}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* 🔵 FOOTER */}
+      <div className="flex justify-end gap-2 px-4 py-3 border-t bg-gray-50">
+        <button
+          onClick={() => setShowItemModal(false)}
+          className="px-4 py-2 text-white rounded-lg font-semibold"
+          style={{ backgroundColor: "#005F99" }}
+        >
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
+
+    {showVendorModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+    
+    <div className="bg-white w-[500px] rounded-xl shadow-lg overflow-hidden">
+
+      {/* 🔴 HEADER */}
+      <div
+        className="px-4 py-3 text-white font-semibold text-lg"
+        style={{ backgroundColor: "#C8102E" }}
+      >
+        Select Vendor
+      </div>
+
+      {/* ⚪ BODY */}
+      <div className="p-4">
+
+        <input
+          type="text"
+          placeholder="Search vendor..."
+          value={vendorSearch}
+          onChange={(e) => setVendorSearch(e.target.value)}
+          className="w-full p-2 border rounded mb-3"
+        />
+
+        <div className="max-h-[300px] overflow-y-auto border rounded">
+          {vendors
+            .filter((v) =>
+              (v.name || "")
+                .toLowerCase()
+                .includes(vendorSearch.toLowerCase())
+            )
+            .map((v) => (
+              <div
+                key={v.vendor_id || v.id}
+                onClick={() => {
+                  updateItem(activeVendorIndex, {
+                    preferred_vendor: v.vendor_id || v.id,
+                  });
+                  setShowVendorModal(false);
+                  setVendorSearch("");
+                }}
+                className="px-3 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition"
+              >
+                {v.name}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* 🔵 FOOTER */}
+      <div className="flex justify-end gap-2 px-4 py-3 border-t bg-gray-50">
+        <button
+          onClick={() => setShowVendorModal(false)}
+          className="px-4 py-2 text-white rounded-lg font-semibold"
+          style={{ backgroundColor: "#005F99" }}
+        >
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
+{showWarehouseModal && (
+  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">
+    
+    <div className="bg-white w-[500px] rounded-xl shadow-lg overflow-hidden">
+
+      {/* 🔴 HEADER */}
+      <div
+        className="px-4 py-3 text-white font-semibold text-lg"
+        style={{ backgroundColor: "#C8102E" }}
+      >
+        Select Warehouse
+      </div>
+
+      {/* ⚪ BODY */}
+      <div className="p-4">
+
+        <input
+          type="text"
+          placeholder="Search warehouse..."
+          value={warehouseSearch}
+          onChange={(e) => setWarehouseSearch(e.target.value)}
+          className="w-full p-2 border rounded mb-3"
+        />
+
+        <div className="max-h-[300px] overflow-y-auto border rounded">
+          {warehouses
+            .filter((w) =>
+              (w.warehouse_name || "")
+                .toLowerCase()
+                .includes(warehouseSearch.toLowerCase())
+            )
+            .map((w) => (
+              <div
+                key={w.warehouse_id || w.id}
+                onClick={() => {
+                  setForm((prev) => ({
+                    ...prev,
+                    delivery_location: w.warehouse_id || w.id,
+                    delivery_address: w.address || "",
+                  }));
+                  setShowWarehouseModal(false);
+                  setWarehouseSearch("");
+                }}
+                className="px-3 py-2 hover:bg-blue-50 cursor-pointer"
+              >
+                {w.warehouse_name}
+              </div>
+            ))}
+        </div>
+      </div>
+
+      {/* 🔵 FOOTER */}
+      <div className="flex justify-end gap-2 px-4 py-3 border-t bg-gray-50">
+        <button
+          onClick={() => setShowWarehouseModal(false)}
+          className="px-4 py-2 text-white rounded-lg font-semibold"
+          style={{ backgroundColor: "#005F99" }}
+        >
+          Close
+        </button>
+      </div>
+
+    </div>
+  </div>
+)}
+
+
     </div>
   );
 }

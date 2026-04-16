@@ -107,6 +107,7 @@ const handleFileUpload = async (e) => {
 
 
   const [searchName, setSearchName] = useState("");
+  const [category, setCategory] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   
@@ -120,10 +121,10 @@ const handleFileUpload = async (e) => {
     return data.filter((item) =>
       item.code.toLowerCase().includes(searchCode.toLowerCase()) &&
       item.name.toLowerCase().includes(searchName.toLowerCase()) &&
-      (categoryFilter ? item.category === categoryFilter : true) &&
+      item.category?.toLowerCase().includes(category.toLowerCase()) &&
       (statusFilter ? item.status === statusFilter : true)
     );
-  }, [data, searchCode, searchName, categoryFilter, statusFilter]);
+  }, [data, searchCode, searchName, category, statusFilter]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
 
@@ -372,19 +373,16 @@ const handleFileUpload = async (e) => {
 
                 <th className="px-4 py-3 text-left">
                   Category
-                  <select
-                    className="mt-2 w-full border rounded px-2 py-1 text-xs"
-                    value={categoryFilter}
-                    onChange={(e) => {
-                      setCategoryFilter(e.target.value);
-                      setCurrentPage(1);
-                    }}
-                  >
-                    <option value="">All</option>
-                    <option value="Machinery">Machinery</option>
-                    <option value="Safety Equipment">Safety Equipment</option>
-                  </select>
-                </th>
+                <input
+                className="mt-2 w-full border rounded px-2 py-1 text-xs"
+                placeholder="Search"
+                value={category}
+                 onChange={(e) => {
+                 setCategory(e.target.value);
+                  setCurrentPage(1);
+                  }}
+                   />
+                  </th>
 
                 <th className="px-4 py-3 text-left">UOM</th>
 

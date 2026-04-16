@@ -8,6 +8,7 @@ const uomRoutes = require("./routes/uom.routes.js"); // ✅ Add UOM routes
 const demandRoutes = require("./routes/demand.routes.js"); // ✅ Add demand forecast routes
 const warehouseRoutes = require("./routes/warehouse.routes.js"); // ✅ Add  warehouse routes
 const customerRoutes = require("./routes/customerRoutes"); // ✅ Add  customer routes
+const prRoutes = require("./routes/prRoutes"); // ✅ Add PR routes
 
 const app = express();
 
@@ -34,6 +35,10 @@ app.use("/api/demand", demandRoutes); // 👈 this is  demand forecast api
 
 // Customer APIs
 app.use("/api/customers", customerRoutes); // 👈 this is  customer api
+
+// PR APIs
+app.use("/api/pr", prRoutes); // 👈 this is  PR api
+
 
 app.listen(5000, () => {
   console.log("SIMS backend running on port 5000");

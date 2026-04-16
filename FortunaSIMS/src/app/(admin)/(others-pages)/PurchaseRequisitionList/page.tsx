@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 // ✅ Add-on (for navigation to edit PR form)
 import { useRouter } from "next/navigation";
@@ -25,6 +25,7 @@ type ApprovalStep = {
 };
 
 interface PurchaseRequisition {
+  pr_id: string;
   prNo: string;
   title: string;
   department: Department;
@@ -91,126 +92,52 @@ function withinRange(dateISO: string, from?: string, to?: string) {
 export default function PurchaseRequisitionListPage() {
   const router = useRouter();
 
-  const [data, setData] = useState<PurchaseRequisition[]>([
-    {
-      prNo: "PR-000101",
-      title: "Spare parts for conveyor maintenance",
-      department: "Maintenance",
-      requestor: "Sandeep",
-      requiredBy: "2026-02-10",
-      createdOn: "2026-02-01",
-      priority: "High",
-      status: "Pending Approval",
-      totalItems: 6,
-      estimatedValue: 145000,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-    },
-    {
-      prNo: "PR-000102",
-      title: "New barcode scanners",
-      department: "IT",
-      requestor: "Aparna",
-      requiredBy: "2026-02-15",
-      createdOn: "2026-02-02",
-      priority: "Medium",
-      status: "Submitted",
-      totalItems: 3,
-      estimatedValue: 78000,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-    },
-    {
-      prNo: "PR-000103",
-      title: "Packaging materials (monthly)",
-      department: "Stores",
-      requestor: "Ravi",
-      requiredBy: "2026-02-08",
-      createdOn: "2026-01-30",
-      priority: "Urgent",
-      status: "Approved",
-      totalItems: 12,
-      estimatedValue: 220000,
-      currentApprovalLevel: 3,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head", decision: "Approved", decidedAt: "2026-01-31", remarks: "OK" },
-        { level: 2, approverRole: "Finance", decision: "Approved", decidedAt: "2026-02-01", remarks: "Budget available" },
-        { level: 3, approverRole: "Procurement", decision: "Approved", decidedAt: "2026-02-02", remarks: "Proceed RFQ" },
-      ],
-    },
-    {
-      prNo: "PR-000104",
-      title: "Office supplies",
-      department: "Admin",
-      requestor: "Divya",
-      requiredBy: "2026-02-20",
-      createdOn: "2026-02-01",
-      priority: "Low",
-      status: "Rejected",
-      totalItems: 9,
-      estimatedValue: 18000,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head", decision: "Rejected", decidedAt: "2026-02-02", remarks: "Not required now" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-    },
-    {
-      prNo: "PR-000105",
-      title: "Forklift servicing contract",
-      department: "Operations",
-      requestor: "Kiran",
-      requiredBy: "2026-02-18",
-      createdOn: "2026-02-03",
-      priority: "High",
-      status: "Pending Approval",
-      totalItems: 1,
-      estimatedValue: 95000,
-      currentApprovalLevel: 2,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head", decision: "Approved", decidedAt: "2026-02-03", remarks: "Approved" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-    },
+  const [data, setData] = useState<PurchaseRequisition[]>([]);
 
-    // ✅ Add-on sample draft row (you can remove later)
-    {
-      prNo: "PR-000106",
-      title: "Draft: Laptop procurement for new joiners",
-      department: "IT",
-      requestor: "Sandeep",
-      requiredBy: "2026-02-22",
-      createdOn: "2026-02-03",
-      priority: "Medium",
-      status: "Draft",
-      totalItems: 5,
-      estimatedValue: 250000,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      draftPayload: {
-        // ✅ optional: PR Create page form snapshot
-        prNo: "PR-000106",
-        department: "IT",
-        priority: "Medium",
-        title: "Laptop procurement for new joiners",
-        items: [{ item: "Laptop", qty: 5, price: 50000 }],
-      },
-    },
-  ]);
+  const fetchPRs = async () => {
+  setLoading(true); // ✅ start loading
+
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/list");
+    const data = await res.json();
+
+    if (data.success) {
+      const formatted: PurchaseRequisition[] = data.data.map((pr: any) => ({
+        pr_id: pr.pr_id,
+        prNo: pr.pr_number,
+        title: pr.justification || "PR Request",
+        department: pr.department,
+        requestor: pr.requested_by,
+        requiredBy: pr.required_by_date || "-", // improved
+        createdOn: pr.created_at?.split("T")[0],
+        priority: pr.priority,
+        status: pr.status,
+        totalItems: 0,
+        estimatedValue: pr.estimated_pr_value || 0,
+        currentApprovalLevel: 1,
+        approvalRoute: [
+          { level: 1, approverRole: "Department Head" },
+          { level: 2, approverRole: "Finance" },
+          { level: 3, approverRole: "Procurement" },
+        ],
+      }));
+
+      setData(formatted);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Failed to load PR list");
+  } finally {
+    setLoading(false); // ✅ stop loading
+  }
+};
+  
+useEffect(() => {
+  fetchPRs();
+}, []);
+
+const [loading, setLoading] = useState(false);
+
 
   /** ✅ Add-on: tab state */
   const [activeTab, setActiveTab] = useState<ListTab>("all");
@@ -421,28 +348,32 @@ export default function PurchaseRequisitionListPage() {
     alert(`Edit Draft: navigate to PR form with data prefill for ${pr.prNo} (demo)`);
   };
 
-  const onSendDraftForApproval = (prNo: string) => {
-    const ok = confirm(`Send ${prNo} for approval?`);
-    if (!ok) return;
+  const onSendDraftForApproval = async (pr_id: string) => {
+  const ok = confirm("Send for approval?");
+  if (!ok) return;
 
-    setData((prev) =>
-      prev.map((pr) => {
-        if (pr.prNo !== prNo) return pr;
-        if (pr.status !== "Draft") return pr;
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pr_id }),
+    });
 
-        // Draft -> Submitted (and typically moves into Pending Approval)
-        return {
-          ...pr,
-          status: "Submitted",
-          currentApprovalLevel: 1,
-        };
-      })
-    );
+    const data = await res.json();
 
-    // optional UX: switch to all tab after send
-    setActiveTab("all");
-    setCurrentPage(1);
-  };
+    if (data.success) {
+      alert("PR sent for approval successfully");
+      await fetchPRs(); // ✅ refresh without reload
+    } else {
+      alert(data.message);
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error sending PR");
+  }
+};
 
   const onDeleteDraft = (prNo: string) => {
     const ok = confirm(`Delete draft ${prNo}?`);
@@ -698,97 +629,129 @@ export default function PurchaseRequisitionListPage() {
                 </thead>
 
                 <tbody className="dark:text-gray-200">
-                  {paginatedData.map((pr) => (
-                    <tr
-                      key={pr.prNo}
-                      className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
-                    >
-                      <td className="px-4 py-3 font-semibold">{pr.prNo}</td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900 dark:text-white">
-                          {pr.title}
-                        </div>
-                        <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                          Required By: <span className="font-semibold">{pr.requiredBy}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{pr.department}</td>
-                      <td className="px-4 py-3">{pr.requestor}</td>
-                      <td className="px-4 py-3">
-                        <span className={priorityPill(pr.priority)}>{pr.priority}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={statusPill(pr.status)}>{pr.status}</span>
-                        {pr.status === "Pending Approval" && (
-                          <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
-                            Level {pr.currentApprovalLevel} •{" "}
-                            {pr.approvalRoute.find((s) => s.level === pr.currentApprovalLevel)?.approverRole}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3">{pr.createdOn}</td>
-                      <td className="px-4 py-3">{pr.totalItems}</td>
-                      <td className="px-4 py-3 font-semibold">{formatINR(pr.estimatedValue)}</td>
-                      <td className="px-4 py-3 space-x-3">
-                        <button
-                          className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => alert(`View: open PR details for ${pr.prNo}`)}
-                        >
-                          View
-                        </button>
+  {loading ? (
+    // 🔄 LOADING STATE
+    <tr>
+      <td colSpan={10} className="text-center py-6 text-gray-500">
+        Loading PRs...
+      </td>
+    </tr>
+  ) : paginatedData.length > 0 ? (
+    // ✅ DATA STATE
+    paginatedData.map((pr) => (
+      <tr
+        key={pr.pr_id}
+        className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
+      >
+        <td className="px-4 py-3 font-semibold">{pr.prNo}</td>
 
-                        {/* ✅ EXISTING APPROVAL FLOW stays SAME */}
-                        {(pr.status === "Submitted" || pr.status === "Pending Approval") && (
-                          <button
-                            className="font-semibold hover:underline"
-                            style={{ color: FORTUNA_SECONDARY_BLUE }}
-                            onClick={() => openApproval(pr.prNo)}
-                          >
-                            Approve / Reject
-                          </button>
-                        )}
+        <td className="px-4 py-3">
+          <div className="font-semibold text-gray-900 dark:text-white">
+            {pr.title}
+          </div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
+            Required By:{" "}
+            <span className="font-semibold">{pr.requiredBy}</span>
+          </div>
+        </td>
 
-                        {/* ✅ ADD-ON: Draft-specific actions (only in Drafts tab OR if status Draft) */}
-                        {pr.status === "Draft" && (
-                          <>
-                            <button
-                              className="font-semibold hover:underline"
-                              style={{ color: FORTUNA_SECONDARY_BLUE }}
-                              onClick={() => onEditDraft(pr)}
-                            >
-                              Edit
-                            </button>
+        <td className="px-4 py-3">{pr.department}</td>
+        <td className="px-4 py-3">{pr.requestor}</td>
 
-                            <button
-                              className="font-semibold hover:underline text-emerald-700"
-                              onClick={() => onSendDraftForApproval(pr.prNo)}
-                            >
-                              Send for Approval
-                            </button>
+        <td className="px-4 py-3">
+          <span className={priorityPill(pr.priority)}>
+            {pr.priority}
+          </span>
+        </td>
 
-                            <button
-                              className="font-semibold text-rose-600 hover:underline"
-                              onClick={() => onDeleteDraft(pr.prNo)}
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+        <td className="px-4 py-3">
+          <span className={statusPill(pr.status)}>
+            {pr.status}
+          </span>
 
-                  {paginatedData.length === 0 && (
-                    <tr>
-                      <td
-                        className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300"
-                        colSpan={10}
-                      >
-                        No PRs found for current filters.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
+          {pr.status === "Pending Approval" && (
+            <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
+              Level {pr.currentApprovalLevel} •{" "}
+              {
+                pr.approvalRoute.find(
+                  (s) => s.level === pr.currentApprovalLevel
+                )?.approverRole
+              }
+            </div>
+          )}
+        </td>
+
+        <td className="px-4 py-3">{pr.createdOn}</td>
+        <td className="px-4 py-3">{pr.totalItems}</td>
+
+        <td className="px-4 py-3 font-semibold">
+          {formatINR(pr.estimatedValue)}
+        </td>
+
+        <td className="px-4 py-3 space-x-3">
+          {/* VIEW */}
+          <button
+            className="font-semibold text-blue-600 hover:underline"
+            onClick={() =>
+              alert(`View: open PR details for ${pr.prNo}`)
+            }
+          >
+            View
+          </button>
+
+          {/* APPROVAL */}
+          {(pr.status === "Submitted" ||
+            pr.status === "Pending Approval") && (
+            <button
+              className="font-semibold hover:underline"
+              style={{ color: FORTUNA_SECONDARY_BLUE }}
+              onClick={() => openApproval(pr.prNo)}
+            >
+              Approve / Reject
+            </button>
+          )}
+
+          {/* DRAFT ACTIONS */}
+          {pr.status === "Draft" && (
+            <>
+              <button
+                className="font-semibold hover:underline"
+                style={{ color: FORTUNA_SECONDARY_BLUE }}
+                onClick={() => onEditDraft(pr)}
+              >
+                Edit
+              </button>
+
+              <button
+                className="font-semibold hover:underline text-emerald-700"
+                onClick={() => onSendDraftForApproval(pr.pr_id)}
+              >
+                Send for Approval
+              </button>
+
+              <button
+                className="font-semibold text-rose-600 hover:underline"
+                onClick={() => onDeleteDraft(pr.prNo)}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </td>
+      </tr>
+    ))
+  ) : (
+    // ❌ EMPTY STATE
+    <tr>
+      <td
+        className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300"
+        colSpan={10}
+      >
+        No PRs found for current filters.
+      </td>
+    </tr>
+  )}
+</tbody>
               </table>
             </div>
 
