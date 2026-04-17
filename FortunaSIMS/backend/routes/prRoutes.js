@@ -29,7 +29,7 @@ router.post("/submit", submitPR);
 // ===============================
 router.get("/:id", getPRById);
 
-// 🔥 MULTIPLE FILES SUPPORT
-router.post("/create", upload.array("attachments"), createPR);
+// // 🔥 MULTIPLE FILES SUPPORT
+ router.post("/create", upload.array("attachments"), createPR);
 
 module.exports = router;

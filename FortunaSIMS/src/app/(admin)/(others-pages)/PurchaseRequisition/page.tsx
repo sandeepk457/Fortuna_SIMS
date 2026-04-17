@@ -188,6 +188,74 @@ export default function PurchaseRequisitionCreatePage() {
   const router = useRouter(); 
 
   const searchParams = useSearchParams();
+
+  const prId = searchParams.get("id");
+const mode = searchParams.get("mode");
+
+const isView = mode === "view";
+
+//view mode useEffect to fetch PR data and populate form//
+
+useEffect(() => {
+  console.log("🔥 VIEW MODE FETCH TRIGGERED:", prId);
+
+  if (!prId) return;
+
+  fetch(`http://localhost:5000/api/pr/${prId}`)
+    .then(res => res.json())
+    .then(res => {
+      console.log("🔥 PR DATA:", res);
+
+      if (!res.success) return;
+
+      const { header, items } = res.data;
+
+      setForm(prev => ({
+        ...prev,
+
+        pr_id: header.pr_id,
+        pr_number: header.pr_number,
+        pr_date: header.created_at?.split("T")[0] || "",
+        requested_by: header.requested_by,
+
+        department: header.department,
+        cost_center: header.cost_center,
+        project_code: header.project_code,
+        priority: header.priority,
+        pr_type: header.pr_type,
+        justification: header.justification,
+        pr_status: header.status,
+
+        delivery_location: header.delivery_location,
+        delivery_address: header.delivery_address,
+        currency: header.currency,
+        tax_estimate: String(header.tax_estimate || ""),
+
+        estimated_pr_value: header.estimated_pr_value || 0,
+        total_estimated_cost: header.total_estimated_cost || 0,
+
+        items: items.map((it: any) => ({
+          pr_item_id: it.pr_item_id,
+          item_type: it.item_type,
+          item_id: it.item_id,
+          item_description: it.item_description,
+          uom: it.uom,
+          requested_qty: String(it.requested_qty),
+          estimated_unit_price: String(it.estimated_unit_price),
+          estimated_total_cost: it.estimated_total_cost,
+          required_by_date: it.required_by_date?.split("T")[0],
+          preferred_vendor: it.preferred_vendor
+        }))
+      }));
+    })
+    .catch(err => console.error("❌ FETCH ERROR:", err));
+
+}, [prId]);
+
+console.log("PR ID:", prId);
+console.log("MODE:", mode);
+
+
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<PRFormState>(initialState);
 
@@ -671,6 +739,7 @@ form.attachments.forEach((a) => {
           )}
         </div>
 
+        {!isView && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
             Reset
@@ -697,6 +766,7 @@ form.attachments.forEach((a) => {
             Send for Approval
           </button>
         </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -912,6 +982,7 @@ form.attachments.forEach((a) => {
                   <span className="font-semibold">Note:</span> PR will feed into RFQ → PO after approval.
                 </div>
 
+                {!isView && (
                 <div className="flex flex-wrap gap-2">
                   <button
                     type="button"
@@ -931,6 +1002,7 @@ form.attachments.forEach((a) => {
                     Go to Item Details →
                   </button>
                 </div>
+                )}
               </div>
             </div>
           )}
@@ -943,7 +1015,7 @@ form.attachments.forEach((a) => {
                   <h4 className="text-base font-semibold text-gray-900 dark:text-white">Item Grid</h4>
                   <p className={helperBase}>Add multiple lines. Inline edit supported.</p>
                 </div>
-
+                {!isView && (
                 <div className="flex gap-2">
                   <button
                     type="button"
@@ -955,6 +1027,8 @@ form.attachments.forEach((a) => {
                     + Add Item
                   </button>
                 </div>
+                )}
+
               </div>
 
               {/* ✅ H-scroll ONLY inside this box (bottom scrollbar) */}
@@ -1148,7 +1222,7 @@ form.attachments.forEach((a) => {
     )}
   </div>
 </td>
-
+                          {!isView && (
                           <td className="px-4 py-3">
                             <button
                               type="button"
@@ -1162,6 +1236,7 @@ form.attachments.forEach((a) => {
                               Remove
                             </button>
                           </td>
+                          )}
                         </tr>
                       );
                     })}
@@ -1346,7 +1421,7 @@ form.attachments.forEach((a) => {
                  
                   <p className={helperBase}>Supporting documents for approvals & audit.</p>
                 </div>
-
+                {!isView && (
                 <button
                   type="button"
                   className={classNames(primaryBtn, "active:scale-95")}
@@ -1355,9 +1430,11 @@ form.attachments.forEach((a) => {
                   disabled={isLocked}
                 >
                   + Add Attachment
-                </button>
-              </div>
+                </button> 
+                )}
 
+              </div>
+               
               <div className="space-y-3">
                 {form.attachments.map((a, idx) => (
                   <div
@@ -1536,6 +1613,7 @@ form.attachments.forEach((a) => {
       </div>
 
       {/* Footer actions */}
+      {!isView && (
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
           Reset
@@ -1562,8 +1640,7 @@ form.attachments.forEach((a) => {
           Send for Approval
         </button>
       </div>
-
-        
+      )}
           {/* 🔥 ADD ITEM MODAL HERE */}
       {showItemModal && (
   <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[9999]">

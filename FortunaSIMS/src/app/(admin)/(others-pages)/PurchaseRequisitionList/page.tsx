@@ -3,7 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 // ✅ Add-on (for navigation to edit PR form)
 import { useRouter } from "next/navigation";
-import AttachmentList from "@/components/AttachmentList";
+
 
 
 /** Fortuna Theme Colors */
@@ -692,13 +692,13 @@ const [loading, setLoading] = useState(false);
         <td className="px-4 py-3 space-x-3">
           {/* VIEW */}
           <button
-            className="font-semibold text-blue-600 hover:underline"
-            onClick={() =>
-              alert(`View: open PR details for ${pr.prNo}`)
-            }
-          >
-            View
-          </button>
+  className="font-semibold text-blue-600 hover:underline"
+  onClick={() =>
+    router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=view`)
+  }
+>
+  View
+</button>
 
           {/* APPROVAL */}
           {(pr.status === "Submitted" ||
