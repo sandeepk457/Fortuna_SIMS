@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import  { useRouter } from "next/navigation";
+import AttachmentList from "@/components/AttachmentList";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -1342,6 +1343,7 @@ form.attachments.forEach((a) => {
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h4 className="text-base font-semibold text-gray-900 dark:text-white">Attachments & Notes</h4>
+                 
                   <p className={helperBase}>Supporting documents for approvals & audit.</p>
                 </div>
 
@@ -1389,7 +1391,7 @@ form.attachments.forEach((a) => {
                         className={classNames(inputBase, "px-2 py-2", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       />
                     </div>
-
+                   
                     <div className="sm:col-span-2 flex items-end justify-end">
                       <button
                         type="button"
@@ -1408,7 +1410,25 @@ form.attachments.forEach((a) => {
                     No attachments added.
                   </div>
                 )}
+
+             {form.attachments.length > 0 && (
+    <div className="mt-4">
+      <h5 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+        Uploaded Files
+      </h5>
+
+      <AttachmentList attachments={form.attachments} />
+    </div>
+  )}
+
+
+
+
               </div>
+
+
+
+
 
               <div>
                 <label className={labelBase}>

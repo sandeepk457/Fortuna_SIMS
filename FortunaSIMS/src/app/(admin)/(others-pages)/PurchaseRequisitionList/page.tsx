@@ -3,6 +3,7 @@ import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 // ✅ Add-on (for navigation to edit PR form)
 import { useRouter } from "next/navigation";
+import AttachmentList from "@/components/AttachmentList";
 
 
 /** Fortuna Theme Colors */
