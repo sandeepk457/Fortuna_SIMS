@@ -193,6 +193,8 @@ export default function PurchaseRequisitionCreatePage() {
 const mode = searchParams.get("mode");
 
 const isView = mode === "view";
+const isEdit = mode === "edit";
+
 
 //view mode useEffect to fetch PR data and populate form//
 
@@ -208,7 +210,7 @@ useEffect(() => {
 
       if (!res.success) return;
 
-      const { header, items } = res.data;
+      const { header, items, attachments } = res.data;
 
       setForm(prev => ({
         ...prev,
@@ -224,6 +226,7 @@ useEffect(() => {
         priority: header.priority,
         pr_type: header.pr_type,
         justification: header.justification,
+        internal_notes: header.internal_notes || "",
         pr_status: header.status,
 
         delivery_location: header.delivery_location,
@@ -233,6 +236,8 @@ useEffect(() => {
 
         estimated_pr_value: header.estimated_pr_value || 0,
         total_estimated_cost: header.total_estimated_cost || 0,
+
+
 
         items: items.map((it: any) => ({
           pr_item_id: it.pr_item_id,
@@ -244,8 +249,23 @@ useEffect(() => {
           estimated_unit_price: String(it.estimated_unit_price),
           estimated_total_cost: it.estimated_total_cost,
           required_by_date: it.required_by_date?.split("T")[0],
-          preferred_vendor: it.preferred_vendor
-        }))
+          preferred_vendor: it.preferred_vendor || "" ,
+
+
+        })),
+
+        //attchments from DB//
+
+                attachments: (attachments || []).map((a: any) => ({
+                  attachment_id: a.attachment_id,
+                  attachment_type: a.attachment_type || "Other",
+                  attachment_file: null, // existing file → no File object
+                  file_name: a.file_name,
+                  file_path: a.file_path
+                  })),
+
+
+
       }));
     })
     .catch(err => console.error("❌ FETCH ERROR:", err));
@@ -268,6 +288,58 @@ useEffect(() => {
     })
     .catch(err => console.error(err));
 }, []);
+
+
+// useEffect(() => {
+//   if (!prId) return;
+
+//   fetch(`http://localhost:5000/api/pr/${prId}`)
+//     .then(res => res.json())
+//     .then(res => {
+//       if (!res.success) return;
+
+//       const { header, items } = res.data;
+
+//       setForm(prev => ({
+//         ...prev,
+
+//         pr_id: header.pr_id,
+//         pr_number: header.pr_number,
+//         pr_date: header.created_at?.split("T")[0] || "",
+//         requested_by: header.requested_by,
+
+//         department: header.department || "",
+//         cost_center: header.cost_center || "",
+//         project_code: header.project_code || "",
+//         priority: header.priority || "",
+//         pr_type: header.pr_type || "",
+//         justification: header.justification || "",
+//         pr_status: header.status || "Draft",
+
+//         delivery_location: header.delivery_location || "",
+//         delivery_address: header.delivery_address || "",
+//         currency: header.currency || "INR",
+//         tax_estimate: String(header.tax_estimate || ""),
+
+//         estimated_pr_value: header.estimated_pr_value || 0,
+//         total_estimated_cost: header.total_estimated_cost || 0,
+
+//         items: items.map((it: any) => ({
+//           pr_item_id: it.pr_item_id,
+//           item_type: it.item_type,
+//           item_id: it.item_id || "",
+//           item_description: it.item_description || "",
+//           uom: it.uom || "",
+//           requested_qty: String(it.requested_qty || ""),
+//           estimated_unit_price: String(it.estimated_unit_price || ""),
+//           estimated_total_cost: it.estimated_total_cost || 0,
+//           required_by_date: it.required_by_date?.split("T")[0] || "",
+//           preferred_vendor: it.preferred_vendor || "",
+//         }))
+//       }));
+//     });
+// }, [prId]);
+
 
 const [vendors, setVendors] = useState([]);
 useEffect(() => {
@@ -322,7 +394,7 @@ const [warehouseSearch, setWarehouseSearch] = useState("");
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
   /** ✅ Lock editing after leaving Draft */
-  const isLocked = form.pr_status !== "Draft";
+const isLocked = isView;
 
   /** Derived totals */
   const totals = useMemo(() => {
@@ -594,10 +666,12 @@ const handleItemSelect = (idx: number, itemCode: string) => {
   };
 
   const onSaveDraft = async () => {
+    console.log("🔥 INTERNAL NOTES:", form.internal_notes); 
+
   try {
 
     console.log("FORM ATTACHMENTS:", form.attachments);
-
+    
     // 🔴 VALIDATION
     if (form.items.length === 0) {
       alert("Add at least one item");
@@ -613,7 +687,7 @@ const handleItemSelect = (idx: number, itemCode: string) => {
   priority: form.priority || null,
   pr_type: form.pr_type || null,
   justification: form.justification || null,
-
+  internal_notes: form.internal_notes || null,
   delivery_location: form.delivery_location,
   delivery_address: form.delivery_address,
   currency: form.currency,
@@ -628,7 +702,7 @@ const handleItemSelect = (idx: number, itemCode: string) => {
     requested_qty: item.requested_qty,
     estimated_unit_price: item.estimated_unit_price,
     required_by_date: item.required_by_date,
-    preferred_vendor: item.preferred_vendor,
+    preferred_vendor: String(item.preferred_vendor || ""),
   })),
 
   
@@ -650,6 +724,8 @@ const handleItemSelect = (idx: number, itemCode: string) => {
     // 🔥 CREATE FORMDATA
 const formData = new FormData();
 
+
+
 // 🔹 Add normal fields
 Object.keys(payload).forEach((key) => {
   if (key !== "attachments" && key !== "items") {
@@ -665,14 +741,23 @@ form.attachments.forEach((a) => {
   }
 });
 
-  
+  const url = isEdit
+  ? `http://localhost:5000/api/pr/update/${prId}`
+  : `http://localhost:5000/api/pr/create`;
 
-    // 🔥 API CALL
-    const res = await fetch("http://localhost:5000/api/pr/create", {
-      method: "POST",
+const method = isEdit ? "PUT" : "POST";
+
+const res = await fetch(url, {
+  method,
+  body: formData,
+});
+
+    // // 🔥 API CALL
+    // const res = await fetch("http://localhost:5000/api/pr/create", {
+    //   method: "POST",
       
-      body: formData,
-    });
+    //   body: formData,
+    // });
 
     const data = await res.json();
 
@@ -899,7 +984,7 @@ form.attachments.forEach((a) => {
                     Project Code <span className={helperBase}>(Optional)</span>
                   </label>
                   <input
-                    value={form.project_code}
+                    value={form.project_code || ""}
                     disabled={isLocked}
                     onChange={(e) => setField("project_code", e.target.value)}
                     placeholder="Example: PRJ-ALPHA"
@@ -1299,7 +1384,7 @@ form.attachments.forEach((a) => {
                   </label>
                   <textarea
                     readOnly
-                    value={form.delivery_address}
+                    value={form.delivery_address || ""}
                     className={classNames(
                       inputBase,
                       "min-h-[100px] cursor-not-allowed bg-gray-50 dark:bg-white/5"
@@ -1512,12 +1597,16 @@ form.attachments.forEach((a) => {
                   Internal Notes <span className={helperBase}>(Optional)</span>
                 </label>
                 <textarea
-                  value={form.internal_notes}
-                  disabled={isLocked}
-                  onChange={(e) => setField("internal_notes", e.target.value)}
-                  className={classNames(inputBase, "min-h-[120px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
-                  placeholder="Notes for approvers"
-                />
+  value={form.internal_notes || ""}
+  disabled={isLocked}
+  onChange={(e) => setField("internal_notes", e.target.value)}
+  className={classNames(
+    inputBase,
+    "min-h-[120px] resize-y",
+    isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5"
+  )}
+  placeholder="Notes for approvers"
+/>
               </div>
 
               <div className="flex justify-end">

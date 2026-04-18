@@ -716,12 +716,13 @@ const [loading, setLoading] = useState(false);
           {pr.status === "Draft" && (
             <>
               <button
-                className="font-semibold hover:underline"
-                style={{ color: FORTUNA_SECONDARY_BLUE }}
-                onClick={() => onEditDraft(pr)}
-              >
-                Edit
-              </button>
+  className="font-semibold text-green-600 hover:underline"
+  onClick={() =>
+    router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=edit`)
+  }
+>
+  Edit
+</button>
 
               <button
                 className="font-semibold hover:underline text-emerald-700"

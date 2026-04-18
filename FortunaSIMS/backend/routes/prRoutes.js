@@ -1,13 +1,15 @@
 const express = require("express");
 const router = express.Router();
+
 const {
   createPR,
   getPRList,
   getPRById,
-  submitPR
+  submitPR,
+  updatePR   // ✅ ensure imported
 } = require("../controllers/prcontroller");
 
-const upload = require("../config/upload"); // or correct path
+const upload = require("../config/upload");
 
 // ===============================
 // 🆕 CREATE PR
@@ -25,11 +27,13 @@ router.get("/list", getPRList);
 router.post("/submit", submitPR);
 
 // ===============================
-// 📄 GET PR BY ID (⚠️ ALWAYS LAST)
+// ✏️ UPDATE PR
+// ===============================
+router.put("/update/:id", upload.array("attachments"), updatePR);
+
+// ===============================
+// 📄 GET PR BY ID (LAST)
 // ===============================
 router.get("/:id", getPRById);
-
-// // 🔥 MULTIPLE FILES SUPPORT
- router.post("/create", upload.array("attachments"), createPR);
 
 module.exports = router;
