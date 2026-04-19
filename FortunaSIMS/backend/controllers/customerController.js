@@ -29,6 +29,29 @@ const getCustomers = async (req, res) => {
   }
 };
 
+// get customer count (for dashboard)//
+
+const getCustomerCount = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT COUNT(*) AS total_customers 
+      FROM customers 
+      WHERE status = 'Active'
+    `);
+
+    res.json({
+      totalCustomers: Number(result.rows[0].total_customers || 0),
+    });
+
+  } catch (err) {
+    console.error("Error fetching customer count:", err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+};
+
 /**
  * ✅ SAVE CUSTOMER
  */
@@ -381,6 +404,7 @@ const updateCustomer = async (req, res) => {
 
   module.exports = {
   getCustomers,
+  getCustomerCount,
   saveCustomer,
   deleteCustomer,
   getNextCustomerCode,

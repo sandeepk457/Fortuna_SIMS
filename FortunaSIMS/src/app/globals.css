@@ -814,3 +814,662 @@ table thead select {
   background-color: #ffffff !important;
   border: 1px solid #e5e7eb;
 }
+
+/* ===============================
+   ⚡ PERFORMANCE SAFE TRANSITIONS
+   =============================== */
+
+button,
+a,
+input,
+textarea,
+select,
+.fortuna-card,
+.fortuna-kpi-card,
+.fortuna-tab {
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    background-color 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease;
+}
+
+/* ===============================
+   🧊 FORTUNA TAB SYSTEM
+   =============================== */
+
+.fortuna-tab {
+  position: relative;
+ transition: color 0.15s ease;
+}
+
+.fortuna-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, #C8102E, #005F99);
+  transition: width 0.3s ease;
+}
+
+.fortuna-tab-active::after {
+  width: 100%;
+}
+
+.fortuna-tab:hover {
+  transform: translateY(-1px);
+}
+
+/* ===============================
+   🧠 INPUT PREMIUM FOCUS
+   =============================== */
+
+input,
+textarea,
+select {
+  transition: all 0.25s ease;
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  transform: none;
+  box-shadow:
+    0 0 0 2px rgba(200, 16, 46, 0.12),
+    0 2px 6px rgba(200, 16, 46, 0.06);
+}
+
+
+/* ===============================
+   🚀 BUTTON EFFECTS
+   =============================== */
+
+button {
+  transition: all 0.25s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-theme-md);
+}
+
+button:active {
+  transform: scale(0.97);
+}
+
+
+/* ===============================
+   🎥 FORTUNA KEYFRAMES
+   =============================== */
+
+@keyframes fortunaFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fortunaPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(200, 16, 46, 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(200, 16, 46, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(200, 16, 46, 0);
+  }
+}
+
+/* ===============================
+   🧊 CARD HOVER
+   =============================== */
+
+.fortuna-card {
+  transition: all 0.3s ease;
+}
+
+.fortuna-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-theme-lg);
+}
+
+
+/* ===============================
+   📊 FORTUNA KPI CARDS
+   =============================== */
+
+.fortuna-kpi-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #ffffff, #f8fbfd);
+}
+
+/* subtle animated gradient glow */
+.fortuna-kpi-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(120deg, transparent, rgba(200,16,46,0.08), transparent);
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.fortuna-kpi-card:hover::before {
+  opacity: 1;
+}
+
+/* hover lift */
+.fortuna-kpi-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-theme-xl);
+}
+
+
+/* ===============================
+   🔢 KPI VALUE ANIMATION
+   =============================== */
+
+.fortuna-kpi-value {
+  display: inline-block;
+  animation: fortunaFadeIn 0.6s ease;
+}
+
+
+/* ===============================
+   🌈 ACTIVE CARD HIGHLIGHT
+   =============================== */
+
+.fortuna-kpi-active {
+  border: 1px solid rgba(200,16,46,0.4);
+  box-shadow:
+    0 0 0 1px rgba(200,16,46,0.2),
+    0 8px 20px rgba(200,16,46,0.15);
+}
+
+/* ===============================
+   🧠 FORTUNA SIMS LOGO ANIMATION
+   =============================== */
+
+.fortuna-logo {
+  animation: fortunaFloat 4s ease-in-out infinite;
+  transition: all 0.3s ease;
+}
+
+/* floating motion */
+@keyframes fortunaFloat {
+  0% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+  100% { transform: translateY(0px); }
+}
+
+/* hover glow */
+.fortuna-logo:hover {
+  filter: drop-shadow(0 0 10px rgba(200,16,46,0.5));
+  transform: scale(1.05);
+}
+
+
+/* ===============================
+   🧊 PREMIUM BORDER CARD
+   =============================== */
+
+.fortuna-card-gradient {
+  position: relative;
+  border-radius: 1rem;
+  background: white;
+}
+
+.fortuna-card-gradient::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, #C8102E, #005F99);
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.fortuna-card-gradient:hover::before {
+  opacity: 1;
+}
+
+/* ======================================================
+   ⚡ FORTUNA PERFORMANCE BOOST (ADD AT VERY END)
+   ====================================================== */
+
+/* 1. FAST GLOBAL INTERACTIONS */
+button,
+a,
+.fortuna-card,
+.fortuna-kpi-card,
+.fortuna-tab {
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out,
+    color 0.12s ease-out;
+}
+
+/* 2. BUTTON SPEED */
+button {
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-theme-sm);
+}
+
+button:active {
+  transform: scale(0.95);
+  transition: transform 0.05s ease-out;
+}
+
+/* 3. KPI CARD FAST */
+.fortuna-kpi-card {
+  will-change: transform;
+}
+
+.fortuna-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-theme-md);
+}
+
+/* 4. TAB SPEED */
+.fortuna-tab {
+  transition: color 0.1s ease-out;
+}
+
+.fortuna-tab::after {
+  transition: width 0.12s ease-out;
+}
+
+/* 5. FAST HOVER UTILITY */
+.fortuna-fast-hover {
+  transition: transform 0.1s ease-out;
+}
+
+.fortuna-fast-hover:hover {
+  transform: translateY(-1px);
+}
+
+/* 6. REMOVE TAP DELAY */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 7. CLICK FEEDBACK */
+.fortuna-click {
+  position: relative;
+  overflow: hidden;
+}
+
+.fortuna-click::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(200,16,46,0.08);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.fortuna-click:active::after {
+  opacity: 1;
+  transition: opacity 0.05s ease;
+}
+
+
+/* ======================================================
+   🚀 FORTUNA NEXT-GEN UI ENGINE (FINAL BLOCK)
+   Fast + Premium + AI Feel (Safe Version)
+   ====================================================== */
+
+
+/* ===============================
+   ⚡ FAST INTERACTIONS (NO LAG)
+   =============================== */
+
+button,
+a,
+.fortuna-card,
+.fortuna-kpi-card,
+.fortuna-tab {
+  transition:
+    transform 0.12s ease-out,
+    box-shadow 0.12s ease-out,
+    background-color 0.12s ease-out,
+    border-color 0.12s ease-out,
+    color 0.12s ease-out;
+}
+
+
+/* ===============================
+   🚀 BUTTON SPEED + CLICK FEEL
+   =============================== */
+
+button {
+  transition: transform 0.1s ease-out, box-shadow 0.1s ease-out;
+}
+
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-theme-sm);
+}
+
+button:active {
+  transform: scale(0.95);
+  transition: transform 0.05s ease-out;
+}
+
+
+/* ===============================
+   🧊 KPI / DASHBOARD CARDS
+   =============================== */
+
+.fortuna-kpi-card {
+  position: relative;
+  overflow: hidden;
+  will-change: transform;
+}
+
+.fortuna-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-theme-md);
+}
+
+
+/* ===============================
+   🧠 KPI VALUE ENTRY
+   =============================== */
+
+.fortuna-kpi-value {
+  animation: fortunaFadeIn 0.4s ease;
+}
+
+
+/* ===============================
+   🧊 TAB FAST RESPONSE
+   =============================== */
+
+.fortuna-tab {
+  position: relative;
+  transition: color 0.1s ease-out;
+}
+
+.fortuna-tab::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  width: 0%;
+  height: 2px;
+  background: linear-gradient(90deg, #C8102E, #005F99);
+  transition: width 0.12s ease-out;
+}
+
+.fortuna-tab-active::after {
+  width: 100%;
+}
+
+
+/* ===============================
+   ✨ FAST HOVER UTILITY
+   =============================== */
+
+.fortuna-fast-hover {
+  transition: transform 0.1s ease-out;
+}
+
+.fortuna-fast-hover:hover {
+  transform: translateY(-1px);
+}
+
+
+/* ===============================
+   ⚡ REMOVE CLICK DELAY
+   =============================== */
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+
+/* ===============================
+   💥 CLICK FEEDBACK EFFECT
+   =============================== */
+
+.fortuna-click {
+  position: relative;
+  overflow: hidden;
+}
+
+.fortuna-click::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(200,16,46,0.08);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.fortuna-click:active::after {
+  opacity: 1;
+  transition: opacity 0.05s ease;
+}
+
+
+/* ===============================
+   🧠 AI HOVER GLOW (SMART FEEL)
+   =============================== */
+
+.fortuna-ai-surface {
+  position: relative;
+  overflow: hidden;
+}
+
+.fortuna-ai-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at var(--x, 50%) var(--y, 50%),
+    rgba(200,16,46,0.12),
+    transparent 60%
+  );
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.fortuna-ai-surface:hover::before {
+  opacity: 1;
+}
+
+
+/* ===============================
+   🧊 DEPTH SYSTEM (SUBTLE 3D)
+   =============================== */
+
+.fortuna-depth {
+  transition: transform 0.15s ease;
+}
+
+.fortuna-depth:hover {
+  transform: translateY(-2px);
+}
+
+
+/* ===============================
+   🎥 STAGGER ENTRY (DASHBOARD)
+   =============================== */
+
+.fortuna-stagger {
+  opacity: 0;
+  transform: translateY(10px);
+  animation: fortunaFadeIn 0.4s ease forwards;
+}
+
+.fortuna-stagger:nth-child(1) { animation-delay: 0.05s; }
+.fortuna-stagger:nth-child(2) { animation-delay: 0.1s; }
+.fortuna-stagger:nth-child(3) { animation-delay: 0.15s; }
+.fortuna-stagger:nth-child(4) { animation-delay: 0.2s; }
+
+
+/* ===============================
+   🧊 GLASS EFFECT (PREMIUM)
+   =============================== */
+
+.fortuna-glass {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(200,16,46,0.1);
+}
+
+
+/* ===============================
+   ⚡ AI CLICK PRESS FEEL
+   =============================== */
+
+.fortuna-ai-click:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1) inset;
+}
+
+
+/* ===============================
+   🌈 ACTIVE BORDER GLOW
+   =============================== */
+
+.fortuna-active-glow {
+  position: relative;
+}
+
+.fortuna-active-glow::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, #C8102E, #005F99);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  z-index: -1;
+}
+
+.fortuna-active-glow:hover::after {
+  opacity: 1;
+}
+
+
+/* ===============================
+   ⏱ ANIMATION DELAY UTIL
+   =============================== */
+
+.delay-2s {
+  animation-delay: 2s;
+}
+/* ======================================================
+   🎨 FORTUNA COLOR SWITCH (LAYER BASED - FINAL)
+   ====================================================== */
+
+.fortuna-red-layer {
+  background: #C8102E;
+  animation: redFade 4s infinite;
+}
+
+.fortuna-blue-layer {
+  background: #005F99;
+  opacity: 0;
+  animation: blueFade 4s infinite;
+}
+
+@keyframes redFade {
+  0% { opacity: 1; }
+  45% { opacity: 1; }
+  50% { opacity: 0; }
+  95% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes blueFade {
+  0% { opacity: 0; }
+  45% { opacity: 0; }
+  50% { opacity: 1; }
+  95% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* ===============================
+   🧊 FORTUNA FLOATING CUBES (DUAL COLOR)
+   =============================== */
+
+.fortuna-cubes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.fortuna-cube {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+  animation: cubeFloat 6s linear infinite;
+}
+
+/* 🎨 color sync */
+.fortuna-color-switch .fortuna-cube {
+  background: rgba(255,255,255,0.2); /* neutral works for both */
+}
+
+/* positions */
+.cube1 { top: 20%; left: 15%; animation-delay: 0s; }
+.cube2 { top: 60%; left: 70%; animation-delay: 2s; }
+.cube3 { top: 40%; left: 40%; animation-delay: 4s; }
+
+@keyframes cubeFloat {
+  0% { transform: translateY(0px) rotate(0deg); opacity: 0.4; }
+  50% { transform: translateY(-10px) rotate(90deg); opacity: 0.8; }
+  100% { transform: translateY(0px) rotate(180deg); opacity: 0.4; }
+}
+
+
+/* ===============================
+   🎨 HARD COLOR SWITCH (FINAL FIXED)
+   =============================== */
+
+@keyframes fortunaColorSwitchFinal {
+  0% {
+    background-color: #C8102E;
+  }
+
+  45% {
+    background-color: #C8102E;
+  }
+
+  50% {
+    background-color: #005F99;
+  }
+
+  95% {
+    background-color: #005F99;
+  }
+
+  100% {
+    background-color: #C8102E;
+  }
+}
+
+.fortuna-color-switch {
+  animation: fortunaColorSwitchFinal 4s ease-in-out infinite;
+}

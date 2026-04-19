@@ -19,6 +19,10 @@ router.post("/", controller.saveCustomer);
 router.get("/", controller.getCustomers);
 // ✅ Get by ID should be before delete (to avoid route conflicts)
 
+
+// ✅ KPI - Customer Count
+router.get("/count", controller.getCustomerCount);
+
 // 🔥 Dynamic routes LAST
 router.get("/:id", controller.getCustomerById);
 router.delete("/:id", controller.deleteCustomer);

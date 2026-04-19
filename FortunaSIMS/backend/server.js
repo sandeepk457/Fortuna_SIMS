@@ -9,6 +9,7 @@ const demandRoutes = require("./routes/demand.routes.js"); // ✅ Add demand for
 const warehouseRoutes = require("./routes/warehouse.routes.js"); // ✅ Add  warehouse routes
 const customerRoutes = require("./routes/customerRoutes"); // ✅ Add  customer routes
 const prRoutes = require("./routes/prRoutes"); // ✅ Add PR routes
+const ecommerceRoutes = require("./routes/ecommerceRoutes"); // ✅ Add ecommerce routes
 
 const app = express();
 
@@ -38,6 +39,9 @@ app.use("/api/customers", customerRoutes); // 👈 this is  customer api
 
 // PR APIs
 app.use("/api/pr", prRoutes); // 👈 this is  PR api
+
+// Ecommerce APIs
+app.use("/api/ecommerce", ecommerceRoutes); // 👈 this is  ecommerce api
 
 
 app.listen(5000, () => {
