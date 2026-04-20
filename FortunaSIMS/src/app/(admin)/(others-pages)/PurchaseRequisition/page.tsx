@@ -781,27 +781,34 @@ const res = await fetch(url, {
 };
 
   /** ✅ NEW: Send for Approval (does validations) */
-  const onSendForApproval = () => {
-    if (isLocked) return;
+  const onSendForApproval = async () => {
+  if (!prId) {
+    alert("Save PR before submitting");
+    return;
+  }
 
-    touchAll();
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/submit", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ pr_id: prId }),
+    });
 
-    if (form.items.length === 0) {
-      setActiveTab("items");
-      alert("PR cannot be sent for approval without at least one item.");
-      return;
+    const data = await res.json();
+
+    if (data.success) {
+      alert("PR Sent for Approval");
+      router.push("/PurchaseRequisitionList");
+    } else {
+      alert(data.message);
     }
-
-    if (hasErrors) {
-      setActiveTab(firstErrorTab());
-      alert("Please fix validation errors before sending for approval.");
-      return;
-    }
-
-    setForm((p) => ({ ...p, pr_status: "Pending Approval" }));
-    setActiveTab("status");
-    alert("Sent for approval (demo). PR is now locked.");
-  };
+  } catch (err) {
+    console.error(err);
+    alert("Error submitting PR");
+  }
+};
 
   /** OPTIONAL: Keep old function name if you use it in other places */
   const onSubmitForApproval = onSendForApproval;

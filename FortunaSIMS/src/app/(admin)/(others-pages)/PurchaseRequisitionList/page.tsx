@@ -19,7 +19,7 @@ type ApprovalDecision = "Approved" | "Rejected";
 
 type ApprovalStep = {
   level: ApprovalLevel;
-  approverRole: string; // ex: "Department Head", "Finance", "Procurement"
+  role: string;// ex: "Department Head", "Finance", "Procurement"
   decision?: ApprovalDecision;
   decidedAt?: string; // ISO date
   remarks?: string;
@@ -95,33 +95,55 @@ export default function PurchaseRequisitionListPage() {
 
   const [data, setData] = useState<PurchaseRequisition[]>([]);
 
-  const fetchPRs = async () => {
-  setLoading(true); // ✅ start loading
+const fetchApprovals = async (pr_id: string) => {
+  try {
+    const res = await fetch(`http://localhost:5000/api/pr/${pr_id}/approvals`);
+    const data = await res.json();
+    return data.data || [];
+  } catch (err) {
+    console.error("Approval fetch error:", err);
+    return [];
+  }
+};
+
+const fetchPRs = async () => {
+  setLoading(true);
 
   try {
     const res = await fetch("http://localhost:5000/api/pr/list");
     const data = await res.json();
 
     if (data.success) {
-      const formatted: PurchaseRequisition[] = data.data.map((pr: any) => ({
-        pr_id: pr.pr_id,
-        prNo: pr.pr_number,
-        title: pr.justification || "PR Request",
-        department: pr.department,
-        requestor: pr.requested_by,
-        requiredBy: pr.required_by_date || "-", // improved
-        createdOn: pr.created_at?.split("T")[0],
-        priority: pr.priority,
-        status: pr.status,
-        totalItems: 0,
-        estimatedValue: pr.estimated_pr_value || 0,
-        currentApprovalLevel: 1,
-        approvalRoute: [
-          { level: 1, approverRole: "Department Head" },
-          { level: 2, approverRole: "Finance" },
-          { level: 3, approverRole: "Procurement" },
-        ],
-      }));
+      const formatted: PurchaseRequisition[] = await Promise.all(
+        data.data.map(async (pr: any) => {
+          const approvals = await fetchApprovals(pr.pr_id);
+
+          console.log("PR ID:", pr.pr_id);         
+          console.log("Approvals:", approvals);
+
+
+          return {
+            pr_id: pr.pr_id,
+            prNo: pr.pr_number,
+            title: pr.justification || "PR Request",
+            department: pr.department,
+            requestor: pr.requested_by,
+            requiredBy: pr.required_by_date || "-",
+            createdOn: pr.created_at?.split("T")[0],
+            priority: pr.priority,
+            status: pr.status,
+            totalItems: 0,
+            estimatedValue: pr.estimated_pr_value || 0,
+
+            // 🔥 REAL APPROVAL DATA
+            approvalRoute: approvals,
+
+            // 🔥 CURRENT LEVEL (Pending one)
+            currentApprovalLevel:
+              approvals.find((a: any) => a.status?.toLowerCase() === "pending")?.level || 0,
+          };
+        })
+      );
 
       setData(formatted);
     }
@@ -129,13 +151,76 @@ export default function PurchaseRequisitionListPage() {
     console.error(err);
     alert("Failed to load PR list");
   } finally {
-    setLoading(false); // ✅ stop loading
+    setLoading(false);
   }
 };
   
 useEffect(() => {
   fetchPRs();
 }, []);
+
+
+const handleApprove = async (pr_id: string, level: number) => {
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pr_id,
+        level,
+        decision: "Approved",
+        remarks: "Approved",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("✅ PR Approved");
+      fetchPRs(); // 🔥 refresh
+    } else {
+      alert(data.message || "Approval failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error approving PR");
+  }
+};
+
+
+// Similar function for rejection (not shown for brevity)//
+
+const handleReject = async (pr_id: string, level: number) => {
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pr_id,
+        level,
+        decision: "Rejected",
+        remarks: "Rejected",
+      }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("❌ PR Rejected");
+      fetchPRs(); // 🔥 refresh list
+    } else {
+      alert(data.message || "Reject failed");
+    }
+  } catch (err) {
+    console.error("Reject error:", err);
+    alert("Error rejecting PR");
+  }
+};
+
 
 const [loading, setLoading] = useState(false);
 
@@ -625,6 +710,7 @@ const [loading, setLoading] = useState(false);
 
                     <th className="px-4 py-3 text-left">Items</th>
                     <th className="px-4 py-3 text-left">Est. Value</th>
+                    <th className="px-4 py-3 text-left">Approval</th>
                     <th className="px-4 py-3 text-left">Actions</th>
                   </tr>
                 </thead>
@@ -688,41 +774,75 @@ const [loading, setLoading] = useState(false);
         <td className="px-4 py-3 font-semibold">
           {formatINR(pr.estimatedValue)}
         </td>
-
+        <td className="px-4 py-3">
+  {pr.approvalRoute?.length === 0 ? (
+    <span className="text-gray-400 text-xs">No Flow</span>
+  ) : (
+    pr.approvalRoute.map((a: any) => (
+      <div key={a.level} className="text-xs">
+        L{a.level} - {a.role} :
+        <span
+          className={
+            a.status === "Approved"
+              ? "text-green-600"
+              : a.status === "Rejected"
+              ? "text-red-600"
+              : "text-amber-600"
+          }
+        >
+          {" "}{a.status}
+        </span>
+      </div>
+    ))
+  )}
+</td>
         <td className="px-4 py-3 space-x-3">
           {/* VIEW */}
           <button
-  className="font-semibold text-blue-600 hover:underline"
-  onClick={() =>
-    router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=view`)
-  }
->
-  View
-</button>
+          className="font-semibold text-blue-600 hover:underline"
+          onClick={() =>
+          router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=view`)
+          }
+          >
+          View
+          </button>
 
           {/* APPROVAL */}
-          {(pr.status === "Submitted" ||
-            pr.status === "Pending Approval") && (
-            <button
-              className="font-semibold hover:underline"
-              style={{ color: FORTUNA_SECONDARY_BLUE }}
-              onClick={() => openApproval(pr.prNo)}
-            >
-              Approve / Reject
-            </button>
-          )}
+          {/* ✅ APPROVE BUTTON */}
+  {pr.status === "Pending Approval" && pr.currentApprovalLevel > 0 && (
+    <button
+      onClick={() =>
+        handleApprove(pr.pr_id, pr.currentApprovalLevel)
+      }
+      className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
+    >
+      Approve
+    </button>
+  )}
+
+  {/* ✅ REJECT BUTTON */}
+  {pr.status === "Pending Approval" && pr.currentApprovalLevel > 0 && (
+    <button
+      onClick={() =>
+        handleReject(pr.pr_id, pr.currentApprovalLevel)
+      }
+      className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
+    >
+      Reject
+    </button>
+  )}
 
           {/* DRAFT ACTIONS */}
           {pr.status === "Draft" && (
             <>
               <button
-  className="font-semibold text-green-600 hover:underline"
-  onClick={() =>
-    router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=edit`)
-  }
->
-  Edit
-</button>
+            className="font-semibold text-green-600 hover:underline"
+            onClick={() =>
+              router.push(`/PurchaseRequisition?id=${pr.pr_id}&mode=edit`)
+            }
+            >
+            Edit
+            </button>
 
               <button
                 className="font-semibold hover:underline text-emerald-700"

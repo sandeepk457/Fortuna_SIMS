@@ -72,6 +72,37 @@ const attachments = await db.query(
 };
 
 
+//===============================
+// 🆕 GET PR APPROVALS (NEW)
+// ===============================
+const getPRApprovals = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const result = await db.query(`
+      SELECT level, role, status, remarks, decided_at
+      FROM pr_approvals
+      WHERE pr_id = $1
+      ORDER BY level ASC
+    `, [id]);
+
+    res.json({
+      success: true,
+      data: result.rows
+    });
+
+  } catch (error) {
+    console.error("GET PR APPROVALS ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
+
+
+
 // ===============================
 // 🆕 CREATE PR
 // ===============================
@@ -599,11 +630,75 @@ const updatePR = async (req, res) => {
   }
 };
 
+// Approve PR function//
+
+// ===============================
+// ✅ APPROVE / REJECT PR
+// ===============================
+const approvePR = async (req, res) => {
+  const { pr_id, level, decision, remarks } = req.body;
+
+  try {
+    if (!pr_id || !level || !decision) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing fields"
+      });
+    }
+
+    // 🔒 Ensure correct level
+    const current = await db.query(`
+      SELECT level FROM pr_approvals
+      WHERE pr_id=$1 AND status='Pending'
+      ORDER BY level ASC LIMIT 1
+    `, [pr_id]);
+
+    if (!current.rows.length || current.rows[0].level !== level) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid approval level"
+      });
+    }
+
+    // update level
+    await db.query(`
+      UPDATE pr_approvals
+      SET status=$1, remarks=$2, decided_at=NOW()
+      WHERE pr_id=$3 AND level=$4
+    `, [decision, remarks, pr_id, level]);
+
+    if (decision === "Rejected") {
+      await db.query(`UPDATE pr_header SET status='Rejected' WHERE pr_id=$1`, [pr_id]);
+    } else {
+      const next = await db.query(`
+        SELECT * FROM pr_approvals WHERE pr_id=$1 AND level=$2
+      `, [pr_id, level + 1]);
+
+      if (next.rows.length) {
+        await db.query(`UPDATE pr_header SET status='Pending Approval' WHERE pr_id=$1`, [pr_id]);
+      } else {
+        await db.query(`UPDATE pr_header SET status='Approved' WHERE pr_id=$1`, [pr_id]);
+      }
+    }
+
+    res.json({ success: true });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
+
+
 // ===============================
 module.exports = {
   createPR,
   getPRList,
   getPRById, 
+  getPRApprovals,
   submitPR,
   updatePR,
+  approvePR,
 };

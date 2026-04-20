@@ -5,8 +5,10 @@ const {
   createPR,
   getPRList,
   getPRById,
+  getPRApprovals,
   submitPR,
-  updatePR   // ✅ ensure imported
+  updatePR,
+  approvePR,
 } = require("../controllers/prcontroller");
 
 const upload = require("../config/upload");
@@ -22,6 +24,11 @@ router.post("/create", upload.array("attachments"), createPR);
 router.get("/list", getPRList);
 
 // ===============================
+// 📄 GET PR APPROVALS
+// ===============================
+router.get("/:id/approvals", getPRApprovals);
+
+// ===============================
 // 🚀 SUBMIT PR
 // ===============================
 router.post("/submit", submitPR);
@@ -35,5 +42,14 @@ router.put("/update/:id", upload.array("attachments"), updatePR);
 // 📄 GET PR BY ID (LAST)
 // ===============================
 router.get("/:id", getPRById);
+
+
+// ===============================
+// PR Approval Workflow
+// ===============================
+router.post("/approve", approvePR);
+
+
+
 
 module.exports = router;
