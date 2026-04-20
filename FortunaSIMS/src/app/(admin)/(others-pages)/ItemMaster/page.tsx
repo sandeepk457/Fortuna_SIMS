@@ -4,11 +4,11 @@ import React, { useState, useMemo,useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
+import api from "../../../utils/api";
 
 interface Item {
   code: string;
-  name: string;
-  category: string;
+  name: string;  category: string;
   uom: string;
   status: string;
 }
