@@ -244,7 +244,7 @@ const [loading, setLoading] = useState(false);
 
   // Approval Modal (unchanged)
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
-  const [selectedPrNo, setSelectedPrNo] = useState<string>("");
+ const [selectedPR, setSelectedPR] = useState<any>(null);
   const [approvalRemarks, setApprovalRemarks] = useState("");
 
   /** ✅ Add-on: tab-level base filter (NO approval flow disturbance) */
@@ -353,68 +353,81 @@ const [loading, setLoading] = useState(false);
   };
 
   // ---- Approval actions (demo only) ---- (unchanged)
-  const openApproval = (prNo: string) => {
-    setSelectedPrNo(prNo);
+  const openApproval = async (pr: any) => {
+  try {
+    // 🔥 fetch latest approvals
+    const res = await fetch(`http://localhost:5000/api/pr/${pr.pr_id}/approvals`);
+    const result = await res.json();
+
+    const latestApprovals = (result.data || []).map((a: any) => ({
+  level: a.level,
+  approverRole: a.role,        // 🔥 KEY FIX
+   status: a.status?.toLowerCase(),
+  remarks: a.remarks,
+  decidedAt: a.decided_at,
+}));
+
+    // sort (optional but clean)
+    latestApprovals.sort((a: any, b: any) => a.level - b.level);
+
+    // 🔥 create updated PR object
+    const updatedPR = {
+      ...pr,
+      approvalRoute: latestApprovals,
+      currentApprovalLevel: (() => {
+  const pending = latestApprovals.find(
+    (a: any) => a.status?.toLowerCase() === "pending"
+  );
+  return pending ? pending.level : null;
+})(),
+    };
+
+    // ✅ store full object (not prNo)
+    setSelectedPR(updatedPR);
     setApprovalRemarks("");
     setApprovalModalOpen(true);
-  };
 
-  const applyDecision = (decision: ApprovalDecision) => {
-    if (!selectedPrNo) return;
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-    setData((prev) =>
-      prev.map((pr) => {
-        if (pr.prNo !== selectedPrNo) return pr;
+  const applyDecision = async (decision: ApprovalDecision) => {
+  if (!selectedPR) return;
 
-        // Only pending/submitted are actionable in this demo
-        if (!(pr.status === "Pending Approval" || pr.status === "Submitted")) return pr;
+  try {
+    const res = await fetch("http://localhost:5000/api/pr/approve", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        pr_id: selectedPR.pr_id,
+        level:
+  selectedPR.currentApprovalLevel ??
+  selectedPR.approvalRoute.find(
+    (a: any) => a.status?.toLowerCase() === "pending"
+  )?.level,
+        decision,
+        remarks: approvalRemarks || "",
+      }),
+    });
 
-        const now = todayISO();
-        const lvl = pr.currentApprovalLevel;
+    const data = await res.json();
 
-        const nextRoute = pr.approvalRoute.map((s) => {
-          if (s.level !== lvl) return s;
-          return {
-            ...s,
-            decision,
-            decidedAt: now,
-            remarks: approvalRemarks?.trim() ? approvalRemarks.trim() : undefined,
-          };
-        });
-
-        if (decision === "Rejected") {
-          return {
-            ...pr,
-            status: "Rejected",
-            approvalRoute: nextRoute,
-          };
-        }
-
-        // Approved at this level -> move to next level or fully approved
-        const nextLevel = (lvl + 1) as ApprovalLevel;
-
-        const hasNext = pr.approvalRoute.some((s) => s.level === nextLevel);
-
-        if (hasNext) {
-          return {
-            ...pr,
-            status: "Pending Approval",
-            approvalRoute: nextRoute,
-            currentApprovalLevel: nextLevel,
-          };
-        }
-
-        // Final approval
-        return {
-          ...pr,
-          status: "Approved",
-          approvalRoute: nextRoute,
-        };
-      })
-    );
-
-    setApprovalModalOpen(false);
-  };
+    if (data.success) {
+      alert(`✅ ${decision} successful`);
+      setApprovalModalOpen(false);
+      setApprovalRemarks("");
+      await fetchPRs(); // 🔥 refresh list
+    } else {
+      alert(data.message || "Action failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error processing approval");
+  }
+};
 
   /** ✅ Add-on: Draft actions */
   const onEditDraft = (pr: PurchaseRequisition) => {
@@ -489,7 +502,7 @@ const [loading, setLoading] = useState(false);
 
   const getPRByNo = (prNo: string) => data.find((x) => x.prNo === prNo);
 
-  const selectedPR = selectedPrNo ? getPRByNo(selectedPrNo) : undefined;
+  // const selectedPR = selectedPrNo ? getPRByNo(selectedPrNo) : undefined;
 
   /** ✅ Add-on: drafts count (for badge) */
   const draftsCount = useMemo(() => data.filter((x) => x.status === "Draft").length, [data]);
@@ -810,27 +823,22 @@ const [loading, setLoading] = useState(false);
           {/* APPROVAL */}
           {/* ✅ APPROVE BUTTON */}
   {pr.status === "Pending Approval" && pr.currentApprovalLevel > 0 && (
+  <>
     <button
-      onClick={() =>
-        handleApprove(pr.pr_id, pr.currentApprovalLevel)
-      }
+      onClick={() => openApproval(pr)}
       className="bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-xs"
     >
       Approve
     </button>
-  )}
 
-  {/* ✅ REJECT BUTTON */}
-  {pr.status === "Pending Approval" && pr.currentApprovalLevel > 0 && (
     <button
-      onClick={() =>
-        handleReject(pr.pr_id, pr.currentApprovalLevel)
-      }
+      onClick={() => openApproval(pr)}
       className="bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded text-xs"
     >
       Reject
     </button>
-  )}
+  </>
+)}
 
           {/* DRAFT ACTIONS */}
           {pr.status === "Draft" && (
@@ -1035,7 +1043,12 @@ const [loading, setLoading] = useState(false);
                     const isCurrent =
                       s.level === selectedPR.currentApprovalLevel &&
                       (selectedPR.status === "Submitted" || selectedPR.status === "Pending Approval");
-                    const decision = s.decision ?? "Pending";
+                    const decision =
+                                    s.status === "approved"
+                                      ? "Approved"
+                                      : s.status === "rejected"
+                                      ? "Rejected"
+                                      : "Pending";
 
                     return (
                       <div
@@ -1047,7 +1060,7 @@ const [loading, setLoading] = useState(false);
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-semibold">
-                            Level {s.level} • {s.approverRole}
+                            Level {s.level} • {s.role}
                           </span>
                           <span
                             className={classNames(

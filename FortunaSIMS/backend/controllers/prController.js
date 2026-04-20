@@ -161,42 +161,42 @@ console.log("PARSED VALUES:", {
     // 🧾 INSERT PR HEADER
     // ===============================
     const prHeaderResult = await client.query(
-      `INSERT INTO pr_header (
-        pr_number,
-        department,
-        cost_center,
-        project_code,
-        priority,
-        pr_type,
-        justification,
-        internal_notes,
-        delivery_location,
-        delivery_address,
-        currency,
-        tax_estimate,
-        status,
-        requested_by
-      )
-      VALUES (
-        CONCAT('PR-', TO_CHAR(NOW(),'YYYY'), '-', EXTRACT(EPOCH FROM NOW())::BIGINT),
-        $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'Draft',$11
-      )
-      RETURNING pr_id`,
-      [
-        department,
-        cost_center,
-        project_code || null,
-        priority,
-        pr_type,
-        justification,
-        internal_notes || null,
-        delivery_location || null,
-        delivery_address || null,
-        currency || "INR",
-        tax_estimate || 0,
-        req.user?.name || "System"
-      ]
-    );
+  `INSERT INTO pr_header (
+    pr_number,
+    department,
+    cost_center,
+    project_code,
+    priority,
+    pr_type,
+    justification,
+    internal_notes,
+    delivery_location,
+    delivery_address,
+    currency,
+    tax_estimate,
+    status,
+    requested_by
+  )
+  VALUES (
+    CONCAT('PR-', TO_CHAR(NOW(),'YYYY'), '-', EXTRACT(EPOCH FROM NOW())::BIGINT),
+    $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,'Draft',$12
+  )
+  RETURNING pr_id`,
+  [
+    department,
+    cost_center,
+    project_code || null,
+    priority,
+    pr_type,
+    justification,
+    internal_notes || null,
+    delivery_location || null,
+    delivery_address || null,
+    currency || "INR",
+    tax_estimate || 0,
+    req.user?.name || "System"
+  ]
+);
 
     const pr_id = prHeaderResult.rows[0].pr_id;
 
