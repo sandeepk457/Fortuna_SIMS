@@ -20,6 +20,9 @@ const getPRList = async (req, res) => {
   FROM pr_header h
   LEFT JOIN pr_items i 
     ON h.pr_id = i.pr_id
+
+where h.is_deleted = FALSE
+
   GROUP BY 
     h.pr_id,
     h.pr_number,
@@ -701,7 +704,51 @@ const approvePR = async (req, res) => {
   }
 };
 
+// delete PR//
 
+const deletePR = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const check = await db.query(
+      `SELECT status FROM pr_header WHERE pr_id = $1`,
+      [id]
+    );
+
+    if (!check.rows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "PR not found",
+      });
+    }
+
+    if (check.rows[0].status !== "Draft") {
+      return res.status(400).json({
+        success: false,
+        message: "Only Draft PR can be deleted",
+      });
+    }
+
+    await db.query(
+      `UPDATE pr_header
+       SET is_deleted = TRUE
+       WHERE pr_id = $1`,
+      [id]
+    );
+
+    res.json({
+      success: true,
+      message: "PR deleted successfully",
+    });
+
+  } catch (error) {
+    console.error("DELETE PR ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
 
 
 // ===============================
@@ -713,4 +760,5 @@ module.exports = {
   submitPR,
   updatePR,
   approvePR,
+  deletePR,
 };

@@ -222,6 +222,32 @@ const handleReject = async (pr_id: string, level: number) => {
 };
 
 
+// Delete function (for drafts)//
+
+const handleDelete = async (id: string) => {
+  const ok = confirm("Are you sure to delete this PR?");
+  if (!ok) return;
+
+  try {
+    const res = await fetch(`http://localhost:5000/api/pr/delete/${id}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("✅ PR deleted successfully");
+      fetchPRs(); // 🔥 refresh list
+    } else {
+      alert(data.message || "Delete failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error deleting PR");
+  }
+};
+
+
 const [loading, setLoading] = useState(false);
 
 
@@ -474,11 +500,11 @@ const [loading, setLoading] = useState(false);
   }
 };
 
-  const onDeleteDraft = (prNo: string) => {
-    const ok = confirm(`Delete draft ${prNo}?`);
-    if (!ok) return;
-    setData((prev) => prev.filter((x) => x.prNo !== prNo));
-  };
+  // const onDeleteDraft = (prNo: string) => {
+  //   const ok = confirm(`Delete draft ${prNo}?`);
+  //   if (!ok) return;
+  //   setData((prev) => prev.filter((x) => x.prNo !== prNo));
+  // };
 
   const statusPill = (s: PRStatus) =>
     classNames(
@@ -860,11 +886,11 @@ const [loading, setLoading] = useState(false);
               </button>
 
               <button
-                className="font-semibold text-rose-600 hover:underline"
-                onClick={() => onDeleteDraft(pr.prNo)}
-              >
-                Delete
-              </button>
+                  onClick={() => handleDelete(pr.pr_id)}
+                  className="text-red-600 text-xs"
+                >
+                  Delete
+                </button>
             </>
           )}
         </td>

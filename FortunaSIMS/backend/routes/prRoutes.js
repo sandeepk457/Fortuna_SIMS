@@ -9,6 +9,7 @@ const {
   submitPR,
   updatePR,
   approvePR,
+  deletePR,
 } = require("../controllers/prcontroller");
 
 const upload = require("../config/upload");
@@ -49,7 +50,9 @@ router.get("/:id", getPRById);
 // ===============================
 router.post("/approve", approvePR);
 
-
-
+// ===============================
+// delete PR
+// ===============================
+router.delete("/delete/:id", deletePR);
 
 module.exports = router;
