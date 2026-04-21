@@ -132,7 +132,7 @@ const fetchPRs = async () => {
             createdOn: pr.created_at?.split("T")[0],
             priority: pr.priority,
             status: pr.status,
-            totalItems: 0,
+            totalItems: Number(pr.total_items) || 0,
             estimatedValue: pr.estimated_pr_value || 0,
 
             // 🔥 REAL APPROVAL DATA

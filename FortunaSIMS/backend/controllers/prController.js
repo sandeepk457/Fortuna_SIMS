@@ -7,18 +7,30 @@ const db = require("../config/db");
 const getPRList = async (req, res) => {
   try {
     const result = await db.query(`
-      SELECT 
-        pr_id,
-        pr_number,
-        department,
-        requested_by,
-        created_at,
-        priority,
-        status,
-        estimated_pr_value
-      FROM pr_header
-      ORDER BY created_at DESC
-    `);
+  SELECT 
+    h.pr_id,
+    h.pr_number,
+    h.department,
+    h.requested_by,
+    h.created_at,
+    h.priority,
+    h.status,
+    h.estimated_pr_value,
+    COUNT(i.pr_id) AS total_items
+  FROM pr_header h
+  LEFT JOIN pr_items i 
+    ON h.pr_id = i.pr_id
+  GROUP BY 
+    h.pr_id,
+    h.pr_number,
+    h.department,
+    h.requested_by,
+    h.created_at,
+    h.priority,
+    h.status,
+    h.estimated_pr_value
+  ORDER BY h.created_at DESC
+`);
 
     res.json({ success: true, data: result.rows });
 
