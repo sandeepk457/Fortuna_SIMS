@@ -129,28 +129,40 @@ function StatCard({
   sub?: string;
   accent?: "red" | "blue";
 }) {
-  const accentColor = accent === "red" ? FORTUNA_PRIMARY_RED : FORTUNA_SECONDARY_BLUE;
+  const isRed = accent === "red";
 
   return (
     <div
-      className="rounded-2xl border p-4 shadow-sm"
+      className="rounded-2xl p-4 shadow-sm text-white"
       style={{
-        borderColor: `${FORTUNA_SECONDARY_BLUE}1A`,
-        background: "linear-gradient(135deg, #FFFFFF 0%, #F8FAFC 100%)",
+        background: isRed
+          ? "linear-gradient(135deg, #C8102E, #005F99)"
+          : "linear-gradient(135deg, #005F99, #C8102E)",
       }}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: FORTUNA_SECONDARY_BLUE }}>
+          
+          {/* Title */}
+          <p className="text-xs font-semibold uppercase tracking-wide text-white/80">
             {title}
           </p>
-          <p className="mt-1 text-2xl font-extrabold" style={{ color: accentColor }}>
+
+          {/* Value */}
+          <p className="mt-1 text-3xl font-extrabold text-white">
             {value}
           </p>
-          {sub && <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">{sub}</p>}
+
+          {/* Sub text */}
+          {sub && (
+            <p className="mt-1 text-xs text-white/80">
+              {sub}
+            </p>
+          )}
         </div>
 
-        <span className="mt-1 h-2.5 w-2.5 rounded-full" style={{ backgroundColor: accentColor }} />
+        {/* Dot */}
+        <span className="mt-1 h-2.5 w-2.5 rounded-full bg-white/80" />
       </div>
     </div>
   );
@@ -526,12 +538,12 @@ export default function SupplierPerformanceAnalysisPage() {
                     className="lg:col-span-7 rounded-2xl border bg-white p-5 shadow-sm dark:bg-gray-950"
                     style={{ borderColor: `${FORTUNA_SECONDARY_BLUE}22` }}
                   >
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-base font-extrabold" style={{ color: FORTUNA_PRIMARY_RED }}>
-                        Grade Distribution
-                      </h3>
-                      <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }} />
-                    </div>
+                    <div className="fortuna-card-header">
+  <h3 className="fortuna-card-title">
+    Grade Distribution
+  </h3>
+  <span className="fortuna-card-dot-blue" />
+</div>
 
                     <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                       {[
@@ -831,7 +843,7 @@ export default function SupplierPerformanceAnalysisPage() {
             {/* INCIDENTS */}
             {activeTab === "incidents" && (
               <div className="space-y-4">
-                <div className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-gray-950" style={{ borderColor: `${FORTUNA_SECONDARY_BLUE}22` }}>
+                <div className="fortuna-card p-5" style={{ borderColor: `${FORTUNA_SECONDARY_BLUE}22` }}>
                   <div className="flex items-center justify-between">
                     <div>
                       <h3 className="text-base font-extrabold" style={{ color: FORTUNA_PRIMARY_RED }}>
@@ -906,7 +918,7 @@ export default function SupplierPerformanceAnalysisPage() {
 
           {/* Right Panel - Quick Stats */}
           <div className="xl:col-span-3">
-            <div className="rounded-2xl border bg-white p-5 shadow-sm dark:bg-gray-950" style={{ borderColor: `${FORTUNA_SECONDARY_BLUE}22` }}>
+            <div className="fortuna-card p-5" style={{ borderColor: `${FORTUNA_SECONDARY_BLUE}22` }}>
               <div className="flex items-center justify-between">
                 <h3 className="text-base font-extrabold" style={{ color: FORTUNA_PRIMARY_RED }}>
                   Quick Stats

@@ -45,6 +45,13 @@ const fetchUoms = async () => {
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const [form, setForm] = useState<UomForm>({
+  code: "",
+  name: "",
+  category: "Count",
+  status: "Active",
+});
+
   // Form state
   interface UomForm {
   code: string;
@@ -83,11 +90,16 @@ const fetchUoms = async () => {
     setIsModalOpen(true);
   };
 
-  const openEdit = (u: Uom) => {
-    setForm(u);
-    setEditingId(u.id);
-    setIsModalOpen(true);
-  };
+const openEdit = (u: Uom) => {
+  setForm({
+    code: u.code,
+    name: u.name,
+    category: u.category,
+    status: u.status,
+  });
+  setEditingId(u.id);
+  setIsModalOpen(true);
+};
 
   const closeModal = () => {
     setIsModalOpen(false);
@@ -276,20 +288,33 @@ const fetchUoms = async () => {
                       {u.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 space-x-3">
-                    <button
-                      onClick={() => openEdit(u)}
-                      className="text-blue-600 hover:underline"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => onDelete(u.id)}
-                      className="text-red-500 hover:underline"
-                    >
-                      Delete
-                    </button>
-                  </td>
+                 <td className="px-4 py-3 text-center">
+  <div className="flex flex-col items-center gap-2">
+
+    {/* EDIT */}
+    <button
+      onClick={() => openEdit(u)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #005F99, #0f6da8)",
+      }}
+    >
+      Edit
+    </button>
+
+    {/* DELETE */}
+    <button
+      onClick={() => onDelete(u.id)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #C8102E, #EF4444)",
+      }}
+    >
+      Delete
+    </button>
+
+  </div>
+</td>
                 </tr>
               ))}
 

@@ -424,19 +424,33 @@ const handleFileUpload = async (e) => {
                       {item.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 space-x-3 text-blue-600 cursor-pointer">
-                   <span
-                  onClick={() => router.push(`/ItemMasterForm?id=${item.id}`)}
-                  className="cursor-pointer text-blue-600">
-                  Edit
-                  </span>
-                    <span
-                    className="text-red-500 cursor-pointer"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                   Delete
-                  </span>
-                  </td>
+                  <td className="px-4 py-3 text-center">
+  <div className="flex flex-col items-center gap-2">
+
+    {/* EDIT */}
+    <button
+      onClick={() => router.push(`/ItemMasterForm?id=${item.id}`)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #005F99, #0f6da8)",
+      }}
+    >
+      Edit
+    </button>
+
+    {/* DELETE */}
+    <button
+      onClick={() => handleDelete(item.id)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #C8102E, #EF4444)",
+      }}
+    >
+      Delete
+    </button>
+
+  </div>
+</td>
                 </tr>
               ))}
             </tbody>

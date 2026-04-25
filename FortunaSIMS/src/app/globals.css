@@ -1473,3 +1473,89 @@ button:active {
 .fortuna-color-switch {
   animation: fortunaColorSwitchFinal 4s ease-in-out infinite;
 }
+
+
+/* ===============================
+   🔥 FORTUNA PREMIUM CARD
+   =============================== */
+
+.fortuna-card-premium {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: linear-gradient(
+    135deg,
+    rgba(255,255,255,0.95) 0%,
+    rgba(0,95,153,0.05) 40%,
+    rgba(200,16,46,0.05) 100%
+  );
+  border: 1px solid rgba(0,95,153,0.15);
+  box-shadow: var(--shadow-theme-md);
+  transition: all 0.3s ease;
+}
+
+/* Glow border effect */
+.fortuna-card-premium::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(120deg, #005F99, #C8102E);
+  -webkit-mask: 
+    linear-gradient(#eea4a4 0 0) content-box, 
+    linear-gradient(#cdb3b3 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+/* Hover effect */
+.fortuna-card-premium:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: var(--shadow-theme-lg);
+}
+
+
+/* ===============================
+   📦 FORTUNA STANDARD CARD
+   =============================== */
+
+.fortuna-card {
+  border-radius: 1rem;
+  background: #ffffff;
+  border: 1px solid rgba(0, 95, 153, 0.15); /* soft blue border */
+  box-shadow: var(--shadow-theme-sm);
+  transition: all 0.25s ease;
+}
+
+.fortuna-card:hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-theme-md);
+}
+
+/* Header style */
+.fortuna-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.fortuna-card-title {
+  font-weight: 800;
+  color: #C8102E; /* primary red */
+}
+
+.fortuna-card-dot-blue {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #005F99;
+}
+
+.fortuna-card-dot-red {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #C8102E;
+}

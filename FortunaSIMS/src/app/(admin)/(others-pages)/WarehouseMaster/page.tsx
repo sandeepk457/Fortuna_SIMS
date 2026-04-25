@@ -311,20 +311,33 @@ const fetchWarehouses = async () => {
                       {wh.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3 space-x-3 text-blue-600 cursor-pointer">
-              <span
-                onClick={() => router.push(`/WarehouseForm?code=${wh.code}`)}
-                className="hover:underline"
-              >
-                Edit
-              </span>
+                  <td className="px-4 py-3 text-center">
+  <div className="flex flex-col items-center gap-2">
 
-              <span 
-              
-                onClick={() => handleview(wh.code)}
+    {/* EDIT */}
+    <button
+      onClick={() => router.push(`/WarehouseForm?code=${wh.code}`)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #005F99, #0f6da8)",
+      }}
+    >
+      Edit
+    </button>
 
-              className="text-red-500">View</span>
-              </td>
+    {/* VIEW */}
+    <button
+      onClick={() => handleview(wh.code)}
+      className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #C8102E, #EF4444)",
+      }}
+    >
+      View
+    </button>
+
+  </div>
+</td>
                 </tr>
               ))}
 
