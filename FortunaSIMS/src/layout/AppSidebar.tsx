@@ -79,7 +79,7 @@ const navItems: NavItem[] = [
             name: "Stock Transfer", 
   subItems: [
     { name: "Transfer List", path: "/StockTransferRequest" },
-    { name: "Create Transfer", path: "/transfers/create" },
+    { name: "Create Transfer", path: "/StockTransferForm" },
     { name: "Dispatch", path: "/transfers/dispatch" },
     { name: "Receive", path: "/transfers/receive" },
     { name: "Approvals", path: "/transfers/approvals" }

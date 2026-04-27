@@ -469,20 +469,33 @@ const onDelete = async (id: string) => {
                           {v.status}
                         </span>
                       </td>
-                      <td className="px-4 py-3 space-x-3">
-                        <button
-                          className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => router.push(`/VendorForm?id=${v.id}`)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="font-semibold text-rose-600 hover:underline"
-                          onClick={() => handleDelete(v.id)}
-                        >
-                          Delete
-                        </button>
-                      </td>
+                     <td className="px-4 py-3 text-center">
+  <div className="flex flex-col items-center gap-2">
+
+    {/* EDIT */}
+    <button
+      onClick={() => router.push(`/VendorForm?id=${v.id}`)}
+      className="w-[90px] px-3 py-1 text-xs rounded-lg text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #005F99, #0f6da8)",
+      }}
+    >
+      Edit
+    </button>
+
+    {/* DELETE */}
+    <button
+      onClick={() => handleDelete(v.id)}
+      className="w-[90px] px-3 py-1 text-xs rounded-lg text-white shadow-md hover:shadow-lg transition-all duration-200 hover:scale-105 active:scale-95"
+      style={{
+        background: "linear-gradient(135deg, #C8102E, #EF4444)",
+      }}
+    >
+      Delete
+    </button>
+
+  </div>
+</td>
                     </tr>
                   ))}
 
