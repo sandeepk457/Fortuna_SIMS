@@ -75,14 +75,29 @@ const navItems: NavItem[] = [
               { name: "Customer Returns", path: "/CustomerReturns" },
             ],
           },
-          { 
-            name: "Stock Transfer", 
+          {
+  name: "Stock Transfer",
   subItems: [
-    { name: "Transfer List", path: "/StockTransferRequest" },
-    { name: "Create Transfer", path: "/StockTransferForm" },
-    { name: "Dispatch", path: "/transfers/dispatch" },
-    { name: "Receive", path: "/transfers/receive" },
-    { name: "Approvals", path: "/transfers/approvals" }
+    {
+      name: "Transfer List",
+      path: "/StockTransferRequest",
+    },
+    {
+      name: "Create Transfer",
+      path: "/StockTransferForm",
+    },
+    {
+      name: "Dispatch",
+      path: "/sims/inventory/stock-transfer/dispatch",
+    },
+    {
+      name: "Receive",
+      path: "/sims/inventory/stock-transfer/receive",
+    },
+    {
+      name: "Approvals",
+      path: "/sims/inventory/stock-transfer/approvals",
+    },
   ],
 },
           { name: "Warehouse Layout", path: "/WarehouseLayout" },
