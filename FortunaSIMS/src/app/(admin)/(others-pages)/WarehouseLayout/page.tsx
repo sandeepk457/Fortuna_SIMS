@@ -217,6 +217,26 @@ export default function WarehouseLayoutPage() {
     link.click();
   };
 
+  const getQrId = (binCode: string) => `qr-${binCode.replace(/[^A-Za-z0-9_-]/g, "-")}`;
+
+  const downloadQrCode = (binCode: string) => {
+    const svg = document.getElementById(getQrId(binCode)) as SVGSVGElement | null;
+    if (!svg) return;
+
+    const serializer = new XMLSerializer();
+    const source = serializer.serializeToString(svg);
+    const blob = new Blob([source], { type: "image/svg+xml;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = href;
+    link.download = `${binCode}-qr.svg`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(href);
+  };
+
   return (
     <div className="space-y-4">
       <PageBreadcrumb pageTitle="Warehouse Layout" />
@@ -415,17 +435,25 @@ export default function WarehouseLayoutPage() {
                  
 
                     {/* 🔥 QR Code Section */}
-<div className="flex flex-col items-center justify-center py-3">
-  <QRCode
-    value={`${window.location.origin}/bin?code=${selectedBin.code}`}
-    size={120}
-  />
+                    <div className="flex flex-col items-center justify-center py-3">
+                      <QRCode
+                        id={getQrId(selectedBin.code)}
+                        value={`${window.location.origin}/bin?code=${selectedBin.code}`}
+                        size={120}
+                      />
 
-  <p className="mt-2 text-xs text-gray-500">
-    Scan to view live bin data
-  </p>
-</div>
+                      <p className="mt-2 text-xs text-gray-500">
+                        Scan to view live bin data
+                      </p>
 
+                      <button
+                        type="button"
+                        onClick={() => downloadQrCode(selectedBin.code)}
+                        className="mt-3 rounded-lg border border-gray-200 bg-white px-4 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                      >
+                        Download QR Code
+                      </button>
+                    </div>
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
                         <div className="flex items-center justify-between">

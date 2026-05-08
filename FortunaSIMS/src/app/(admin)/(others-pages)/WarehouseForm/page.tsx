@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useRef, useMemo, useState } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 import { useSearchParams } from "next/navigation";
@@ -89,6 +90,7 @@ type Bin = {
   level: number;
   position: number;
   status: BinStatus;
+  qrCode?: string; // QR code data for the bin
   meta?: BinMeta;
 };
 
@@ -153,19 +155,22 @@ function makeRackBins(params: {
 
   for (let l = 1; l <= levels; l++) {
     for (let b = 1; b <= binsPerLevel; b++) {
+      const binCode = buildBinCode({
+        warehouseCode,
+        zoneName,
+        aisleName,
+        rackName,
+        level: l,
+        pos: b,
+      });
+      
       bins.push({
         id: uid("bin"),
-        code: buildBinCode({
-          warehouseCode,
-          zoneName,
-          aisleName,
-          rackName,
-          level: l,
-          pos: b,
-        }),
+        code: binCode,
         level: l,
         position: b,
         status: "Available",
+        qrCode: binCode, // Generate QR code from bin code
         meta: { capacity: "", maxWeightKg: "", notes: "" },
       });
     }
@@ -388,6 +393,7 @@ const transformDBToUI = (zones, aisles, racks, bins) => {
                 level: b.level,
                 position: b.position,
                 status: b.status,
+                qrCode: b.bin_code, // Generate QR code from bin code
               })),
             };
           });
@@ -1691,6 +1697,41 @@ if (isEdit) {
                           label="Level / Position"
                           value={`L${pad2(drawerData?.b?.level ?? 0)} / B${pad2(drawerData?.b?.position ?? 0)}`}
                         />
+                      </div>
+
+                      <div className="rounded-2xl border border-gray-200 p-4">
+                        <h4 className="text-sm font-semibold text-gray-900">QR Code</h4>
+                        <p className="mt-1 text-xs text-gray-500">Scan to identify bin location.</p>
+                        
+                        <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-gray-200 bg-gray-50 p-4">
+                          {drawerData?.b?.qrCode && (
+                            <QRCodeCanvas
+                              id={`qr-${drawerData.b.id}`}
+                              value={drawerData.b.qrCode}
+                              size={200}
+                              level="H"
+                              includeMargin={true}
+                            />
+                          )}
+                          <p className="mt-2 text-xs text-gray-600 font-semibold">{drawerData?.b?.code}</p>
+                        </div>
+                        
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const qrElement = document.getElementById(`qr-${drawerData?.b?.id}`);
+                            if (qrElement instanceof HTMLCanvasElement) {
+                              const url = qrElement.toDataURL("image/png");
+                              const link = document.createElement("a");
+                              link.href = url;
+                              link.download = `${drawerData?.b?.code}-qr.png`;
+                              link.click();
+                            }
+                          }}
+                          className="mt-3 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+                        >
+                          Download QR Code
+                        </button>
                       </div>
 
                       <div className="rounded-2xl border border-gray-200 p-4">
