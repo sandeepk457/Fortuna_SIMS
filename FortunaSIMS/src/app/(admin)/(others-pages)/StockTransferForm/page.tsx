@@ -32,6 +32,7 @@ import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 const COLORS = {
   primary: "#005F99",
   secondary: "#C8102E",
+  
 
   bg: "#ECF5FC",
   card: "#FFFFFF",
@@ -202,6 +203,8 @@ export default function StockTransferRequestPage() {
   const [activeTab, setActiveTab] =
     useState<TabType>("basic");
 
+    const [errors, setErrors] = useState<any>({});
+
   const [form, setForm] =
     useState<TransferForm>({
       strNo: "STR-2026-000145",
@@ -318,6 +321,56 @@ export default function StockTransferRequestPage() {
     });
   };
 
+  // validation can be added here before saving or sending approval//
+
+  const validateTab = (tab: TabType) => {
+  let newErrors: any = {};
+
+  if (tab === "basic") {
+    if (!form.fromWarehouse)
+      newErrors.fromWarehouse = "From Warehouse is required";
+
+    if (!form.toWarehouse)
+      newErrors.toWarehouse = "To Warehouse is required";
+
+    if (!form.priority)
+      newErrors.priority = "Priority is required";
+
+    if (!form.requiredDate)
+      newErrors.requiredDate = "Required Date is required";
+
+    if (!form.department)
+      newErrors.department = "Department is required";
+  }
+
+  if (tab === "items") {
+    if (form.items.length === 0) {
+      newErrors.items = "At least one item is required";
+    }
+
+    form.items.forEach((item, index) => {
+      if (!item.transferQty || item.transferQty <= 0) {
+        newErrors[`transferQty_${index}`] =
+          "Enter valid transfer quantity";
+      }
+    });
+  }
+
+  if (tab === "logistics") {
+    if (!form.transporter)
+      newErrors.transporter = "Transporter required";
+
+    if (!form.vehicleType)
+      newErrors.vehicleType = "Vehicle Type required";
+  }
+
+  setErrors(newErrors);
+
+  return Object.keys(newErrors).length === 0;
+};
+
+
+
   /* =======================================================================
      SAVE
   ======================================================================= */
@@ -328,13 +381,26 @@ export default function StockTransferRequestPage() {
 
   const sendApproval = () => {
 
-    setForm((prev) => ({
-      ...prev,
-      status: "Pending Approval",
-    }));
+  const tabs: TabType[] = [
+    "basic",
+    "items",
+    "logistics",
+  ];
 
-    alert("Approval Sent");
-  };
+  for (let tab of tabs) {
+    if (!validateTab(tab)) {
+      setActiveTab(tab);
+      return;
+    }
+  }
+
+  setForm((prev) => ({
+    ...prev,
+    status: "Pending Approval",
+  }));
+
+  alert("Approval Sent");
+};
 
   /* =======================================================================
      RENDER
@@ -619,11 +685,11 @@ export default function StockTransferRequestPage() {
               return (
                 <button
   key={tab.key}
-  onClick={() =>
-    setActiveTab(
-      tab.key as TabType
-    )
+  onClick={() => {
+  if (validateTab(activeTab)) {
+    setActiveTab(tab.key as TabType);
   }
+}}
   className="relative rounded-lg px-3 py-2 text-sm font-semibold transition"
   style={{
     backgroundColor: active

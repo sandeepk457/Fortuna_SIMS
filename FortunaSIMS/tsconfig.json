@@ -26,15 +26,17 @@
       "@/*": [
         "./src/*"
       ]
-    }
+    },
+    "forceConsistentCasingInFileNames": true
   },
   "include": [
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
-, "backend/controllers/demand.controller.js"  ],
+    ".next/dev/types/**/*.ts",
+    "backend/controllers/demand.controller.js"
+  ],
   "exclude": [
     "node_modules"
   ]

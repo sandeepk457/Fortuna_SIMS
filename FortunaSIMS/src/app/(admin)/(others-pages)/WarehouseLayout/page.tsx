@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import QRCode from "react-qr-code";
 
 /** Fortuna Theme (minimal accents) */
 const FORTUNA_RED = "#C8102E";
@@ -410,6 +411,21 @@ export default function WarehouseLayoutPage() {
                           <div className="mt-1"><span className={statusChip(selectedBin.status)}>{selectedBin.status}</span></div>
                         </div>
                       </div>
+
+                 
+
+                    {/* 🔥 QR Code Section */}
+<div className="flex flex-col items-center justify-center py-3">
+  <QRCode
+    value={`${window.location.origin}/bin?code=${selectedBin.code}`}
+    size={120}
+  />
+
+  <p className="mt-2 text-xs text-gray-500">
+    Scan to view live bin data
+  </p>
+</div>
+
 
                       <div className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
                         <div className="flex items-center justify-between">
