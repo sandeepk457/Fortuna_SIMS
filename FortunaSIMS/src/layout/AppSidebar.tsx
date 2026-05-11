@@ -82,10 +82,10 @@ const navItems: NavItem[] = [
       name: "Transfer List",
       path: "/StockTransferRequest",
     },
-    {
-      name: "Create Transfer",
-      path: "/StockTransferForm",
-    },
+    // {
+    //   name: "Create Transfer",
+    //   path: "/StockTransferForm",
+    // },
     {
       name: "Dispatch",
       path: "/sims/inventory/stock-transfer/dispatch",

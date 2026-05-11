@@ -601,14 +601,17 @@ export default function StockTransferRequestPage() {
           {
             title: "Total Lines",
             value: totalLines,
+            color: "#C8102E",
           },
           {
             title: "Transfer Qty",
             value: totalQty,
+            color: "#005F99",
           },
           {
             title: "Priority",
             value: form.priority,
+            color: "#C8102E",
           },
           {
             title: "Approval",
@@ -616,21 +619,33 @@ export default function StockTransferRequestPage() {
               form.approvalRequired
                 ? "Required"
                 : "Not Required",
+            color: "#005F99",
           },
         ].map((card, index) => (
           <div
             key={index}
-            className={`${sectionCard} p-3`}
+            className="relative p-6 rounded-2xl text-white font-semibold shadow-lg overflow-hidden group transition-all duration-300 hover:shadow-2xl"
+            style={{
+              background: `linear-gradient(135deg, ${card.color}99 0%, ${card.color} 100%)`,
+            }}
           >
+            {/* Glow Effect */}
+            <div
+              className="absolute inset-0 opacity-0 group-hover:opacity-20 blur-xl transition-opacity duration-300"
+              style={{
+                background: card.color,
+              }}
+            />
 
-            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-              {card.title}
+            <div className="relative z-10">
+              <div className="text-xs font-semibold uppercase tracking-wider text-white/80">
+                {card.title}
+              </div>
+
+              <div className="mt-3 text-3xl font-bold text-white">
+                {card.value}
+              </div>
             </div>
-
-            <div className="mt-3 text-lg font-bold text-slate-800">
-              {card.value}
-            </div>
-
           </div>
         ))}
 
@@ -685,11 +700,7 @@ export default function StockTransferRequestPage() {
               return (
                 <button
   key={tab.key}
-  onClick={() => {
-  if (validateTab(activeTab)) {
-    setActiveTab(tab.key as TabType);
-  }
-}}
+  onClick={() => setActiveTab(tab.key as TabType)}
   className="relative rounded-lg px-3 py-2 text-sm font-semibold transition"
   style={{
     backgroundColor: active

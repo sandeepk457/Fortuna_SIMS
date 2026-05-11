@@ -51,8 +51,6 @@ const [activeTab, setActiveTab] = useState<"all" | "draft">("all");
 const [currentPage, setCurrentPage] = useState(1);
 const [itemsPerPage, setItemsPerPage] = useState(5);
 
-const [openModal, setOpenModal] = useState(false);
-
   /** STATIC DATA */
   const [data] = useState<Transfer[]>([
     { id: 1001, from: "Vizag WH", to: "Hyderabad WH", date: "2026-04-20", status: "Draft", value: 25000 },
@@ -157,7 +155,7 @@ const paginatedRows = rows.slice(
           </button>
 
           <button
-            onClick={() => setOpenModal(true)}
+            onClick={() => router.push('/StockTransferForm')}
             className="px-6 py-3 text-white font-semibold rounded-2xl shadow-lg"
             style={{ backgroundColor: "#005F99" }}
           >
