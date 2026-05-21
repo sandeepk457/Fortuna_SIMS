@@ -1559,3 +1559,12 @@ button:active {
   border-radius: 999px;
   background: #C8102E;
 }
+
+.fortuna-label {
+  color: #5A1E1E;
+  font-weight: 600;
+}
+
+.fortuna-heading {
+  color: #5A1E1E;
+}
