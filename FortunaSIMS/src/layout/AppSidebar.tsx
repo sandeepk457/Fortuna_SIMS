@@ -92,7 +92,7 @@ const navItems: NavItem[] = [
     },
     {
       name: "Receive",
-      path: "/sims/inventory/stock-transfer/receive",
+      path: "/Receive",
     },
     {
       name: "Approvals",
