@@ -222,6 +222,20 @@ export default function ReceiveManagementPage() {
     }
   };
 
+
+    const [openDockPopup, setOpenDockPopup] =
+  useState(false);
+
+    const [dockLocation, setDockLocation] =
+  useState("");
+
+    const [grnType, setGrnType] =
+  useState("Normal");
+
+    const [putawayStrategy, setPutawayStrategy] =
+  useState("FIFO");
+
+
   return (
     <div
       className="min-h-screen overflow-x-hidden p-5 xl:p-6"
@@ -282,9 +296,12 @@ export default function ReceiveManagementPage() {
       {/* ACTIONS */}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <button className="rounded-xl bg-[#005F99] px-4 py-2 text-sm font-semibold text-white shadow transition hover:opacity-90">
-          Receive Selected
-        </button>
+        <button
+        onClick={() => setOpenDockPopup(true)}
+        className="rounded-xl bg-[#005F99] px-4 py-2 text-sm font-semibold text-white shadow transition hover:opacity-90"
+            >
+        Receive Selected
+            </button>
 
         
 
@@ -330,7 +347,7 @@ export default function ReceiveManagementPage() {
   className={`px-5 py-4 text-left text-xs font-bold uppercase tracking-[0.18em] text-white ${
     head === "SELECT" ? "w-[90px]" : ""
   }`}
->
+    >
                     {head}
                   </th>
                 ))}
@@ -363,7 +380,7 @@ export default function ReceiveManagementPage() {
       All
     </span> */}
   </div>
-</th>
+    </th>
 
                 <th className="px-2 pb-4">
                   <input
@@ -885,6 +902,198 @@ export default function ReceiveManagementPage() {
           </div>
         </div>
       )}
+
+      {/* DOCK RECEIVING POPUP */}
+
+{openDockPopup && (
+  <div className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+
+    <div className="w-full max-w-3xl rounded-3xl bg-white shadow-2xl">
+
+      {/* HEADER */}
+
+      <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900">
+            Dock Receiving Allocation
+          </h2>
+
+          <p className="mt-1 text-sm text-slate-500">
+            Allocate selected receipts to warehouse receiving dock
+          </p>
+        </div>
+
+        <button
+          onClick={() => setOpenDockPopup(false)}
+          className="rounded-xl bg-slate-100 p-3 hover:bg-red-100"
+        >
+          <X size={18} />
+        </button>
+
+      </div>
+
+      {/* BODY */}
+
+      <div className="grid gap-5 p-6 md:grid-cols-2">
+
+        {/* WAREHOUSE */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Warehouse
+          </label>
+
+          <input
+            value="Hyderabad RDC"
+            disabled
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-100 px-4"
+          />
+        </div>
+
+        {/* RECEIVING DOCK */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Receiving Dock *
+          </label>
+
+          <select
+            value={dockLocation}
+            onChange={(e) =>
+              setDockLocation(e.target.value)
+            }
+            className="h-12 w-full rounded-2xl border border-slate-200 px-4 outline-none focus:border-[#005F99]"
+          >
+            <option value="">
+              Select Receiving Dock
+            </option>
+
+            <option value="HYD-RECV-01">
+              HYD-RECV-01
+            </option>
+
+            <option value="HYD-RECV-02">
+              HYD-RECV-02
+            </option>
+
+            <option value="HYD-STAGE-A01">
+              HYD-STAGE-A01
+            </option>
+          </select>
+        </div>
+
+        {/* GRN TYPE */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            GRN Type
+          </label>
+
+          <select
+            value={grnType}
+            onChange={(e) =>
+              setGrnType(e.target.value)
+            }
+            className="h-12 w-full rounded-2xl border border-slate-200 px-4"
+          >
+            <option>Normal</option>
+
+            <option>QC Hold</option>
+
+            <option>Damage Hold</option>
+          </select>
+        </div>
+
+        {/* STRATEGY */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Putaway Strategy
+          </label>
+
+          <select
+            value={putawayStrategy}
+            onChange={(e) =>
+              setPutawayStrategy(e.target.value)
+            }
+            className="h-12 w-full rounded-2xl border border-slate-200 px-4"
+          >
+            <option>FIFO</option>
+
+            <option>FEFO</option>
+
+            <option>Manual</option>
+          </select>
+        </div>
+
+        {/* RECEIVED BY */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Received By
+          </label>
+
+          <input
+            value="KKR Warehouse User"
+            disabled
+            className="h-12 w-full rounded-2xl border border-slate-200 bg-slate-100 px-4"
+          />
+        </div>
+
+        {/* ARRIVAL */}
+
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Vehicle Arrival Time
+          </label>
+
+          <input
+            type="datetime-local"
+            className="h-12 w-full rounded-2xl border border-slate-200 px-4"
+          />
+        </div>
+
+        {/* REMARKS */}
+
+        <div className="md:col-span-2">
+          <label className="mb-2 block text-sm font-semibold text-slate-700">
+            Remarks
+          </label>
+
+          <textarea
+            rows={4}
+            placeholder="Enter remarks..."
+            className="w-full rounded-2xl border border-slate-200 p-4 outline-none focus:border-[#005F99]"
+          />
+        </div>
+
+      </div>
+
+      {/* FOOTER */}
+
+      <div className="flex justify-end gap-3 border-t border-slate-200 px-6 py-5">
+
+        <button
+          onClick={() => setOpenDockPopup(false)}
+          className="rounded-2xl border px-5 py-3 font-semibold"
+        >
+          Cancel
+        </button>
+
+        <button
+          className="rounded-2xl bg-[#005F99] px-6 py-3 font-semibold text-white"
+        >
+          Allocate to Receiving Dock
+        </button>
+
+      </div>
+
+    </div>
+
+  </div>
+)}
+
     </div>
   );
 }
@@ -946,6 +1155,10 @@ function InfoCard({
       <p className="mt-3 text-xl font-bold text-slate-900">
         {value}
       </p>
+
+
+
+      
     </div>
   );
 }
