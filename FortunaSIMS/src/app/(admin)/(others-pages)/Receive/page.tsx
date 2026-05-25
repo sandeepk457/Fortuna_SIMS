@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import {
   Eye,
   Truck,
@@ -223,6 +225,175 @@ export default function ReceiveManagementPage() {
   };
 
 
+//grn generation pdf//
+
+const generateGRN = async () => {
+
+  const doc = new jsPDF();
+
+  // =========================
+  // LOAD IMAGE PROPERLY
+  // =========================
+
+  const img = new Image();
+
+  img.src = "/images/logo/sims-logo.png";
+
+  img.onload = () => {
+
+    // =========================
+    // LOGO
+    // =========================
+
+    doc.addImage(
+      img,
+      "PNG",
+      12,
+      6,
+      60,
+      34
+    );
+
+    // =========================
+    // COMPANY TITLE
+    // =========================
+
+    doc.setFontSize(24);
+
+    doc.setTextColor(0, 95, 153);
+
+    // doc.text(
+    //   "FORTUNA SIMS",
+    //   78,
+    //   20
+    // );
+
+    // SUB TITLE
+
+    // doc.setFontSize(10);
+
+    // doc.setTextColor(100);
+
+    // doc.text(
+    //   "Supply & Inventory Management System",
+    //   78,
+    //   28
+    // );
+
+    // =========================
+    // GRN TITLE
+    // =========================
+
+    doc.setFontSize(20);
+
+    doc.setTextColor(200, 16, 46);
+
+    doc.text(
+      "Goods Receipt Note (GRN)",
+      78,
+      40
+    );
+
+    // =========================
+    // HEADER INFO
+    // =========================
+
+    doc.setFontSize(11);
+
+    doc.setTextColor(60);
+
+    doc.text(
+      "GRN No : GRN-2026-001",
+      14,
+      58
+    );
+
+    doc.text(
+      "Warehouse : Hyderabad RDC",
+      14,
+      65
+    );
+
+    doc.text(
+      "Dock : DOCK-A01",
+      14,
+      72
+    );
+
+    doc.text(
+      `Date : ${new Date().toLocaleDateString()}`,
+      145,
+      58
+    );
+
+    // =========================
+    // TABLE
+    // =========================
+
+    autoTable(doc, {
+
+      startY: 85,
+
+      head: [[
+        "SKU",
+        "Item",
+        "Expected Qty",
+        "Received Qty",
+        "Bin Location",
+      ]],
+
+      body: receiveItems.map((item) => [
+        item.sku,
+        item.item,
+        item.qty,
+        item.receiveQty,
+        item.bin || "N/A",
+      ]),
+
+      styles: {
+        fontSize: 10,
+        cellPadding: 4,
+      },
+
+      headStyles: {
+        fillColor: [232, 17, 77],
+      },
+
+      alternateRowStyles: {
+        fillColor: [248, 250, 252],
+      },
+    });
+
+    // =========================
+    // FOOTER
+    // =========================
+
+    const finalY =
+      (doc as any).lastAutoTable.finalY + 25;
+
+    doc.setFontSize(11);
+
+    doc.text(
+      "Received By : ____________________",
+      14,
+      finalY
+    );
+
+    doc.text(
+      "Verified By : ____________________",
+      120,
+      finalY
+    );
+
+    // =========================
+    // SAVE PDF
+    // =========================
+
+    doc.save("Fortuna_GRN.pdf");
+  };
+};
+
+
     const [openDockPopup, setOpenDockPopup] =
   useState(false);
 
@@ -305,9 +476,12 @@ export default function ReceiveManagementPage() {
 
         
 
-        <button className="rounded-xl bg-[#C8102E] px-4 py-2 text-sm font-semibold text-white shadow transition hover:opacity-90">
-          Print GRN
-        </button>
+        <button
+  onClick={generateGRN}
+  className="rounded-xl bg-[#C8102E] px-4 py-2 text-sm font-semibold text-white shadow transition hover:opacity-90"
+>
+  Print GRN
+</button>
 
         <div className="ml-auto text-sm font-medium text-slate-500">
           Selected Rows : {selectedRows.length}
