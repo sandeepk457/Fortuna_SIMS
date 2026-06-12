@@ -139,6 +139,8 @@ try {
   };
 
 const department = body.department || null;
+const requested_by = body.requested_by || "System";
+
 const cost_center = body.cost_center || null;
 const project_code = body.project_code || null;
 const priority = body.priority || null;

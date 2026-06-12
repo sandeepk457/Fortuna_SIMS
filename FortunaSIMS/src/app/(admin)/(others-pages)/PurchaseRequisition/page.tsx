@@ -681,6 +681,8 @@ const handleItemSelect = (idx: number, itemCode: string) => {
 
     // 🔥 PREPARE PAYLOAD
    const payload = {
+
+  requested_by: form.requested_by,
   department: form.department || null,
   cost_center: form.cost_center || null,
   project_code: form.project_code || null,

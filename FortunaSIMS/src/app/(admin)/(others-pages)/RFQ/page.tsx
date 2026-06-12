@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 
@@ -65,6 +65,7 @@ interface RFQRecord {
   currency: Currency;
   totalItems: number;
   estimatedValue: number;
+  vendorCount: number;
 
   prNo: string; // source
   approvalRoute: ApprovalStep[];
@@ -87,6 +88,7 @@ const LS_EDIT_DRAFT = "FORTUNA_RFQ_EDIT_DRAFT";
 function classNames(...v: Array<string | false | undefined | null>) {
   return v.filter(Boolean).join(" ");
 }
+
 function formatMoney(n: number, currency: Currency) {
   try {
     return new Intl.NumberFormat("en-IN", {
@@ -98,6 +100,19 @@ function formatMoney(n: number, currency: Currency) {
     return `${currency} ${Math.round(n)}`;
   }
 }
+
+function formatDate(dateValue: string) {
+  if (!dateValue) return "-";
+
+  const d = new Date(dateValue);
+
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+
+  return `${day}-${month}-${year}`;
+}
+
 function todayISO() {
   const d = new Date();
   const yyyy = d.getFullYear();
@@ -105,6 +120,7 @@ function todayISO() {
   const dd = String(d.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
 }
+
 function withinRange(dateISO: string, from?: string, to?: string) {
   const t = new Date(dateISO).getTime();
   if (from) {
@@ -121,133 +137,52 @@ function withinRange(dateISO: string, from?: string, to?: string) {
 export default function RFQListPage() {
   const router = useRouter();
 
-  const [data, setData] = useState<RFQRecord[]>([
-    {
-      rfqNo: "RFQ-2026-000101",
-      title: "Packaging materials (monthly)",
-      department: "Stores",
-      requestor: "Ravi",
-      createdOn: "2026-02-01",
-      requiredBy: "2026-02-07",
-      priority: "High",
-      status: "Pending Approval",
-      currency: "INR",
-      totalItems: 4,
-      estimatedValue: 68080,
-      prNo: "PR-000103",
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      vendors: [
-        { vendor_id: "V1", vendor_name: "Sri Lakshmi Suppliers", vendor_code: "V-001", invited: true, responded: false },
-        { vendor_id: "V2", vendor_name: "Aparna Packaging", vendor_code: "V-002", invited: true, responded: true, quoted_total: 67500 },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "PKG-001", item_description: "Carton boxes", uom: "Nos", qty: 1000, target_price: 45 },
-        { rfq_item_id: "I2", item_code: "PKG-002", item_description: "Bubble wrap roll", uom: "Nos", qty: 50, target_price: 350 },
-        { rfq_item_id: "I3", item_code: "PKG-003", item_description: "Packing tape", uom: "Nos", qty: 200, target_price: 65 },
-        { rfq_item_id: "I4", item_code: "PKG-004", item_description: "Stretch film", uom: "Nos", qty: 40, target_price: 420 },
-      ],
-    },
-    {
-      rfqNo: "RFQ-2026-000102",
-      title: "Conveyor spare parts",
-      department: "Maintenance",
-      requestor: "Sandeep",
-      createdOn: "2026-02-02",
-      requiredBy: "2026-02-10",
-      priority: "Urgent",
-      status: "Approved",
-      currency: "INR",
-      totalItems: 6,
-      estimatedValue: 145000,
-      prNo: "PR-000101",
-      currentApprovalLevel: 3,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head", decision: "Approved", decidedAt: "2026-02-02", remarks: "OK" },
-        { level: 2, approverRole: "Finance", decision: "Approved", decidedAt: "2026-02-03", remarks: "Budget ok" },
-        { level: 3, approverRole: "Procurement", decision: "Approved", decidedAt: "2026-02-03", remarks: "Proceed PO" },
-      ],
-      vendors: [
-        { vendor_id: "V1", vendor_name: "Sri Lakshmi Suppliers", vendor_code: "V-001", invited: true, responded: true, quoted_total: 146500 },
-        { vendor_id: "V3", vendor_name: "Prime 3PL", vendor_code: "V-010", invited: true, responded: true, quoted_total: 145000 },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "SP-101", item_description: "Bearing set", uom: "Nos", qty: 10, target_price: 3500 },
-        { rfq_item_id: "I2", item_code: "SP-102", item_description: "Belt roller", uom: "Nos", qty: 6, target_price: 6200 },
-        { rfq_item_id: "I3", item_code: "SP-103", item_description: "Chain lubricant", uom: "Ltr", qty: 15, target_price: 650 },
-        { rfq_item_id: "I4", item_code: "SP-104", item_description: "Sensor", uom: "Nos", qty: 3, target_price: 4500 },
-        { rfq_item_id: "I5", item_code: "SP-105", item_description: "Fasteners", uom: "Nos", qty: 300, target_price: 12 },
-        { rfq_item_id: "I6", item_code: "SP-106", item_description: "Alignment kit", uom: "Set", qty: 1, target_price: 15000 },
-      ],
-    },
-    {
-      rfqNo: "RFQ-2026-000103",
-      title: "New barcode scanners",
-      department: "IT",
-      requestor: "Aparna",
-      createdOn: "2026-02-03",
-      requiredBy: "2026-02-15",
-      priority: "Medium",
-      status: "Submitted",
-      currency: "INR",
-      totalItems: 3,
-      estimatedValue: 78000,
-      prNo: "PR-000102",
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      vendors: [
-        { vendor_id: "V4", vendor_name: "TechZone India", vendor_code: "V-021", invited: true, responded: false },
-        { vendor_id: "V5", vendor_name: "ScanPro Systems", vendor_code: "V-022", invited: true, responded: false },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "IT-201", item_description: "Barcode scanner handheld", uom: "Nos", qty: 3, target_price: 26000 },
-      ],
-    },
+  const [data, setData] = useState<RFQRecord[]>([]);
 
-    /** ✅ Draft sample row */
-    {
-      rfqNo: "RFQ-2026-000104",
-      title: "Draft: Laptop procurement for new joiners",
-      department: "IT",
-      requestor: "Sandeep",
-      createdOn: "2026-02-03",
-      requiredBy: "2026-02-22",
-      priority: "Medium",
-      status: "Draft",
-      currency: "INR",
-      totalItems: 2,
-      estimatedValue: 120000,
-      prNo: "PR-000106",
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Department Head" },
-        { level: 2, approverRole: "Finance" },
-        { level: 3, approverRole: "Procurement" },
-      ],
-      vendors: [
-        { vendor_id: "V6", vendor_name: "LaptopWorld", vendor_code: "V-030", invited: false, responded: false },
-      ],
-      items: [
-        { rfq_item_id: "I1", item_code: "LT-001", item_description: "Laptop i5 16GB", uom: "Nos", qty: 2, target_price: 60000 },
-      ],
-      draftPayload: {
-        rfqNo: "RFQ-2026-000104",
-        department: "IT",
-        priority: "Medium",
-        title: "Laptop procurement for new joiners",
-        vendors: [{ vendor_name: "LaptopWorld", vendor_code: "V-030" }],
-        items: [{ item_code: "LT-001", qty: 2, price: 60000 }],
-      },
-    },
-  ]);
+  useEffect(() => {
+  loadRFQs();
+}, []);
+
+const loadRFQs = async () => {
+  try {
+
+    const res = await fetch(
+      "http://localhost:5000/api/rfq/list"
+    );
+
+    const result = await res.json();
+
+    if (result.success) {
+
+      const mapped = result.data.map((r: any) => ({
+        rfqNo: r.rfq_number,
+        title: r.remarks || "RFQ",
+        department: r.department,
+        requestor: r.created_by,
+        createdOn: formatDate(r.rfq_date),
+        requiredBy: formatDate(r.quotation_due_date),
+        priority: r.priority,
+        status: r.status,
+        currency: r.currency,
+        totalItems: r.total_items,
+        estimatedValue: Number(r.estimated_value || 0),
+        prNo: r.pr_number,
+
+        vendorCount: Number(r.vendor_count || 0),
+        vendors: [],
+        items: [],
+
+        approvalRoute: [],
+        currentApprovalLevel: 1
+      }));
+
+      setData(mapped);
+    }
+
+  } catch (err) {
+    console.error("RFQ LIST ERROR", err);
+  }
+};
 
   /** Tabs state */
   const [activeTab, setActiveTab] = useState<ListTab>("all");
@@ -279,28 +214,43 @@ export default function RFQListPage() {
 
   /** Filtered data */
   const filteredData = useMemo(() => {
-    return tabFilteredBase.filter((rfq) => {
-      const ok =
-        rfq.rfqNo.toLowerCase().includes(searchRfqNo.toLowerCase()) &&
-        rfq.title.toLowerCase().includes(searchTitle.toLowerCase()) &&
-        rfq.requestor.toLowerCase().includes(searchRequestor.toLowerCase()) &&
-        (deptFilter ? rfq.department === deptFilter : true) &&
-        (priorityFilter ? rfq.priority === priorityFilter : true) &&
-        (statusFilter ? rfq.status === statusFilter : true) &&
-        withinRange(rfq.createdOn, createdFrom || undefined, createdTo || undefined);
-      return ok;
-    });
-  }, [
-    tabFilteredBase,
-    searchRfqNo,
-    searchTitle,
-    searchRequestor,
-    deptFilter,
-    priorityFilter,
-    statusFilter,
-    createdFrom,
-    createdTo,
-  ]);
+  return tabFilteredBase.filter((rfq) => {
+    const ok =
+      (rfq.rfqNo || "")
+        .toLowerCase()
+        .includes(searchRfqNo.toLowerCase()) &&
+
+      (rfq.title || "")
+        .toLowerCase()
+        .includes(searchTitle.toLowerCase()) &&
+
+      (rfq.requestor || "")
+        .toLowerCase()
+        .includes(searchRequestor.toLowerCase()) &&
+
+      (deptFilter ? rfq.department === deptFilter : true) &&
+      (priorityFilter ? rfq.priority === priorityFilter : true) &&
+      (statusFilter ? rfq.status === statusFilter : true) &&
+
+      withinRange(
+        rfq.createdOn,
+        createdFrom || undefined,
+        createdTo || undefined
+      );
+
+    return ok;
+  });
+}, [
+  tabFilteredBase,
+  searchRfqNo,
+  searchTitle,
+  searchRequestor,
+  deptFilter,
+  priorityFilter,
+  statusFilter,
+  createdFrom,
+  createdTo,
+]);
 
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -758,7 +708,7 @@ export default function RFQListPage() {
                       </td>
 
                       <td className="px-4 py-3">{rfq.createdOn}</td>
-                      <td className="px-4 py-3">{rfq.vendors.length}</td>
+                      <td className="px-4 py-3">{rfq.vendorCount}</td>
                       <td className="px-4 py-3">{rfq.totalItems}</td>
                       <td className="px-4 py-3 font-semibold">{formatMoney(rfq.estimatedValue, rfq.currency)}</td>
 

@@ -2,6 +2,8 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
+
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -31,10 +33,7 @@ type AttachmentType = "Quotation" | "Spec" | "Brochure" | "Other";
 
 type Priority = "Low" | "Medium" | "High" | "Urgent";
 
-/** Masters */
-const DEPARTMENTS = ["Stores", "Maintenance", "Production", "IT", "Finance", "Admin", "Procurement"] as const;
 
-const USERS = ["Sandeep", "Aparna", "Ravi", "Kiran", "Divya"] as const;
 
 type PRLine = {
   pr_item_id: string;
@@ -47,92 +46,26 @@ type PRLine = {
 type ApprovedPR = {
   pr_id: string;
   pr_number: string;
-  pr_date: string;
-  department: (typeof DEPARTMENTS)[number];
-  requested_by: (typeof USERS)[number];
-  priority: Priority;
+  department: string;
+  requested_by: string;
+  estimated_pr_value: number;
   currency: Currency;
-  items: PRLine[];
+  priority: string;
 };
 
-/** Demo Approved PRs (RFQ should come from Approved PR only) */
-const APPROVED_PRS: ApprovedPR[] = [
-  {
-    pr_id: "PR-UUID-001",
-    pr_number: "PR-2026-000103",
-    pr_date: "2026-02-01",
-    department: "Stores",
-    requested_by: "Sandeep",
-    priority: "High",
-    currency: "INR",
-    items: [
-      {
-        pr_item_id: "PRITEM-1001",
-        item_id: "SKU-BOX-5PLY",
-        item_description: "Corrugated Box (5-ply)",
-        uom: "Nos",
-        requested_qty: 200,
-      },
-      {
-        pr_item_id: "PRITEM-1002",
-        item_id: "SKU-BUBBLE-L",
-        item_description: "Bubble Wrap Roll (Large)",
-        uom: "Box",
-        requested_qty: 20,
-      },
-    ],
-  },
-  {
-    pr_id: "PR-UUID-002",
-    pr_number: "PR-2026-000105",
-    pr_date: "2026-02-02",
-    department: "Maintenance",
-    requested_by: "Aparna",
-    priority: "Urgent",
-    currency: "INR",
-    items: [
-      {
-        pr_item_id: "PRITEM-2001",
-        item_id: "SKU-BELT-01",
-        item_description: "Conveyor Belt (Heavy Duty)",
-        uom: "Nos",
-        requested_qty: 4,
-      },
-    ],
-  },
-];
+/** Approved PRs (RFQ should come from Approved PR only) */
+
 
 type VendorMaster = {
-  vendor_id: string;
+  id: string;
+  vendor_code: string;
   vendor_name: string;
-  vendor_email: string;
-  is_active: boolean;
-  compliance_status: "Verified" | "Pending" | "Rejected";
+  contact_email: string;
+  status: string;
+  compliance_status: string;
 };
 
-const VENDOR_MASTER: VendorMaster[] = [
-  {
-    vendor_id: "V-001",
-    vendor_name: "Sri Lakshmi Suppliers",
-    vendor_email: "sales@srilakshmi.example",
-    is_active: true,
-    compliance_status: "Verified",
-  },
-  {
-    vendor_id: "V-002",
-    vendor_name: "Aparna Packaging",
-    vendor_email: "quotes@aparnapack.example",
-    is_active: true,
-    compliance_status: "Verified",
-  },
-  {
-    vendor_id: "V-003",
-    vendor_name: "Prime 3PL",
-    vendor_email: "rfq@prime3pl.example",
-    is_active: true,
-    compliance_status: "Pending",
-  },
-];
+
 
 /** RFQ Vendor mapping (as per LLD) */
 type RFQVendor = {
@@ -183,18 +116,30 @@ type RFQAttachment = {
 };
 
 type RFQFormState = {
-  /** RFQ Basic Info (as per LLD) */
-  rfq_id: string; // system
-  rfq_number: string; // system RFQ-YYYY-SEQ
-  rfq_date: string; // system auto
-  pr_id: string; // required (Approved PR only)
-  pr_number: string; // system read-only (from PR)
-  created_by: string; // system (logged-in)
-  rfq_status: RFQStatus; // system-driven
-  quotation_due_date: string; // required > rfq_date
-  rfq_type: RFQType; // required
-  currency: Currency; // required (from PR default)
-  remarks: string; // optional internal
+
+  rfq_id: string;
+  rfq_number: string;
+  rfq_date: string;
+
+  pr_id: string;
+  pr_number: string;
+
+  department: string;
+  requestor: string;
+  priority: string;
+  estimated_value: number;
+
+  created_by: string;
+
+  rfq_status: RFQStatus;
+
+  quotation_due_date: string;
+
+  rfq_type: RFQType;
+
+  currency: Currency;
+
+  remarks: string;
 
   /** Vendor selection */
   vendors: RFQVendor[];
@@ -297,7 +242,11 @@ const initialState: RFQFormState = {
   rfq_date: todayISO(),
   pr_id: "",
   pr_number: "Auto",
-  created_by: "Logged-in user",
+  department: "",
+  requestor: "",
+  priority: "Medium",
+  estimated_value: 0,
+  created_by: "",
   rfq_status: "Draft",
   quotation_due_date: todayISO(),
   rfq_type: "Multi Vendor",
@@ -323,9 +272,49 @@ const initialState: RFQFormState = {
 };
 
 export default function RFQCreatePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<RFQFormState>(initialState);
+  const [approvedPRs, setApprovedPRs] = useState<ApprovedPR[]>([]);
+  const [vendorMaster, setVendorMaster] = useState<VendorMaster[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+  loadApprovedPRs();
+  loadVendors();
+}, []);
+
+const loadApprovedPRs = async () => {
+  try {
+    const res = await fetch(
+      "http://localhost:5000/api/rfq/approved-prs"
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      setApprovedPRs(data.data);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const loadVendors = async () => {
+  try {
+    const res = await fetch(
+      "http://localhost:5000/api/rfq/vendors"
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      setVendorMaster(data.data);
+    }
+  } catch (err) {
+    console.error(err);
+  }
+};
 
   /** Lock after leaving Draft (you can tweak) */
   const isLocked = useMemo(() => {
@@ -404,79 +393,127 @@ export default function RFQCreatePage() {
     setForm((p) => ({ ...p, [key]: value }));
   };
 
-  /** Load PR -> Items (read-only) + currency */
-  const onSelectApprovedPR = (pr_id: string) => {
-    if (isLocked) return;
+ const onSelectApprovedPR = async (pr_id: string) => {
+  if (isLocked) return;
 
-    const pr = APPROVED_PRS.find((p) => p.pr_id === pr_id);
-    if (!pr) return;
+  try {
 
-    // build RFQ items
-    const rfqItems: RFQItem[] = pr.items.map((line) => ({
-      rfq_item_id: uuidLike("RFQITEM"),
+   const selectedPR = approvedPRs.find(
+  (p) => p.pr_id === pr_id
+);
+
+if (!selectedPR) {
+  alert("PR not found");
+  return;
+}
+
+setForm((prev) => ({
+  ...prev,
+  pr_id: selectedPR.pr_id,
+  pr_number: selectedPR.pr_number,
+  department: selectedPR.department,
+  requestor: selectedPR.requested_by,
+created_by:
+  localStorage.getItem("userName") || "Unknown User",
+estimated_value: selectedPR.estimated_pr_value
+}));
+
+
+
+    if (!selectedPR) return;
+
+    const itemRes = await fetch(
+      `http://localhost:5000/api/rfq/pr/${pr_id}/items`
+    );
+
+    const itemData = await itemRes.json();
+
+    const rfqItems = itemData?.data?.map((line: any) => ({
+      rfq_item_id: uuidLike("RFQI"),
       pr_item_id: line.pr_item_id,
       item_id: line.item_id,
       item_description: line.item_description,
       uom: line.uom,
-      requested_qty: line.requested_qty,
-      quotes_by_vendor: {}, // will be auto-filled when vendors are selected
+      requested_qty: Number(line.requested_qty),
+      quotes_by_vendor: {},
     }));
 
-    setForm((p) => ({
-      ...p,
-      pr_id: pr.pr_id,
-      pr_number: pr.pr_number,
-      currency: pr.currency,
+    setForm((prev) => ({
+      ...prev,
+      pr_id,
+      pr_number: selectedPR.pr_number,
+      currency: selectedPR.currency,
       items: rfqItems,
     }));
-  };
 
-  /** Vendor selection helpers */
-  const addVendorFromMaster = (vendorId: string) => {
-    if (isLocked) return;
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-    const vm = VENDOR_MASTER.find((v) => v.vendor_id === vendorId);
-    if (!vm) return;
 
-    if (!vm.is_active) {
-      alert("Vendor must be Active.");
-      return;
+const addVendorFromMaster = (vendorId: string) => {
+  if (isLocked) return;
+
+  const vm = vendorMaster.find(
+    (v) => v.id === vendorId
+  );
+
+  if (!vm) return;
+
+  if (vm.status !== "Active") {
+    alert("Vendor must be Active");
+    return;
+  }
+
+  if (vm.compliance_status !== "Verified") {
+    alert("Vendor compliance must be Verified");
+    return;
+  }
+
+  setForm((p) => {
+
+    if (
+      p.vendors.some(
+        (x) => x.vendor_id === vm.id
+      )
+    ) {
+      alert("Vendor already added");
+      return p;
     }
-    if (vm.compliance_status !== "Verified") {
-      alert("Vendor compliance must be Verified (Phase-1 rule).");
-      return;
-    }
 
-    setForm((p) => {
-      if (p.vendors.some((x) => x.vendor_id === vendorId)) return p;
+    const newVendor: RFQVendor = {
+      rfq_vendor_id: uuidLike("RFQV"),
+      vendor_id: vm.id,
+      vendor_name: vm.vendor_name,
+      vendor_email: vm.contact_email,
+      invitation_status: "Not Sent",
+      response_received: false,
+      response_date: "",
+    };
 
-      const newVendor: RFQVendor = {
-        rfq_vendor_id: uuidLike("RFQV"),
-        vendor_id: vm.vendor_id,
-        vendor_name: vm.vendor_name,
-        vendor_email: vm.vendor_email,
-        invitation_status: "Not Sent",
-        response_received: false,
-        response_date: "",
-      };
-
-      // When vendor added, ensure every item has a quote cell for this vendor
-      const nextItems = p.items.map((it) => ({
-        ...it,
-        quotes_by_vendor: {
-          ...it.quotes_by_vendor,
-          [vm.vendor_id]: it.quotes_by_vendor[vm.vendor_id] ?? {
-            quoted_unit_price: "",
-            delivery_days: "",
-            tax_percentage: "",
-            warranty_terms: "",
-          },
+    const nextItems = p.items.map((it) => ({
+      ...it,
+      quotes_by_vendor: {
+        ...it.quotes_by_vendor,
+        [vm.id]: {
+          quoted_unit_price: "",
+          delivery_days: "",
+          tax_percentage: "",
+          warranty_terms: "",
         },
-      }));
+      },
+    }));
 
-      return { ...p, vendors: [...p.vendors, newVendor], items: nextItems };
-    });
-  };
+    return {
+      ...p,
+      vendors: [...p.vendors, newVendor],
+      items: nextItems,
+    };
+  });
+};
+  
+    
 
   const removeVendor = (vendorId: string) => {
     if (isLocked) return;
@@ -609,17 +646,80 @@ export default function RFQCreatePage() {
     setActiveTab("basic");
   };
 
-  const onSaveDraft = () => {
-    console.log("Save Draft RFQ:", form);
-    alert("Saved Draft (demo). Next: connect API.");
-  };
+ const onSaveDraft = async () => {
+
+  console.log("RFQ SAVE PAYLOAD =", form);
+
+  try {
+    touchAll();
+
+    const payload = {
+  ...form,
+  rfq_status: "Draft",
+};
+
+console.log(
+  "Estimated Value Before Save =",
+  payload.estimated_value
+);
+
+console.log(
+  "FULL PAYLOAD =",
+  JSON.stringify(payload, null, 2)
+);
+
+    const response = await fetch(
+  "http://localhost:5000/api/rfq/create",
+  {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  }
+);
+
+const result = await response.json();
+
+console.log("API RESPONSE =", result);
+
+if (!response.ok || !result.success) {
+
+  console.log("BACKEND ERROR =", result);
+
+  throw new Error(
+    result.message || "Failed to save RFQ"
+  );
+}
+
+    setForm((p) => ({
+      ...p,
+      rfq_id: result.rfqId || p.rfq_id,
+      rfq_number: result.rfqNumber || p.rfq_number,
+    }));
+
+    alert(
+      result.message ||
+      "RFQ Saved Successfully"
+    );
+
+    router.push("/RFQ");
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    console.error("CREATE RFQ ERROR FULL =", error);
+
+    alert(errorMessage);
+  }
+};
 
   /**
    * "Send RFQ" – internal action:
    * Phase-1: procurement team sends email/portal link externally later.
    * Here we only mark invitation_status = Sent and status = Sent.
    */
-  const onSendRFQ = () => {
+  const onSendRFQ = async () => {
     if (isLocked) return;
     touchAll();
 
@@ -644,16 +744,46 @@ export default function RFQCreatePage() {
       return;
     }
 
-    setForm((p) => ({
-      ...p,
-      rfq_status: "Sent",
-      vendors: p.vendors.map((v) => ({
-        ...v,
-        invitation_status: "Sent",
-      })),
-    }));
-    setActiveTab("compare");
-    alert("RFQ marked as Sent (demo). RFQ is now locked.");
+   const payload = {
+  ...form,
+  status: "Submitted",
+  rfq_status: "Submitted",
+  vendors: form.vendors.map((v) => ({
+    ...v,
+    invitation_status: "Sent",
+  })),
+};
+
+try {
+
+  const response = await fetch(
+    "http://localhost:5000/api/rfq/create",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    }
+  );
+
+  const result = await response.json();
+
+  if (!response.ok) {
+    throw new Error(result.message);
+  }
+
+  alert(
+    `RFQ Submitted Successfully\n${result.rfqNumber}`
+  );
+
+  router.push("/RFQ");
+
+} catch (error: any) {
+
+  alert(error.message || "Failed to submit RFQ");
+
+}
   };
 
   /** Move to Pending Approval (internal approval before convert to PO) */
@@ -829,7 +959,7 @@ export default function RFQCreatePage() {
                     )}
                   >
                     <option value="">Select Approved PR</option>
-                    {APPROVED_PRS.map((p) => (
+                    {approvedPRs.map((p) => (
                       <option key={p.pr_id} value={p.pr_id}>
                         {p.pr_number} • {p.department} • {p.requested_by}
                       </option>
@@ -958,9 +1088,9 @@ export default function RFQCreatePage() {
                     }}
                   >
                     <option value="">+ Add Vendor</option>
-                    {VENDOR_MASTER.map((v) => (
-                      <option key={v.vendor_id} value={v.vendor_id}>
-                        {v.vendor_name} ({v.vendor_id}) • {v.compliance_status}
+                    {vendorMaster.map((v) => (
+                      <option key={v.id} value={v.id}>
+                        {v.vendor_name} ({v.vendor_code}) • {v.compliance_status}
                       </option>
                     ))}
                   </select>
@@ -1595,4 +1725,5 @@ export default function RFQCreatePage() {
       </div>
     </div>
   );
+  
 }

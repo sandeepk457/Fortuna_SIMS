@@ -10,6 +10,7 @@ const warehouseRoutes = require("./routes/warehouse.routes.js"); // ✅ Add  war
 const customerRoutes = require("./routes/customerRoutes"); // ✅ Add  customer routes
 const prRoutes = require("./routes/prRoutes"); // ✅ Add PR routes
 const ecommerceRoutes = require("./routes/ecommerceRoutes"); // ✅ Add ecommerce routes
+const rfqRoutes = require("./routes/rfqRoutes"); // ✅ Add RFQ routes
 
 const app = express();
 
@@ -42,6 +43,14 @@ app.use("/api/pr", prRoutes); // 👈 this is  PR api
 
 // Ecommerce APIs
 app.use("/api/ecommerce", ecommerceRoutes); // 👈 this is  ecommerce api
+
+
+// RFQ APIs
+// console.log("RFQ ROUTES =", rfqRoutes);
+
+app.use("/api/rfq", rfqRoutes); // 👈 this is  RFQ ap i
+
+
 
 
 app.listen(5000, () => {
