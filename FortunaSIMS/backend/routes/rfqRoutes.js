@@ -37,6 +37,8 @@ router.get(
 );
 
 
-
+router.get(
+    "/:rfqId", rfqController.getRFQById
+);
 
 module.exports = router;

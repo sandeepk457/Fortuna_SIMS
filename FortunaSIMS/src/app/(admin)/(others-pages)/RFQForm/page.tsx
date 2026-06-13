@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
-
+import { useSearchParams } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -112,7 +112,11 @@ type RFQTerms = {
 type RFQAttachment = {
   attachment_id: string;
   attachment_type: AttachmentType;
+
   attachment_file: File | null;
+
+  file_name?: string;
+  file_path?: string;
 };
 
 type RFQFormState = {
@@ -273,16 +277,121 @@ const initialState: RFQFormState = {
 
 export default function RFQCreatePage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<RFQFormState>(initialState);
   const [approvedPRs, setApprovedPRs] = useState<ApprovedPR[]>([]);
   const [vendorMaster, setVendorMaster] = useState<VendorMaster[]>([]);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
+  const rfqId = searchParams.get("rfqId");
+  const mode = searchParams.get("mode");
+
+  const isViewMode = mode === "view";
+
+
+
+const loadRFQById = async (id: string) => {
+
+  console.log("STEP-1 RFQ ID =", id);
+
+  try {
+
+    const res = await fetch(
+      `http://localhost:5000/api/rfq/${id}`
+    );
+    console.log("STEP-2 RESPONSE STATUS =", res.status);
+
+    const result = await res.json();
+
+    console.log("STEP-3 API RESULT =", result);
+
+    console.log("RFQ VIEW =", result);
+
+    if (result.success) {
+
+      const rfq = result.header;
+
+      console.log("ITEMS =", result.items);
+      console.log("VENDORS =", result.vendors);
+      console.log("TERMS =", result.terms);
+
+      setForm({
+
+  rfq_id: rfq.rfq_id,
+  rfq_number: rfq.rfq_number,
+  rfq_date: rfq.rfq_date?.split("T")[0],
+
+  pr_id: rfq.pr_id,
+  pr_number: rfq.pr_number,
+
+  department: rfq.department || "",
+  requestor: rfq.requestor || "",
+
+  priority: rfq.priority || "Medium",
+
+  estimated_value:
+    Number(rfq.estimated_value || 0),
+
+  created_by: rfq.created_by || "",
+
+  rfq_status: rfq.status,
+
+  quotation_due_date:
+    rfq.quotation_due_date?.split("T")[0],
+
+  rfq_type: rfq.rfq_type,
+
+  currency: rfq.currency,
+
+  remarks: rfq.remarks || "",
+
+  vendors: result.vendors || [],
+
+  items: (result.items || []).map((item: any) => ({
+  ...item,
+  quotes_by_vendor: {},
+})),
+
+  terms: result.terms || {
+    payment_terms: "Net 15",
+    incoterms: "",
+    freight_charges: "",
+    validity_days: "15",
+    penalty_clause: false,
+    special_conditions: "",
+  },
+
+  attachments: [],
+
+  internal_notes:
+    rfq.internal_notes || "",
+
+  approval_remarks: ""
+});
+
+    }
+
+  } catch (error) {
+
+    console.error(error);
+
+  }
+
+};
+
   useEffect(() => {
   loadApprovedPRs();
   loadVendors();
 }, []);
+
+useEffect(() => {
+  if (!rfqId) return;
+  loadRFQById(rfqId);
+}, [rfqId]);
+
+
+
 
 const loadApprovedPRs = async () => {
   try {
@@ -343,13 +452,13 @@ const loadVendors = async () => {
     // Terms
     if (!form.terms.payment_terms) e.payment_terms = "Payment terms is required";
 
-    if (!form.terms.validity_days.trim()) e.validity_days = "Validity days is required";
+    if (!String(form.terms.validity_days).trim()) e.validity_days = "Validity days is required";
     else {
       const n = toNum(form.terms.validity_days);
       if (!Number.isFinite(n) || n <= 0) e.validity_days = "Validity days must be > 0";
     }
 
-    if (form.terms.freight_charges.trim()) {
+    if (String(form.terms.freight_charges).trim()) {
       const n = toNum(form.terms.freight_charges);
       if (!Number.isFinite(n) || n < 0) e.freight_charges = "Freight charges must be >= 0";
     }
@@ -655,7 +764,19 @@ const addVendorFromMaster = (vendorId: string) => {
 
     const payload = {
   ...form,
-  rfq_status: "Draft",
+
+  attachments: form.attachments.map(
+    (a) => ({
+      attachment_type:
+        a.attachment_type,
+
+      file_name:
+        a.file_name,
+
+      file_path:
+        a.file_path
+    })
+  )
 };
 
 console.log(
@@ -744,13 +865,25 @@ if (!response.ok || !result.success) {
       return;
     }
 
-   const payload = {
+  const payload = {
   ...form,
+
   status: "Submitted",
   rfq_status: "Submitted",
+
   vendors: form.vendors.map((v) => ({
     ...v,
     invitation_status: "Sent",
+  })),
+
+  attachments: form.attachments.map((a) => ({
+    attachment_type: a.attachment_type,
+
+    file_name:
+      a.attachment_file?.name || "",
+
+    file_path:
+      a.file_path || "",
   })),
 };
 
@@ -854,7 +987,7 @@ try {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
+          <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || isViewMode}>
             Reset
           </button>
 
@@ -863,7 +996,7 @@ try {
             className={classNames(primaryBtn, "active:scale-95")}
             style={{ backgroundColor: FORTUNA_SECONDARY_BLUE, opacity: isLocked ? 0.6 : 1 }}
             onClick={onSaveDraft}
-            disabled={isLocked}
+            disabled={isLocked || isViewMode}
           >
             Save Draft
           </button>
@@ -873,7 +1006,7 @@ try {
             className={classNames(primaryBtn, "active:scale-95")}
             style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
             onClick={onSendRFQ}
-            disabled={isLocked}
+            disabled={isLocked || isViewMode}
           >
             Send RFQ
           </button>
@@ -949,7 +1082,7 @@ try {
                   </label>
                   <select
                     value={form.pr_id}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => onSelectApprovedPR(e.target.value)}
                     onBlur={() => markTouched("pr_id")}
                     className={classNames(
@@ -985,7 +1118,7 @@ try {
                     <input
                       type="date"
                       value={form.quotation_due_date}
-                      disabled={isLocked}
+                      disabled={isLocked || isViewMode}
                       onChange={(e) => setField("quotation_due_date", e.target.value)}
                       onBlur={() => markTouched("quotation_due_date")}
                       className={classNames(
@@ -1003,7 +1136,7 @@ try {
                     </label>
                     <select
                       value={form.rfq_type}
-                      disabled={isLocked}
+                      disabled={isLocked || isViewMode}
                       onChange={(e) => setField("rfq_type", e.target.value as RFQType)}
                       onBlur={() => markTouched("rfq_type")}
                       className={classNames(
@@ -1026,7 +1159,7 @@ try {
                   </label>
                   <select
                     value={form.currency}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setField("currency", e.target.value as Currency)}
                     onBlur={() => markTouched("currency")}
                     className={classNames(
@@ -1048,7 +1181,7 @@ try {
                   </label>
                   <textarea
                     value={form.remarks}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setField("remarks", e.target.value)}
                     className={classNames(inputBase, "min-h-[110px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     placeholder="Internal remarks..."
@@ -1079,7 +1212,7 @@ try {
                 <div className="flex gap-2">
                   <select
                     className={classNames(inputBase, "min-w-[260px]", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     defaultValue=""
                     onChange={(e) => {
                       if (!e.target.value) return;
@@ -1142,7 +1275,7 @@ try {
                             type="button"
                             className={classNames("text-sm font-semibold text-rose-600 hover:underline", isLocked && "opacity-50")}
                             onClick={() => removeVendor(v.vendor_id)}
-                            disabled={isLocked}
+                            disabled={isLocked || isViewMode}
                           >
                             Remove
                           </button>
@@ -1248,7 +1381,7 @@ try {
                                     <label className={miniLabel}>Unit Price ({form.currency})</label>
                                     <input
                                       value={cell?.quoted_unit_price ?? ""}
-                                      disabled={isLocked}
+                                      disabled={isLocked || isViewMode}
                                       onChange={(e) =>
                                         updateQuoteCell(it.rfq_item_id, v.vendor_id, {
                                           quoted_unit_price: e.target.value.replace(/[^\d.]/g, ""),
@@ -1269,7 +1402,7 @@ try {
                                       <label className={miniLabel}>Delivery Days</label>
                                       <input
                                         value={cell?.delivery_days ?? ""}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isViewMode}
                                         onChange={(e) =>
                                           updateQuoteCell(it.rfq_item_id, v.vendor_id, {
                                             delivery_days: e.target.value.replace(/[^\d]/g, ""),
@@ -1288,7 +1421,7 @@ try {
                                       <label className={miniLabel}>Tax %</label>
                                       <input
                                         value={cell?.tax_percentage ?? ""}
-                                        disabled={isLocked}
+                                        disabled={isLocked || isViewMode}
                                         onChange={(e) =>
                                           updateQuoteCell(it.rfq_item_id, v.vendor_id, {
                                             tax_percentage: e.target.value.replace(/[^\d.]/g, ""),
@@ -1309,7 +1442,7 @@ try {
                                     <label className={miniLabel}>Warranty Terms</label>
                                     <input
                                       value={cell?.warranty_terms ?? ""}
-                                      disabled={isLocked}
+                                      disabled={isLocked || isViewMode}
                                       onChange={(e) =>
                                         updateQuoteCell(it.rfq_item_id, v.vendor_id, {
                                           warranty_terms: e.target.value,
@@ -1356,7 +1489,7 @@ try {
                   </label>
                   <select
                     value={form.terms.payment_terms}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, payment_terms: e.target.value as PaymentTerms } }))}
                     onBlur={() => markTouched("payment_terms")}
                     className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5", showError("payment_terms") && "border-brand-500")}
@@ -1374,7 +1507,7 @@ try {
                   </label>
                   <select
                     value={form.terms.incoterms}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, incoterms: e.target.value as Incoterms } }))}
                     className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                   >
@@ -1391,7 +1524,7 @@ try {
                   </label>
                   <input
                     value={form.terms.freight_charges}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, freight_charges: e.target.value.replace(/[^\d.]/g, "") } }))}
                     onBlur={() => markTouched("freight_charges")}
                     placeholder=">= 0"
@@ -1408,7 +1541,7 @@ try {
                   </label>
                   <input
                     value={form.terms.validity_days}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, validity_days: e.target.value.replace(/[^\d]/g, "") } }))}
                     onBlur={() => markTouched("validity_days")}
                     placeholder="> 0"
@@ -1426,7 +1559,7 @@ try {
                     <input
                       type="checkbox"
                       checked={form.terms.penalty_clause}
-                      disabled={isLocked}
+                      disabled={isLocked || isViewMode}
                       onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, penalty_clause: e.target.checked } }))}
                       className="h-5 w-5"
                     />
@@ -1439,7 +1572,7 @@ try {
                   </label>
                   <textarea
                     value={form.terms.special_conditions}
-                    disabled={isLocked}
+                    disabled={isLocked || isViewMode}
                     onChange={(e) => setForm((p) => ({ ...p, terms: { ...p.terms, special_conditions: e.target.value } }))}
                     className={classNames(inputBase, "min-h-[120px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     placeholder="Additional clauses..."
@@ -1469,7 +1602,7 @@ try {
                   className={classNames(primaryBtn, "active:scale-95")}
                   style={{ backgroundColor: FORTUNA_SECONDARY_BLUE, opacity: isLocked ? 0.6 : 1 }}
                   onClick={addAttachment}
-                  disabled={isLocked}
+                  disabled={isLocked || isViewMode}
                 >
                   + Add Attachment
                 </button>
@@ -1485,7 +1618,7 @@ try {
                       <label className={labelBase}>Attachment Type</label>
                       <select
                         value={a.attachment_type}
-                        disabled={isLocked}
+                        disabled={isLocked || isViewMode}
                         onChange={(e) => updateAttachment(idx, { attachment_type: e.target.value as AttachmentType })}
                         className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       >
@@ -1502,9 +1635,25 @@ try {
                       </label>
                       <input
                         type="file"
-                        disabled={isLocked}
+                        disabled={isLocked || isViewMode}
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                        onChange={(e) => updateAttachment(idx, { attachment_file: e.target.files?.[0] ?? null })}
+                        onChange={(e) => {
+
+  const file =
+    e.target.files?.[0] || null;
+
+  updateAttachment(idx, {
+
+    attachment_file: file,
+
+    file_name: file?.name || "",
+
+    file_path:
+      file ? `/uploads/rfq/${file.name}` : ""
+
+  });
+
+}}
                         className={classNames(inputBase, "px-2 py-2", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       />
                     </div>
@@ -1514,7 +1663,7 @@ try {
                         type="button"
                         className={classNames("text-sm font-semibold text-rose-600 hover:underline", isLocked && "opacity-50")}
                         onClick={() => removeAttachment(idx)}
-                        disabled={isLocked}
+                        disabled={isLocked || isViewMode}
                       >
                         Remove
                       </button>
@@ -1535,7 +1684,7 @@ try {
                 </label>
                 <textarea
                   value={form.internal_notes}
-                  disabled={isLocked}
+                  disabled={isLocked || isViewMode}
                   onChange={(e) => setField("internal_notes", e.target.value)}
                   className={classNames(inputBase, "min-h-[120px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                   placeholder="Notes for internal users / approvers..."
@@ -1699,7 +1848,7 @@ try {
 
       {/* Footer actions */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
+        <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || isViewMode}>
           Reset
         </button>
 
@@ -1708,7 +1857,7 @@ try {
           className={classNames(primaryBtn, "active:scale-95")}
           style={{ backgroundColor: FORTUNA_SECONDARY_BLUE, opacity: isLocked ? 0.6 : 1 }}
           onClick={onSaveDraft}
-          disabled={isLocked}
+          disabled={isLocked || isViewMode}
         >
           Save Draft
         </button>
@@ -1718,7 +1867,7 @@ try {
           className={classNames(primaryBtn, "active:scale-95")}
           style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
           onClick={onSendRFQ}
-          disabled={isLocked}
+          disabled={isLocked || isViewMode}
         >
           Send RFQ
         </button>

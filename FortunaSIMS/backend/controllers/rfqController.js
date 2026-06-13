@@ -155,9 +155,15 @@ const createRFQ = async (req, res) => {
   status,
   vendors = [],
   items = [],
-  terms = {}
+  terms = {},
+  attachments = []
 } = req.body;
 
+
+console.log(
+  "RFQ ATTACHMENTS RECEIVED =",
+  attachments
+);
 
 // =====================================
 // Check Duplicate RFQ for same PR
@@ -370,6 +376,48 @@ console.log("HEADER INSERT DONE");
       ]
     );
 
+    // ============================
+// RFQ Attachments
+// ============================
+
+for (const file of attachments) {
+
+  await client.query(
+    `
+    INSERT INTO rfq_attachments
+    (
+      attachment_id,
+      rfq_id,
+      attachment_type,
+      file_path,
+      file_name,
+      uploaded_at
+    )
+    VALUES
+    (
+      gen_random_uuid(),
+      $1,
+      $2,
+      $3,
+      $4,
+      NOW()
+    )
+    `,
+    [
+      rfqId,
+      file.attachment_type || "RFQ Document",
+      file.file_path || "",
+      file.file_name || ""
+    ]
+  );
+
+}
+
+    console.log(
+  "ATTACHMENTS INSERT COUNT =",
+  attachments.length
+);
+
     await client.query("COMMIT");
 
     res.json({
@@ -428,6 +476,79 @@ const getRFQList = async (req, res) => {
 };
 
 
+const getRFQById = async (req, res) => {
+  try {
+
+    const { rfqId } = req.params;
+
+    const header = await db.query(
+      `
+      SELECT *
+      FROM rfq
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    const attachments = await db.query(
+  `
+  SELECT *
+  FROM rfq_attachments
+  WHERE rfq_id = $1
+  ORDER BY uploaded_at DESC
+  `,
+  [rfqId]
+);
+
+    const items = await db.query(
+      `
+      SELECT *
+      FROM rfq_items
+      WHERE rfq_id = $1
+      ORDER BY item_description
+      `,
+      [rfqId]
+    );
+
+    const vendors = await db.query(
+      `
+      SELECT *
+      FROM rfq_vendors
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    const terms = await db.query(
+      `
+      SELECT *
+      FROM rfq_terms
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    res.json({
+      success: true,
+      header: header.rows[0],
+      items: items.rows,
+      vendors: vendors.rows,
+      terms: terms.rows[0] || {},
+      attachments: attachments.rows
+    });
+
+  } catch (error) {
+
+    console.error("GET RFQ BY ID ERROR:", error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message
+    });
+
+  }
+};
+
 // console.log("EXPORTING RFQ CONTROLLER");
 
 module.exports = {
@@ -435,5 +556,6 @@ module.exports = {
   getPRItems,
   getVendors,
   createRFQ,
-  getRFQList
+  getRFQList,
+  getRFQById
 };

@@ -53,6 +53,7 @@ type RFQVendorLine = {
 };
 
 interface RFQRecord {
+  rfqId: string;
   rfqNo: string;
   title: string;
   department: Department;
@@ -155,6 +156,7 @@ const loadRFQs = async () => {
     if (result.success) {
 
       const mapped = result.data.map((r: any) => ({
+        rfqId: r.rfq_id,
         rfqNo: r.rfq_number,
         title: r.remarks || "RFQ",
         department: r.department,
@@ -714,11 +716,15 @@ const loadRFQs = async () => {
 
                       <td className="px-4 py-3 space-x-3">
                         <button
-                          className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => alert(`View RFQ details for ${rfq.rfqNo} (demo)`)}
-                        >
-                          View
-                        </button>
+  className="font-semibold text-blue-600 hover:underline"
+  onClick={() =>
+    router.push(
+      `/RFQForm?rfqId=${rfq.rfqId}&mode=view`
+    )
+  }
+>
+  View
+</button>
 
                         {/* ✅ EXISTING APPROVAL FLOW stays SAME */}
                         {(rfq.status === "Submitted" || rfq.status === "Pending Approval") && (
