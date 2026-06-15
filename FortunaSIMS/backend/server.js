@@ -48,7 +48,7 @@ app.use("/api/ecommerce", ecommerceRoutes); // 👈 this is  ecommerce api
 // RFQ APIs
 // console.log("RFQ ROUTES =", rfqRoutes);
 
-app.use("/api/rfq", rfqRoutes); // 👈 this is  RFQ ap i
+app.use("/api/rfq", rfqRoutes); // 👈 this is  RFQ api
 
 
 
@@ -56,10 +56,6 @@ app.use("/api/rfq", rfqRoutes); // 👈 this is  RFQ ap i
 app.listen(5000, () => {
   console.log("SIMS backend running on port 5000");
 });
-
-
-
-
 
 
 

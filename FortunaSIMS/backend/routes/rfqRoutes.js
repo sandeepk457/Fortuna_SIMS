@@ -3,6 +3,8 @@ const router = express.Router();
 
 const rfqController = require("../controllers/rfqController");
 
+const upload = require("../config/upload");
+
 console.log("RFQ ROUTES FILE LOADED");
 router.get("/test", (req, res) => {
   res.json({
@@ -25,8 +27,11 @@ router.get(
   rfqController.getVendors
 );
 
+
+
 router.post(
   "/create",
+  upload.array("attachments"),
   rfqController.createRFQ
 );
 

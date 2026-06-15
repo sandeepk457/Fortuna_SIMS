@@ -308,6 +308,11 @@ const loadRFQById = async (id: string) => {
 
     console.log("RFQ VIEW =", result);
 
+    console.log(
+  "ATTACHMENTS FROM API =",
+  result.attachments
+);
+
     if (result.success) {
 
       const rfq = result.header;
@@ -362,7 +367,14 @@ const loadRFQById = async (id: string) => {
     special_conditions: "",
   },
 
-  attachments: [],
+  attachments:
+  (result.attachments || []).map((a: any) => ({
+    attachment_id: a.attachment_id,
+    attachment_type: a.attachment_type || "Other",
+    attachment_file: null,
+    file_name: a.file_name,
+    file_path: a.file_path,
+  })),
 
   internal_notes:
     rfq.internal_notes || "",
@@ -757,61 +769,63 @@ const addVendorFromMaster = (vendorId: string) => {
 
  const onSaveDraft = async () => {
 
+  console.log(
+    "ATTACHMENTS =",
+    form.attachments
+  );
+
   console.log("RFQ SAVE PAYLOAD =", form);
 
   try {
     touchAll();
 
-    const payload = {
+    if (hasErrors) {
+      setActiveTab(firstErrorTab());
+      alert("Please fix validation errors before saving draft.");
+      return;
+    }
+
+    // send save draft request
+    const formData = new FormData();
+
+const payload = {
   ...form,
-
-  attachments: form.attachments.map(
-    (a) => ({
-      attachment_type:
-        a.attachment_type,
-
-      file_name:
-        a.file_name,
-
-      file_path:
-        a.file_path
-    })
-  )
+  attachments: form.attachments.map((a) => ({
+    attachment_id: a.attachment_id,
+    attachment_type: a.attachment_type,
+    file_name: a.file_name || "",
+  })),
 };
 
-console.log(
-  "Estimated Value Before Save =",
-  payload.estimated_value
+formData.append(
+  "rfqData",
+  JSON.stringify(payload)
 );
 
-console.log(
-  "FULL PAYLOAD =",
-  JSON.stringify(payload, null, 2)
-);
+form.attachments.forEach((a) => {
+  if (a.attachment_file) {
+    formData.append(
+      "attachments",
+      a.attachment_file
+    );
+  }
+});
 
-    const response = await fetch(
+const response = await fetch(
   "http://localhost:5000/api/rfq/create",
   {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
+    body: formData,
   }
 );
+    const result = await response.json();
 
-const result = await response.json();
+    console.log("API RESPONSE =", result);
 
-console.log("API RESPONSE =", result);
-
-if (!response.ok || !result.success) {
-
-  console.log("BACKEND ERROR =", result);
-
-  throw new Error(
-    result.message || "Failed to save RFQ"
-  );
-}
+    if (!response.ok || !result.success) {
+      console.log("BACKEND ERROR =", result);
+      throw new Error(result.message || "Failed to save RFQ");
+    }
 
     setForm((p) => ({
       ...p,
@@ -819,10 +833,7 @@ if (!response.ok || !result.success) {
       rfq_number: result.rfqNumber || p.rfq_number,
     }));
 
-    alert(
-      result.message ||
-      "RFQ Saved Successfully"
-    );
+    alert(result.message || "RFQ Saved Successfully");
 
     router.push("/RFQ");
 
@@ -887,18 +898,35 @@ if (!response.ok || !result.success) {
   })),
 };
 
+
+
+
+
 try {
 
-  const response = await fetch(
-    "http://localhost:5000/api/rfq/create",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload),
-    }
-  );
+  const formData = new FormData();
+
+formData.append(
+  "rfqData",
+  JSON.stringify(payload)
+);
+
+form.attachments.forEach((a) => {
+  if (a.attachment_file) {
+    formData.append(
+      "attachments",
+      a.attachment_file
+    );
+  }
+});
+
+const response = await fetch(
+  "http://localhost:5000/api/rfq/create",
+  {
+    method: "POST",
+    body: formData,
+  }
+);
 
   const result = await response.json();
 
@@ -1640,18 +1668,13 @@ try {
                         onChange={(e) => {
 
   const file =
-    e.target.files?.[0] || null;
+  e.target.files?.[0] || null;
 
-  updateAttachment(idx, {
-
-    attachment_file: file,
-
-    file_name: file?.name || "",
-
-    file_path:
-      file ? `/uploads/rfq/${file.name}` : ""
-
-  });
+updateAttachment(idx, {
+  attachment_file: file,
+  file_name: file?.name || "",
+  file_path: ""
+});
 
 }}
                         className={classNames(inputBase, "px-2 py-2", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
@@ -1676,6 +1699,52 @@ try {
                     No attachments added.
                   </div>
                 )}
+
+                {form.attachments.length > 0 && (
+  <div className="space-y-2">
+    <h5 className="font-semibold text-gray-900">
+      Uploaded Files
+    </h5>
+
+    {form.attachments.map((att) => (
+      <div
+        key={att.attachment_id}
+        className="flex items-center justify-between border rounded-lg p-3"
+      >
+        <span>
+          {att.file_name}
+        </span>
+
+        <div className="flex gap-3">
+
+          <button
+            type="button"
+            className="text-blue-600"
+            onClick={() =>
+             window.open(
+  `http://localhost:5000/${att.file_path}`,
+  "_blank"
+)
+            }
+          >
+            View
+          </button>
+
+          <a
+            href={`http://localhost:5000/${att.file_path}`}
+            download
+            className="text-green-600"
+          >
+            Download
+          </a>
+
+        </div>
+      </div>
+    ))}
+  </div>
+)}
+
+
               </div>
 
               <div>

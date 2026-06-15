@@ -132,14 +132,22 @@ const getVendors = async (req, res) => {
 // ============================
 // Create RFQ
 // ============================
+
+
+
 const createRFQ = async (req, res) => {
+console.log("FILES =", req.files);
+console.log("BODY =", req.body);
+
   const client = await db.connect();
 
   try {
 
     await client.query("BEGIN");
 
-    const {
+    const data = JSON.parse(req.body.rfqData);
+
+const {
   pr_id,
   pr_number,
   department,
@@ -155,14 +163,13 @@ const createRFQ = async (req, res) => {
   status,
   vendors = [],
   items = [],
-  terms = {},
-  attachments = []
-} = req.body;
-
+  terms = {}
+} = data;
 
 console.log(
   "RFQ ATTACHMENTS RECEIVED =",
-  attachments
+    req.files
+
 );
 
 // =====================================
@@ -213,6 +220,12 @@ if (existingRFQ.rows.length > 0) {
     // RFQ Header
 
 console.log("HEADER INSERT START");
+
+console.log("REMARKS =", remarks);
+console.log("INTERNAL NOTES =", internal_notes);
+
+
+
 
 await client.query(
   `
@@ -280,6 +293,22 @@ await client.query(
 );
 
 console.log("HEADER INSERT DONE");
+
+const checkRFQ = await client.query(
+`
+SELECT
+  remarks,
+  internal_notes
+FROM rfq
+WHERE rfq_id = $1
+`,
+[rfqId]
+);
+
+console.log(
+  "AFTER INSERT RFQ =",
+  checkRFQ.rows[0]
+);
 
     // RFQ Items
     for (const item of items) {
@@ -380,42 +409,45 @@ console.log("HEADER INSERT DONE");
 // RFQ Attachments
 // ============================
 
-for (const file of attachments) {
+// RFQ Attachments
+if (req.files && req.files.length > 0) {
 
-  await client.query(
-    `
-    INSERT INTO rfq_attachments
-    (
-      attachment_id,
-      rfq_id,
-      attachment_type,
-      file_path,
-      file_name,
-      uploaded_at
-    )
-    VALUES
-    (
-      gen_random_uuid(),
-      $1,
-      $2,
-      $3,
-      $4,
-      NOW()
-    )
-    `,
-    [
-      rfqId,
-      file.attachment_type || "RFQ Document",
-      file.file_path || "",
-      file.file_name || ""
-    ]
-  );
+  for (const file of req.files) {
 
+    await client.query(
+      `
+      INSERT INTO rfq_attachments
+      (
+        attachment_id,
+        rfq_id,
+        attachment_type,
+        file_path,
+        file_name,
+        uploaded_at
+      )
+      VALUES
+      (
+        gen_random_uuid(),
+        $1,
+        $2,
+        $3,
+        $4,
+        NOW()
+      )
+      `,
+      [
+        rfqId,
+        "RFQ Document",
+        file.path,
+        file.originalname
+      ]
+    );
+  }
 }
 
     console.log(
-  "ATTACHMENTS INSERT COUNT =",
-  attachments.length
+      "ATTACHMENTS INSERT COUNT =",
+      req.files?.length || 0
 );
 
     await client.query("COMMIT");
