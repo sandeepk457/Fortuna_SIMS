@@ -716,14 +716,26 @@ const loadRFQs = async () => {
 
                       <td className="px-4 py-3 space-x-3">
                         <button
-  className="font-semibold text-blue-600 hover:underline"
+                          className="font-semibold text-blue-600 hover:underline"
+                          onClick={() =>
+                            router.push(
+                              `/RFQForm?rfqId=${rfq.rfqId}&mode=view`
+                            )
+                          }
+                            >
+                            View
+                        </button>
+
+
+                        <button
+  className="font-semibold text-green-600 hover:underline"
   onClick={() =>
     router.push(
-      `/RFQForm?rfqId=${rfq.rfqId}&mode=view`
+      `/RFQForm?rfqId=${rfq.rfqId}&mode=edit`
     )
   }
 >
-  View
+  Edit
 </button>
 
                         {/* ✅ EXISTING APPROVAL FLOW stays SAME */}

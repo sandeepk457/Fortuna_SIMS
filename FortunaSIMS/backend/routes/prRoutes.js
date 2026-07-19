@@ -10,7 +10,7 @@ const {
   updatePR,
   approvePR,
   deletePR,
-} = require("../controllers/prcontroller");
+} = require("../controllers/prController");
 
 const upload = require("../config/upload");
 

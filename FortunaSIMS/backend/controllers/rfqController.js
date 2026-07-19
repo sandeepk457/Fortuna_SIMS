@@ -167,6 +167,11 @@ const {
 } = data;
 
 console.log(
+  "ITEMS FROM FRONTEND =",
+  JSON.stringify(items, null, 2)
+);
+
+console.log(
   "RFQ ATTACHMENTS RECEIVED =",
     req.files
 
@@ -310,37 +315,99 @@ console.log(
   checkRFQ.rows[0]
 );
 
-    // RFQ Items
-    for (const item of items) {
+   // RFQ Items + Quotes
+for (const item of items) {
 
-      await client.query(
-        `
-        INSERT INTO rfq_items
-        (
-          rfq_item_id,
-          rfq_id,
-          pr_item_id,
-          item_id,
-          item_description,
-          uom,
-          requested_qty
-        )
-        VALUES
-        (
-          gen_random_uuid(),
-          $1,$2,$3,$4,$5,$6
-        )
-        `,
-        [
-          rfqId,
-          item.pr_item_id,
-          item.item_id,
-          item.item_description,
-          item.uom,
-          item.requested_qty
-        ]
-      );
-    }
+  const itemResult = await client.query(
+    `
+    INSERT INTO rfq_items
+    (
+      rfq_item_id,
+      rfq_id,
+      pr_item_id,
+      item_id,
+      item_description,
+      uom,
+      requested_qty
+    )
+    VALUES
+    (
+      gen_random_uuid(),
+      $1,$2,$3,$4,$5,$6
+    )
+    RETURNING rfq_item_id
+    `,
+    [
+      rfqId,
+      item.pr_item_id,
+      item.item_id,
+      item.item_description,
+      item.uom,
+      item.requested_qty
+    ]
+  );
+
+  const rfqItemId =
+    itemResult.rows[0].rfq_item_id;
+
+    console.log(
+  "RFQ ITEM ID =",
+  rfqItemId
+);
+
+  // Save Vendor Quotes
+  if (item.quotes_by_vendor) {
+
+    for (const vendorId of Object.keys(item.quotes_by_vendor)) {
+
+      console.log(
+  "VENDOR IDS =",
+  Object.keys(item.quotes_by_vendor || {})
+);
+
+      const quote = item.quotes_by_vendor[vendorId];
+
+      const quoteResult = await client.query(
+`
+INSERT INTO rfq_quotes
+(
+  quote_id,
+  rfq_id,
+  rfq_item_id,
+  vendor_id,
+  quoted_unit_price,
+  delivery_days,
+  tax_percentage,
+  warranty_terms
+)
+VALUES
+(
+  gen_random_uuid(),
+  $1,$2,$3,$4,$5,$6,$7
+)
+RETURNING *
+`,
+[
+  rfqId,
+  rfqItemId,
+  vendorId,
+  Number(quote.quoted_unit_price || 0),
+  Number(quote.delivery_days || 0),
+  Number(quote.tax_percentage || 0),
+  quote.warranty_terms || ""
+]
+);
+
+console.log(
+  "QUOTE INSERT RESULT =",
+  quoteResult.rows
+);
+
+} 
+
+   } 
+
+} 
 
     // Vendors
     for (const vendor of vendors) {
@@ -475,7 +542,9 @@ if (req.files && req.files.length > 0) {
     client.release();
 
   }
+  
 };
+
 const getRFQList = async (req, res) => {
   try {
 
@@ -515,12 +584,40 @@ const getRFQById = async (req, res) => {
 
     const header = await db.query(
       `
-      SELECT *
-      FROM rfq
-      WHERE rfq_id = $1
+      SELECT
+  rfq_id,
+  rfq_number,
+
+  TO_CHAR(rfq_date,'YYYY-MM-DD') AS rfq_date,
+
+  TO_CHAR(
+    quotation_due_date,
+    'YYYY-MM-DD'
+  ) AS quotation_due_date,
+
+  pr_id,
+  pr_number,
+  department,
+  requestor,
+  priority,
+  estimated_value,
+  created_by,
+  status,
+  rfq_type,
+  currency,
+  remarks,
+  internal_notes
+
+FROM rfq
+WHERE rfq_id = $1
       `,
       [rfqId]
     );
+
+console.log(
+  "HEADER DATA =",
+  header.rows[0]
+);
 
     const attachments = await db.query(
   `
@@ -560,14 +657,32 @@ const getRFQById = async (req, res) => {
       [rfqId]
     );
 
+
+    const quotes = await db.query(
+`
+SELECT *
+FROM rfq_quotes
+WHERE rfq_id = $1
+`,
+[rfqId]
+);
+
+console.log("ITEMS =", items.rows);
+console.log("VENDORS =", vendors.rows);
+console.log("QUOTES =", quotes.rows);
+
+
     res.json({
       success: true,
       header: header.rows[0],
       items: items.rows,
       vendors: vendors.rows,
       terms: terms.rows[0] || {},
-      attachments: attachments.rows
+      attachments: attachments.rows,
+      quotes: quotes.rows
     });
+
+    
 
   } catch (error) {
 
@@ -581,6 +696,309 @@ const getRFQById = async (req, res) => {
   }
 };
 
+// update rfq header, items, quotes, vendors, terms, attachments//
+
+const updateRFQ = async (req, res) => {
+   console.log("UPDATE RFQ HIT");
+
+   const client = await db.connect();
+  try {
+
+    await client.query("BEGIN");
+
+    const { rfqId } = req.params;
+
+    const rfqData = JSON.parse(
+      req.body.rfqData
+    );
+
+    const checkRFQ = await db.query(
+      `
+      SELECT status
+      FROM rfq
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    
+
+    if (
+      checkRFQ.rows.length === 0
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found"
+      });
+    }
+
+    if (
+      checkRFQ.rows[0].status !== "Draft"
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Only Draft RFQ can be edited"
+      });
+    }
+
+   console.log("RFQ DATA =", rfqData);
+
+   const {
+quotation_due_date,
+rfq_type,
+currency,
+priority,
+remarks,
+estimated_value,
+internal_notes
+} = rfqData;
+
+await client.query(
+`
+UPDATE rfq
+SET
+  quotation_due_date = $1,
+  rfq_type = $2,
+  currency = $3,
+  priority = $4,
+  remarks = $5,
+  estimated_value = $6,
+  internal_notes = $7
+WHERE rfq_id = $8
+`,
+[
+quotation_due_date,
+rfq_type,
+currency,
+priority,
+remarks,
+Number(estimated_value || 0),
+internal_notes || "",
+rfqId
+]
+);
+
+console.log("HEADER UPDATED");
+
+await client.query(
+`
+DELETE FROM rfq_quotes
+WHERE rfq_id = $1
+`,
+[rfqId]
+);
+
+await client.query(
+`
+DELETE FROM rfq_items
+WHERE rfq_id = $1
+`,
+[rfqId]
+);
+
+
+console.log("OLD ITEMS DELETED");
+
+   console.log(
+  "VENDORS COUNT =",
+  rfqData.vendors?.length
+);
+
+//update rfq header, items, quotes, vendors, terms, attachments// 
+  
+for (const item of rfqData.items || []) {
+
+
+
+  const itemResult = await client.query(
+
+    `
+
+    INSERT INTO rfq_items
+
+    (
+
+      rfq_item_id,
+
+      rfq_id,
+
+      pr_item_id,
+
+      item_id,
+
+      item_description,
+
+      uom,
+
+      requested_qty
+
+    )
+
+    VALUES
+
+    (
+
+      gen_random_uuid(),
+
+      $1,$2,$3,$4,$5,$6
+
+    )
+
+    RETURNING rfq_item_id
+
+    `,
+
+    [
+
+      rfqId,
+
+      item.pr_item_id,
+
+      item.item_id,
+
+      item.item_description,
+
+      item.uom,
+
+      item.requested_qty
+
+    ]
+
+  );
+
+
+
+  const rfqItemId =
+
+    itemResult.rows[0].rfq_item_id;
+
+
+
+  if (item.quotes_by_vendor) {
+
+
+
+    for (const vendorId of Object.keys(item.quotes_by_vendor)) {
+
+
+
+      const quote = item.quotes_by_vendor[vendorId];
+
+
+
+      await client.query(
+
+      `
+
+      INSERT INTO rfq_quotes
+
+      (
+
+        quote_id,
+
+        rfq_id,
+
+        rfq_item_id,
+
+        vendor_id,
+
+        quoted_unit_price,
+
+        delivery_days,
+
+        tax_percentage,
+
+        warranty_terms
+
+      )
+
+      VALUES
+
+      (
+
+        gen_random_uuid(),
+
+        $1,$2,$3,$4,$5,$6,$7
+
+      )
+
+      `,
+
+      [
+
+        rfqId,
+
+        rfqItemId,
+
+        vendorId,
+
+        Number(quote.quoted_unit_price || 0),
+
+        Number(quote.delivery_days || 0),
+
+        Number(quote.tax_percentage || 0),
+
+        quote.warranty_terms || ""
+
+      ]
+
+      );
+
+
+
+    }
+
+  }
+
+}
+
+console.log("ITEMS + QUOTES INSERTED");
+
+await client.query("COMMIT");
+
+console.log("COMMIT SUCCESS");
+
+return res.json({
+  success: true,
+  message: "RFQ Updated Successfully"
+});
+
+console.log(
+  "ITEMS COUNT =",
+  rfqData.items?.length
+);
+
+console.log(
+  "ATTACHMENTS COUNT =",
+  rfqData.attachments?.length
+);
+
+console.log(
+  "TERMS =",
+  rfqData.terms
+);
+
+    // continue update...
+
+  } catch (err) {
+
+  await client.query("ROLLBACK");
+
+  console.error("UPDATE RFQ ERROR =", err);
+
+  return res.status(500).json({
+    success: false,
+    message: err.message
+  });
+
+} finally {
+
+  client.release();
+
+}
+};
+
 // console.log("EXPORTING RFQ CONTROLLER");
 
 module.exports = {
@@ -589,5 +1007,6 @@ module.exports = {
   getVendors,
   createRFQ,
   getRFQList,
-  getRFQById
+  getRFQById,
+  updateRFQ
 };

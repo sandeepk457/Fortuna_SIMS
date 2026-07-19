@@ -1,62 +1,53 @@
+require("dotenv").config();
+
 const express = require("express");
 const cors = require("cors");
 
 const authRoutes = require("./routes/authRoutes");
-const vendorRoutes = require("./routes/vendorRoutes"); // ✅ Add vendor routes
-const itemRoutes = require("./routes/itemRoutes");  // ✅ Add Items routes
-const uomRoutes = require("./routes/uom.routes.js"); // ✅ Add UOM routes
-const demandRoutes = require("./routes/demand.routes.js"); // ✅ Add demand forecast routes
-const warehouseRoutes = require("./routes/warehouse.routes.js"); // ✅ Add  warehouse routes
-const customerRoutes = require("./routes/customerRoutes"); // ✅ Add  customer routes
-const prRoutes = require("./routes/prRoutes"); // ✅ Add PR routes
-const ecommerceRoutes = require("./routes/ecommerceRoutes"); // ✅ Add ecommerce routes
-const rfqRoutes = require("./routes/rfqRoutes"); // ✅ Add RFQ routes
+const vendorRoutes = require("./routes/vendorRoutes");
+const itemRoutes = require("./routes/itemRoutes");
+const uomRoutes = require("./routes/uom.routes.js");
+const demandRoutes = require("./routes/demand.routes.js");
+const warehouseRoutes = require("./routes/warehouse.routes.js");
+const customerRoutes = require("./routes/customerRoutes");
+const prRoutes = require("./routes/prRoutes");
+const ecommerceRoutes = require("./routes/ecommerceRoutes");
+const rfqRoutes = require("./routes/rfqRoutes");
 
 const app = express();
 
+// Middleware
 app.use(cors());
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
+// Static uploads
 app.use("/uploads", express.static("uploads"));
 
+// API Routes
 app.use("/api/auth", authRoutes);
-// NEW (Vendor APIs)
-app.use("/api/vendors", vendorRoutes); // 👈 this is  vendor api
-// NEW (Item Master APIs)
-app.use("/api/items", itemRoutes); // 👈 this is  Item Master api
+app.use("/api/vendors", vendorRoutes);
+app.use("/api/items", itemRoutes);
+app.use("/api/warehouses", warehouseRoutes);
+app.use("/api/uoms", uomRoutes);
+app.use("/api/demand", demandRoutes);
+app.use("/api/customers", customerRoutes);
+app.use("/api/pr", prRoutes);
+app.use("/api/ecommerce", ecommerceRoutes);
+app.use("/api/rfq", rfqRoutes);
 
-//  Warehouse APIs
-app.use("/api/warehouses", warehouseRoutes); // 👈 this is  warehouse api 
-
-// UOM APIs
-app.use("/api/uoms", uomRoutes); // 👈 this is  UOM api
-
-// Demand Forecast APIs
-app.use("/api/demand", demandRoutes); // 👈 this is  demand forecast api
-
-// Customer APIs
-app.use("/api/customers", customerRoutes); // 👈 this is  customer api
-
-// PR APIs
-app.use("/api/pr", prRoutes); // 👈 this is  PR api
-
-// Ecommerce APIs
-app.use("/api/ecommerce", ecommerceRoutes); // 👈 this is  ecommerce api
-
-
-// RFQ APIs
-// console.log("RFQ ROUTES =", rfqRoutes);
-
-app.use("/api/rfq", rfqRoutes); // 👈 this is  RFQ api
-
-
-
-
-app.listen(5000, () => {
-  console.log("SIMS backend running on port 5000");
+// Health check - useful for Render
+app.get("/", (req, res) => {
+  res.status(200).json({
+    status: "success",
+    message: "Fortuna SIMS Backend API is running",
+  });
 });
 
+// Render provides PORT automatically.
+// Local development falls back to port 5000.
+const PORT = process.env.PORT || 5000;
 
-
-
+app.listen(PORT, () => {
+  console.log(`SIMS backend running on port ${PORT}`);
+});

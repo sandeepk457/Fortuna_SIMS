@@ -42,6 +42,12 @@ router.get(
 );
 
 
+router.put(
+  "/:rfqId",
+  upload.array("attachments"),
+  rfqController.updateRFQ
+);
+
 router.get(
     "/:rfqId", rfqController.getRFQById
 );

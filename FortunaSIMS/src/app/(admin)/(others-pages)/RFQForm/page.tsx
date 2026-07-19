@@ -288,6 +288,7 @@ export default function RFQCreatePage() {
   const mode = searchParams.get("mode");
 
   const isViewMode = mode === "view";
+  const isEditMode = mode === "edit";
 
 
 
@@ -315,7 +316,70 @@ const loadRFQById = async (id: string) => {
 
     if (result.success) {
 
+      
+
+      console.log(
+  "ITEMS FROM API =",
+  JSON.stringify(result.items, null, 2)
+);
+
+console.log(
+  "VENDORS FROM API =",
+  JSON.stringify(result.vendors, null, 2)
+);
+
+
+  const quotes = result.quotes || [];
+
+const itemsWithQuotes = (result.items || []).map((item: any) => {
+
+  const quotes_by_vendor: any = {};
+
+  quotes
+    .filter(
+      (q: any) => q.rfq_item_id === item.rfq_item_id
+    )
+    .forEach((q: any) => {
+
+      quotes_by_vendor[q.vendor_id] = {
+        quoted_unit_price:
+          q.quoted_unit_price?.toString() || "",
+
+        delivery_days:
+          q.delivery_days?.toString() || "",
+
+        tax_percentage:
+          q.tax_percentage?.toString() || "",
+
+        warranty_terms:
+          q.warranty_terms || "",
+      };
+
+    });
+
+  return {
+    ...item,
+    quotes_by_vendor,
+  };
+});
+
+console.log(
+  "ITEMS WITH QUOTES =",
+  JSON.stringify(itemsWithQuotes, null, 2)
+);
+
+
       const rfq = result.header;
+
+      console.log(
+  "RAW RFQ DATE =",
+  rfq.rfq_date
+);
+
+console.log(
+  "RAW DUE DATE =",
+  rfq.quotation_due_date
+);
 
       console.log("ITEMS =", result.items);
       console.log("VENDORS =", result.vendors);
@@ -325,7 +389,7 @@ const loadRFQById = async (id: string) => {
 
   rfq_id: rfq.rfq_id,
   rfq_number: rfq.rfq_number,
-  rfq_date: rfq.rfq_date?.split("T")[0],
+  rfq_date: rfq.rfq_date || "",
 
   pr_id: rfq.pr_id,
   pr_number: rfq.pr_number,
@@ -343,7 +407,7 @@ const loadRFQById = async (id: string) => {
   rfq_status: rfq.status,
 
   quotation_due_date:
-    rfq.quotation_due_date?.split("T")[0],
+   rfq.quotation_due_date || "", 
 
   rfq_type: rfq.rfq_type,
 
@@ -353,9 +417,16 @@ const loadRFQById = async (id: string) => {
 
   vendors: result.vendors || [],
 
-  items: (result.items || []).map((item: any) => ({
-  ...item,
-  quotes_by_vendor: {},
+  items: itemsWithQuotes.map((item: any) => ({
+  rfq_item_id: item.rfq_item_id,
+  pr_item_id: item.pr_item_id,
+  item_id: item.item_id,
+  item_description: item.item_description,
+  uom: item.uom,
+  requested_qty: Number(item.requested_qty || 0),
+
+  quotes_by_vendor:
+    item.quotes_by_vendor || {},
 })),
 
   terms: result.terms || {
@@ -770,6 +841,11 @@ const addVendorFromMaster = (vendorId: string) => {
  const onSaveDraft = async () => {
 
   console.log(
+  "ITEMS BEFORE SAVE",
+  JSON.stringify(form.items, null, 2)
+);
+
+  console.log(
     "ATTACHMENTS =",
     form.attachments
   );
@@ -811,13 +887,27 @@ form.attachments.forEach((a) => {
   }
 });
 
-const response = await fetch(
-  "http://localhost:5000/api/rfq/create",
-  {
-    method: "POST",
-    body: formData,
-  }
-);
+
+
+
+const apiUrl = isEditMode
+  ? `http://localhost:5000/api/rfq/${form.rfq_id}`
+  : "http://localhost:5000/api/rfq/create";
+
+const apiMethod = isEditMode
+  ? "PUT"
+  : "POST";
+
+
+  console.log(
+      "UPDATE RFQ DATA =",
+      JSON.stringify(form, null, 2)
+    );
+
+const response = await fetch(apiUrl, {
+  method: apiMethod,
+  body: formData,
+});
     const result = await response.json();
 
     console.log("API RESPONSE =", result);
@@ -1144,17 +1234,27 @@ const response = await fetch(
                       Quotation Due Date <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                     </label>
                     <input
-                      type="date"
-                      value={form.quotation_due_date}
-                      disabled={isLocked || isViewMode}
-                      onChange={(e) => setField("quotation_due_date", e.target.value)}
-                      onBlur={() => markTouched("quotation_due_date")}
-                      className={classNames(
-                        inputBase,
-                        isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
-                        showError("quotation_due_date") && "border-brand-500"
-                      )}
-                    />
+  type="date"
+  min={form.rfq_date}
+  value={form.quotation_due_date}
+  disabled={isLocked || isViewMode}
+  onChange={(e) =>
+    setField(
+      "quotation_due_date",
+      e.target.value
+    )
+  }
+  onBlur={() =>
+    markTouched("quotation_due_date")
+  }
+  className={classNames(
+    inputBase,
+    isLocked &&
+      "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+    showError("quotation_due_date") &&
+      "border-brand-500"
+  )}
+/>
                     {showError("quotation_due_date") && <p className="mt-1 text-xs text-brand-500">{errors.quotation_due_date}</p>}
                   </div>
 
@@ -1360,18 +1460,26 @@ const response = await fetch(
                     <thead className="bg-gray-100 dark:bg-gray-800">
                       <tr>
                         <th className="px-4 py-3 text-left w-[380px]">
-                          <span className="font-semibold text-gray-900 dark:text-white">Item (From PR)</span>
+                          <span className="px-4 py-3 text-left w-[110px]">Item (From PR)</span>
                         </th>
                         <th className="px-4 py-3 text-left w-[110px]">Qty</th>
                         <th className="px-4 py-3 text-left w-[110px]">UOM</th>
 
                         {form.vendors.map((v) => (
-                          <th key={v.vendor_id} className={classNames("px-4 py-3 text-left", cellWrap)}>
-                            <div className="flex flex-col">
-                              <span className="font-semibold text-gray-900 dark:text-white">{v.vendor_name}</span>
-                              <span className="text-xs text-gray-500 dark:text-gray-300">{v.vendor_id}</span>
-                            </div>
-                          </th>
+                          <th
+  key={v.vendor_id}
+  className={classNames("px-4 py-3 text-left", cellWrap)}
+>
+  <div className="flex flex-col">
+    <span className="font-semibold text-white">
+      {v.vendor_name}
+    </span>
+
+    {/* <span className="text-xs text-white/80">
+      {v.vendor_id}
+    </span> */}
+  </div>
+</th>
                         ))}
                       </tr>
                     </thead>
