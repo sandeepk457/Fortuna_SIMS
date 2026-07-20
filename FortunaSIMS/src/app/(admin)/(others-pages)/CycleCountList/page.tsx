@@ -32,10 +32,10 @@ const TABS = [
 ];
 
 /** Helpers */
-function classNames(...v) {
+function classNames(...v: (string | false | null | undefined)[]) {
   return v.filter(Boolean).join(" ");
 }
-function withinRange(dateISO, from, to) {
+function withinRange(dateISO: string | null, from: string | null, to: string | null) {
   if (!dateISO) return true;
   const t = new Date(dateISO).getTime();
   if (from) {
@@ -184,7 +184,7 @@ export default function CycleCountListPage() {
       const okSearch = q ? hay.includes(q) : true;
       const okWh = warehouseFilter === "All" ? true : r.warehouse === warehouseFilter;
       const okStatus = statusFilter === "All" ? true : r.status === statusFilter;
-      const okDate = withinRange(r.scheduledOn, scheduledFrom || undefined, scheduledTo || undefined);
+      const okDate = withinRange(r.scheduledOn, scheduledFrom || null, scheduledTo || null);
 
       return okSearch && okWh && okStatus && okDate;
     });
@@ -201,7 +201,7 @@ export default function CycleCountListPage() {
   /** Counts for badges (like GRN tab badges) */
   const badgeCount = useMemo(() => {
     const base = data; // badges generally show overall counts, like GRN screenshot
-    const map = {};
+    const map: Record<string, number> = {};
     map.all = base.length;
     map.drafts = base.filter((x) => x.status === "Draft").length;
     map.planned = base.filter((x) => x.status === "Planned").length;
@@ -248,28 +248,28 @@ export default function CycleCountListPage() {
   }, [filteredData]);
 
   /** Actions (Draft clear, Cancel, Approve, Post) */
-  const onView = (ccNo) => alert(`View ${ccNo} (demo)`);
-  const onEdit = (ccNo) => alert(`Edit ${ccNo} (demo)`);
-  const onClearDraft = (ccNo) => {
+  const onView = (ccNo: string) => alert(`View ${ccNo} (demo)`);
+  const onEdit = (ccNo: string) => alert(`Edit ${ccNo} (demo)`);
+  const onClearDraft = (ccNo: string) => {
     const ok = confirm(`Clear draft ${ccNo}? This cannot be undone.`);
     if (!ok) return;
     setData((prev) => prev.filter((x) => x.ccNo !== ccNo));
   };
-  const onCancel = (ccNo) => {
+  const onCancel = (ccNo: string) => {
     const ok = confirm(`Cancel ${ccNo}?`);
     if (!ok) return;
     setData((prev) =>
       prev.map((x) => (x.ccNo === ccNo ? { ...x, status: "Cancelled" } : x))
     );
   };
-  const onApprove = (ccNo) => {
+  const onApprove = (ccNo: string) => {
     const ok = confirm(`Approve ${ccNo}?`);
     if (!ok) return;
     setData((prev) =>
       prev.map((x) => (x.ccNo === ccNo ? { ...x, status: "Approved" } : x))
     );
   };
-  const onPost = (ccNo) => {
+  const onPost = (ccNo: string) => {
     const ok = confirm(`Post ${ccNo}? (Final step)`);
     if (!ok) return;
     setData((prev) =>
@@ -330,7 +330,7 @@ export default function CycleCountListPage() {
     setCurrentPage(1);
   };
 
-  const statusPill = (s) =>
+  const statusPill = (s: string) =>
     classNames(
       "rounded-full px-3 py-1 text-xs font-semibold",
       s === "Posted" && "bg-green-100 text-green-700",
@@ -751,7 +751,7 @@ export default function CycleCountListPage() {
 }
 
 /** Small components */
-function TabBtn({ active, onClick, label }) {
+function TabBtn({ active, onClick, label, color }: { active: boolean; onClick: () => void; label: string; color: string }) {
   return (
     <button
       type="button"
@@ -762,7 +762,7 @@ function TabBtn({ active, onClick, label }) {
           ? "text-white shadow"
           : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
       )}
-      style={active ? { backgroundColor: "#C8102E" } : undefined} // ✅ FORCE PRIMARY RED
+      style={active ? { backgroundColor: color } : undefined}
     >
       {label}
     </button>
@@ -770,7 +770,7 @@ function TabBtn({ active, onClick, label }) {
 }
 
 
-function StatRow({ label, value, badge }) {
+function StatRow({ label, value, badge }: { label: string; value: number | string; badge?: "green" | "red" | "amber" | "blue" | "purple" | "gray" }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-gray-600 dark:text-gray-300">{label}</span>
