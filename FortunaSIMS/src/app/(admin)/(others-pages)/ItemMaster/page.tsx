@@ -3,14 +3,41 @@
 import React, { useState, useMemo,useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
+// import { useSearchParams } from "next/navigation";
 import api from "../../../utils/api";
 
 interface Item {
   code: string;
-  name: string;  category: string;
+  name: string;
+  category: string;
   uom: string;
   status: string;
+  short_name?: string;
+  item_type?: string;
+  sub_category?: string;
+  brand?: string;
+  alt_uom?: string;
+  conversion_factor?: number | string;
+  barcode?: string;
+  hsn_sac?: string;
+  description?: string;
+  inventory_controlled?: boolean;
+  batch_controlled?: boolean;
+  serial_controlled?: boolean;
+  expiry_controlled?: boolean;
+  min_stock_level?: number | string;
+  max_stock_level?: number | string;
+  reorder_qty?: number | string;
+  storage_type?: string;
+  hazardous?: boolean;
+  fragile?: boolean;
+  stackable?: boolean;
+  default_warehouse?: string;
+  default_zone?: string;
+  default_bin?: string;
+  valuation_method?: string;
+  standard_cost?: number | string;
+  inventory_gl_code?: string;
 }
 
 export default function ItemMasterPage() {
@@ -22,9 +49,9 @@ export default function ItemMasterPage() {
   const [uploading, setUploading] = useState(false);
 
   //  (FETCH FUNCTION)
-  const searchParams = useSearchParams();
+  // const searchParams = useSearchParams();
 
-  const id = searchParams.get("id");
+  // const id = searchParams.get("id");
   const fetchItems = async () => {
     try {
       const res = await fetch("http://localhost:5000/api/items");
@@ -45,7 +72,7 @@ export default function ItemMasterPage() {
 
   //stub for delete function//
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (id: string) => {
   if (!confirm("Are you sure to delete?")) return;
 
   const res = await fetch(`http://localhost:5000/api/items/${id}`, {
@@ -62,8 +89,8 @@ export default function ItemMasterPage() {
   }
 };
 
-const handleFileUpload = async (e) => {
-  const file = e.target.files[0];
+const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const file = e.target.files?.[0];
   if (!file) return;
 
   const formData = new FormData();
