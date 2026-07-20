@@ -99,7 +99,7 @@ const SAMPLE_PLANS = [
 ];
 
 /** UI helpers */
-function classNames(...v) {
+function classNames(...v: (string | false | null | undefined)[]) {
   return v.filter(Boolean).join(" ");
 }
 
@@ -117,7 +117,7 @@ const outlineBtn =
   "inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition active:scale-95";
 
 /** Pills */
-function StatusPill({ status }) {
+function StatusPill({ status }: { status: string }) {
   const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
   const cls =
     status === "Draft"
@@ -139,7 +139,7 @@ function StatusPill({ status }) {
   return <span className={classNames(base, cls)}>{status}</span>;
 }
 
-function SummaryRow({ label, value }) {
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-gray-600">{label}</span>
@@ -148,8 +148,15 @@ function SummaryRow({ label, value }) {
   );
 }
 
+type QuickStats = {
+  total: number;
+  byStatus: Record<string, number>;
+  totalVariance: number;
+  avgAccuracy: number;
+};
+
 /** Quick stats card (RIGHT panel) */
-function QuickStatsCard({ stats }) {
+function QuickStatsCard({ stats }: { stats: QuickStats }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -196,7 +203,7 @@ function QuickStatsCard({ stats }) {
   );
 }
 
-function StatLine({ label, value, pillBg }) {
+function StatLine({ label, value, pillBg }: { label: string; value: string | number; pillBg?: string }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-gray-700">{label}</span>
@@ -222,10 +229,18 @@ export default function CCPAssignmentPage() {
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activePlan, setActivePlan] = useState(null);
+  const [activePlan, setActivePlan] = useState<typeof SAMPLE_PLANS[number] | null>(null);
 
   // Modal form
-  const [assignment, setAssignment] = useState({
+  const [assignment, setAssignment] = useState<{
+    role_type: string;
+    include_mobile: boolean;
+    max_per_user: string;
+    allow_reassign: boolean;
+    due_date: string;
+    remarks: string;
+    assignees: string[];
+  }>({
     role_type: "Counter",
     include_mobile: true,
     max_per_user: "0",
@@ -237,7 +252,7 @@ export default function CCPAssignmentPage() {
 
   const [userSearch, setUserSearch] = useState("");
 
-  const whName = (whId) => WAREHOUSES.find((w) => w.id === whId)?.name || whId;
+  const whName = (whId: string) => WAREHOUSES.find((w) => w.id === whId)?.name || whId;
 
   const filteredPlans = useMemo(() => {
     return plans.filter((p) => {
@@ -254,7 +269,7 @@ export default function CCPAssignmentPage() {
   }, [plans, search, warehouse, status]);
 
   const quickStats = useMemo(() => {
-    const byStatus = {};
+    const byStatus: Record<string, number> = {};
     let totalVariance = 0;
     let accSum = 0;
     let accCount = 0;
@@ -284,14 +299,14 @@ export default function CCPAssignmentPage() {
     currentPage * itemsPerPage
   );
 
-  const getAssignStatus = (plan) => {
+  const getAssignStatus = (plan: typeof SAMPLE_PLANS[number]) => {
     const assignedCount = (plan.assigned_to || []).length;
     if (assignedCount === 0) return "Not Assigned";
     if (assignedCount >= 2) return "Fully Assigned"; // demo
     return "Partially Assigned";
   };
 
-  const assignPill = (s) => {
+  const assignPill = (s: string) => {
     const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
     const cls =
       s === "Not Assigned"
@@ -340,7 +355,7 @@ export default function CCPAssignmentPage() {
     link.click();
   };
 
-  const resetAssignmentForm = (plan) => {
+  const resetAssignmentForm = (plan: typeof SAMPLE_PLANS[number] | null) => {
     setAssignment({
       role_type: "Counter",
       include_mobile: true,
@@ -353,7 +368,7 @@ export default function CCPAssignmentPage() {
     setUserSearch("");
   };
 
-  const openAssignPopup = (plan) => {
+  const openAssignPopup = (plan: typeof SAMPLE_PLANS[number]) => {
     setActivePlan(plan);
     resetAssignmentForm(plan);
     setIsModalOpen(true);
@@ -365,7 +380,7 @@ export default function CCPAssignmentPage() {
     setUserSearch("");
   };
 
-  const toggleAssignee = (userId) => {
+  const toggleAssignee = (userId: string) => {
     setAssignment((p) => {
       const exists = p.assignees.includes(userId);
       return {

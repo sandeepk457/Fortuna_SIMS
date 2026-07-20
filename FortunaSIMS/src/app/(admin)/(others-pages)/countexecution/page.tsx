@@ -89,7 +89,7 @@ const SAMPLE_TASKS = [
 ];
 
 /** Helpers */
-function classNames(...v) {
+function classNames(...v: Array<string | number | boolean | null | undefined>) {
   return v.filter(Boolean).join(" ");
 }
 
@@ -106,9 +106,9 @@ const primaryBtn =
 const outlineBtn =
   "inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50 transition active:scale-95";
 
-function Pill({ children, tone = "gray" }) {
+function Pill({ children, tone = "gray" }: { children: React.ReactNode; tone?: string }) {
   const base = "inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold";
-  const map = {
+  const map: Record<string, string> = {
     gray: "bg-gray-100 text-gray-700",
     blue: "bg-blue-50 text-blue-700",
     amber: "bg-amber-50 text-amber-800",
@@ -120,7 +120,7 @@ function Pill({ children, tone = "gray" }) {
   return <span className={classNames(base, map[tone] || map.gray)}>{children}</span>;
 }
 
-function StatusPill({ status }) {
+function StatusPill({ status }: { status: string }) {
   const tone =
     status === "Assigned"
       ? "blue"
@@ -136,7 +136,7 @@ function StatusPill({ status }) {
   return <Pill tone={tone}>{status}</Pill>;
 }
 
-function SummaryRow({ label, value }) {
+function SummaryRow({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3">
       <span className="text-gray-600">{label}</span>
@@ -145,7 +145,7 @@ function SummaryRow({ label, value }) {
   );
 }
 
-function QuickStatsCard({ stats }) {
+function QuickStatsCard({ stats }: { stats: { total: number; byStatus: Record<string, number>; avgProgress: number } }) {
   return (
     <div className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between">
@@ -187,7 +187,7 @@ function QuickStatsCard({ stats }) {
   );
 }
 
-function StatLine({ label, value, pillBg }) {
+function StatLine({ label, value, pillBg }: { label: string; value: string | number; pillBg: string }) {
   return (
     <div className="flex items-center justify-between">
       <span className="text-gray-700">{label}</span>
@@ -215,7 +215,7 @@ export default function CountExecutionPage() {
 
   // Modal
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [activeTaskId, setActiveTaskId] = useState(null);
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
 
   // Modal states
   const [lineSearch, setLineSearch] = useState("");
@@ -223,8 +223,8 @@ export default function CountExecutionPage() {
   const [scanSku, setScanSku] = useState("");
   const [remarks, setRemarks] = useState("");
 
-  const whName = (id) => WAREHOUSES.find((w) => w.id === id)?.name || id;
-  const userName = (id) => USERS.find((u) => u.id === id)?.name || id;
+  const whName = (id: string) => WAREHOUSES.find((w) => w.id === id)?.name || id;
+  const userName = (id: string) => USERS.find((u) => u.id === id)?.name || id;
 
   const filteredTasks = useMemo(() => {
     return tasks.filter((t) => {
@@ -243,7 +243,7 @@ export default function CountExecutionPage() {
   }, [tasks, search, warehouse, status, assignee]);
 
   const quickStats = useMemo(() => {
-    const byStatus = {};
+    const byStatus: Record<string, number> = {};
     let progressSum = 0;
 
     filteredTasks.forEach((t) => {
@@ -312,7 +312,7 @@ export default function CountExecutionPage() {
     setRemarks("");
   };
 
-  const openExecute = (taskId) => {
+  const openExecute = (taskId: string) => {
     setActiveTaskId(taskId);
     setIsModalOpen(true);
     resetModalState();
@@ -324,17 +324,21 @@ export default function CountExecutionPage() {
     resetModalState();
   };
 
-  const calcProgress = (lines) => {
+  const calcProgress = (lines: Array<{ counted_qty: string | number }>) => {
     if (!lines?.length) return 0;
     const done = lines.filter((l) => String(l.counted_qty).trim() !== "").length;
     return Math.round((done / lines.length) * 100);
   };
 
-  const updateLineCount = (lineId, value) => {
+  const updateLineCount = (lineId: string, value: string) => {
     if (!activeTask) return;
 
     const num = value === "" ? "" : Number(value);
-    if (value !== "" && (!Number.isFinite(num) || num < 0)) return;
+    if (
+      value !== "" &&
+      (typeof num !== "number" || !Number.isFinite(num) || (num as number) < 0)
+    )
+      return;
 
     setTasks((prev) =>
       prev.map((t) => {
@@ -346,7 +350,7 @@ export default function CountExecutionPage() {
           const counted = value === "" ? "" : Number(value);
           const variance = counted === "" ? "" : Number(counted) - Number(l.system_qty || 0);
 
-          return { ...l, counted_qty: counted, variance };
+          return { ...l, counted_qty: counted, variance } as typeof l;
         });
 
         const progress_pct = calcProgress(updatedLines);
@@ -357,7 +361,7 @@ export default function CountExecutionPage() {
             ? "In-Progress"
             : "Assigned";
 
-        return { ...t, lines: updatedLines, progress_pct, status: nextStatus };
+        return { ...t, lines: updatedLines as typeof t.lines, progress_pct, status: nextStatus };
       })
     );
   };

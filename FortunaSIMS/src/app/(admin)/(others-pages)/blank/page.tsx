@@ -49,6 +49,7 @@ export default function ItemMasterPage() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(5);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Filtering Logic
   const filteredData = useMemo(() => {
