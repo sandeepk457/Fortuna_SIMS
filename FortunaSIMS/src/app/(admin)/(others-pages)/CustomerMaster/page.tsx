@@ -46,35 +46,35 @@ export default function CustomerMasterListPage() {
   const [data, setData] = useState<Customer[]>([]);
    const activeCustomers = data.filter(c => c.status === "Active");
 
-  // delete function //
-  const handleDelete = async (id: number) => {
-  const confirmDelete = confirm("Are you sure to deactivate this customer?");
+//   // delete function //
+//   const handleDelete = async (id: number) => {
+//   const confirmDelete = confirm("Are you sure to deactivate this customer?");
 
-  if (!confirmDelete) return;
+//   if (!confirmDelete) return;
 
-  try {
-    const res = await fetch(
-      `http://localhost:5000/api/customers/${id}`,
-      {
-        method: "DELETE",
-      }
-    );
+//   try {
+//     const res = await fetch(
+//       `http://localhost:5000/api/customers/${id}`,
+//       {
+//         method: "DELETE",
+//       }
+//     );
 
-    const data = await res.json();
+//     const data = await res.json();
 
-    if (data.success) {
-      alert("Customer deactivated successfully 🚫");
+//     if (data.success) {
+//       alert("Customer deactivated successfully 🚫");
 
-      // 🔥 Refresh list
-      fetchCustomers();
-    } else {
-      alert("Error: " + data.message);
-    }
-  } catch (err) {
-    console.error(err);
-    alert("Delete failed ❌");
-  }
-};
+//       // 🔥 Refresh list
+//       fetchCustomers();
+//     } else {
+//       alert("Error: " + data.message);
+//     }
+//   } catch (err) {
+//     console.error(err);
+//     alert("Delete failed ❌");
+//   }
+// };
 
 
   // Column Filters
