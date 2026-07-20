@@ -329,7 +329,16 @@ const filteredData = useMemo(() => {
       return;
     }
 
-    setData((p) => [{ ...newCustomer, code, name, creditLimit: Number(newCustomer.creditLimit) }, ...p]);
+    setData((p) => [
+      {
+        customer_id: p.length ? Math.max(...p.map((c) => c.customer_id)) + 1 : 1,
+        ...newCustomer,
+        code,
+        name,
+        creditLimit: Number(newCustomer.creditLimit),
+      },
+      ...p,
+    ]);
     setIsModalOpen(false);
 
     setNewCustomer({
