@@ -751,7 +751,19 @@ export default function CycleCountListPage() {
 }
 
 /** Small components */
-function TabBtn({ active, onClick, label, color }: { active: boolean; onClick: () => void; label: string; color: string }) {
+function TabBtn({
+  active,
+  onClick,
+  label,
+  color,
+}: {
+  active: boolean;
+  onClick: () => void;
+  label: React.ReactNode;
+  color: string;
+}) {
+
+  
   return (
     <button
       type="button"
