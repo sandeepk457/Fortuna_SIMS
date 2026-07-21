@@ -37,6 +37,30 @@ type ItemMasterFormState = {
   description: string;
 
   // Inventory Controls (placeholder fields can be expanded later)
+  inventory_controlled: boolean;
+  batch_controlled: boolean;
+  serial_controlled: boolean;
+  expiry_controlled: boolean;
+  min_stock_level: string;
+  max_stock_level: string;
+  reorder_qty: string;
+  
+  // Storage & Handling
+  storage_type: string;
+  hazardous: boolean;
+  fragile: boolean;
+  stackable: boolean;
+  default_warehouse: string;
+  default_zone: string;
+  default_bin: string;
+  
+  // Valuation & Accounting
+  valuation_method: string;
+  standard_cost: string;
+  inventory_gl_code: string;
+  
+  // Status & Audit
+  status: string;
   // Storage & Handling
   // Valuation & Accounting
   // Status & Audit
@@ -64,6 +88,24 @@ const initialState: ItemMasterFormState = {
   barcode: "",
   hsnSac: "",
   description: "",
+  inventory_controlled: false,
+  batch_controlled: false,
+  serial_controlled: false,
+  expiry_controlled: false,
+  min_stock_level: "",
+  max_stock_level: "",
+  reorder_qty: "",
+  storage_type: "",
+  hazardous: false,
+  fragile: false,
+  stackable: false,
+  default_warehouse: "",
+  default_zone: "",
+  default_bin: "",
+  valuation_method: "",
+  standard_cost: "",
+  inventory_gl_code: "",
+  status: "",
 };
 
 const inputBase =
