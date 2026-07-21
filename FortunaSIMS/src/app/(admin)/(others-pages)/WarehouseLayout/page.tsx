@@ -438,7 +438,7 @@ export default function WarehouseLayoutPage() {
                     <div className="flex flex-col items-center justify-center py-3">
                       <QRCode
                         id={getQrId(selectedBin.code)}
-                        value={`${window.location.origin}/bin?code=${selectedBin.code}`}
+                        value={`/bin?code=${selectedBin.code}`}
                         size={120}
                       />
 
