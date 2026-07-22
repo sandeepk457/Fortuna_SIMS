@@ -60,11 +60,12 @@ app.get("/api/testdb", async (req, res) => {
       time: result.rows[0],
     });
   } catch (err) {
-    console.error(err);
+    console.error("DB Error:", err);
 
     res.status(500).json({
       status: "Database Connection Failed",
-      error: err.message,
+      error: err?.message || String(err),
+      stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
     });
   }
 });
