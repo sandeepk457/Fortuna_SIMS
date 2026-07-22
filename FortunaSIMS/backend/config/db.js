@@ -12,4 +12,4 @@ const pool = process.env.DATABASE_URL
       database: "fortuna_sims_db",
     });
 
-module.exports = pool;
+module.exports = { pool };

@@ -2,6 +2,8 @@ require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
+const { pool } = require("./config/db");
+
 
 const authRoutes = require("./routes/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
@@ -47,6 +49,26 @@ app.get("/", (req, res) => {
 // Render provides PORT automatically.
 // Local development falls back to port 5000.
 const PORT = process.env.PORT || 5000;
+
+
+app.get("/api/testdb", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT NOW()");
+
+    res.json({
+      status: "Database Connected",
+      time: result.rows[0],
+    });
+  } catch (err) {
+    console.error(err);
+
+    res.status(500).json({
+      status: "Database Connection Failed",
+      error: err.message,
+    });
+  }
+});
+
 
 app.listen(PORT, () => {
   console.log(`SIMS backend running on port ${PORT}`);
