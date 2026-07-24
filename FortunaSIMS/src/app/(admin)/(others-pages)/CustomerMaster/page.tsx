@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
@@ -101,12 +101,15 @@ export default function CustomerMasterListPage() {
   formData.append("file", file);
 
   try {
-    setUploading(true);
+  setUploading(true);
 
-    const res = await fetch("http://localhost:5000/api/customers/bulk-upload", {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/customers/bulk-upload`,
+    {
       method: "POST",
       body: formData,
-    });
+    }
+  );
 
     const data = await res.json();
 
@@ -114,12 +117,12 @@ export default function CustomerMasterListPage() {
       alert(`✅ Uploaded: ${data.inserted}\n❌ Skipped: ${data.skipped}`);
 
       // 🔥 error file download
-      if (data.errorFile) {
-        const link = document.createElement("a");
-        link.href = `http://localhost:5000/${data.errorFile}`;
-        link.download = "Customer_Error_Report.xlsx";
-        link.click();
-      }
+     if (data.errorFile) {
+  const link = document.createElement("a");
+  link.href = `${process.env.NEXT_PUBLIC_API_URL}/${data.errorFile}`;
+  link.download = "Customer_Error_Report.xlsx";
+  link.click();
+}
 
       // refresh list
       window.location.reload();
@@ -181,8 +184,8 @@ const downloadCustomerTemplate = () => {
 };
 
   //useEffect to fetch data from backend API
- useEffect(() => {
-  fetch("http://localhost:5000/api/customers")
+useEffect(() => {
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers`)
     .then((res) => res.json())
     .then((resData) => {
       console.log("API RESPONSE:", resData);
@@ -295,15 +298,17 @@ const filteredData = useMemo(() => {
   const ok = confirm("Delete this customer?");
   if (!ok) return;
 
-  try {
-    await fetch(`http://localhost:5000/api/customers/${id}`, {
-      method: "DELETE",
-    });
+try {
+  await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${id}`, {
+    method: "DELETE",
+  });
 
-    // refresh data
-    const res = await fetch("http://localhost:5000/api/customers");
-    const updated = await res.json();
-    setData(updated);
+  // refresh data
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/customers`
+  );
+  const updated = await res.json();
+  setData(updated);
 
   } catch (err) {
     console.error("Delete error:", err);

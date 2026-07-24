@@ -179,7 +179,7 @@ export default function CustomerMasterCreatePage() {
   if (id) {
     console.log("Edit ID:", id);
 
-    fetch(`http://localhost:5000/api/customers/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/${id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("EDIT DATA:", data);
@@ -248,7 +248,7 @@ export default function CustomerMasterCreatePage() {
 useEffect(() => {
   const id = new URLSearchParams(window.location.search).get("id");
 
-  fetch("http://localhost:5000/api/customers/next-code")
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/customers/next-code`)
     .then((res) => res.json())
     .then((data) => {
       if (data.success && !id) {   // ✅ FIX
@@ -493,7 +493,9 @@ useEffect(() => {
   };
 
   try {
-    const res = await fetch("http://localhost:5000/api/customers", {
+   const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/customers`,
+  {
       method: "POST",
 
       headers: {
