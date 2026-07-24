@@ -225,7 +225,9 @@ useEffect(() => {
 
 const fetchUoms = async () => {
   try {
-    const res = await fetch("http://localhost:5000/api/uoms");
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/uoms`
+);
     const data = await res.json();
     setUoms(data);
   } catch (err) {
@@ -264,7 +266,9 @@ useEffect(() => {
 
 const fetchWarehouses = async () => {
   try {
-    const res = await fetch("http://localhost:5000/api/warehouses");
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
+);
     const data = await res.json();
 
     // only active
@@ -292,8 +296,8 @@ const handleWarehouseChange = async (code: string) => {
 
   try {
     const res = await fetch(
-      `http://localhost:5000/api/warehouses/full/${code}`
-    );
+  `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full/${code}`
+);
     const data = await res.json();
 
     setZones(data.zones || []);
@@ -423,11 +427,11 @@ const onSave = async () => {
   try {
     const isEdit = !!id;
 
-    const url = isEdit
-      ? `http://localhost:5000/api/items/${id}`
-      : `http://localhost:5000/api/items`;
+   const url = isEdit
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/items/${id}`
+  : `${process.env.NEXT_PUBLIC_API_URL}/api/items`;
 
-    const method = isEdit ? "PUT" : "POST";
+const method = isEdit ? "PUT" : "POST";
 
     // 🔥 Clean payload (avoid undefined/null issues)
     const payload = {

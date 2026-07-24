@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import React, { useState, useMemo,useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import api from "../../../utils/api";
 
 interface Item {
+  id?: string;
   code: string;
   name: string;
   category: string;
@@ -54,7 +55,9 @@ export default function ItemMasterPage() {
   // const id = searchParams.get("id");
   const fetchItems = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/items");
+      const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/items`
+);
       const result = await res.json();
 
       console.log("API DATA:", result); // 🔥 ADD THIS
@@ -75,9 +78,12 @@ export default function ItemMasterPage() {
   const handleDelete = async (id: string) => {
   if (!confirm("Are you sure to delete?")) return;
 
-  const res = await fetch(`http://localhost:5000/api/items/${id}`, {
+  const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/items/${id}`,
+  {
     method: "DELETE"
-  });
+  }
+);
 
   const data = await res.json();
 
@@ -99,10 +105,13 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
   try {
     setUploading(true);
 
-    const res = await fetch("http://localhost:5000/api/items/bulk-upload", {
-      method: "POST",
-      body: formData,
-    });
+   const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/items/bulk-upload`,
+  {
+    method: "POST",
+    body: formData,
+  }
+);
 
     const data = await res.json();
 
@@ -111,11 +120,11 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
       // 🔥 DOWNLOAD ERROR FILE (FIXED)
       if (data.errorFile) {
-        const link = document.createElement("a");
-        link.href = `http://localhost:5000/${data.errorFile}`;
-        link.download = "Error_Report.xlsx";
-        link.click();
-      }
+  const link = document.createElement("a");
+  link.href = `${process.env.NEXT_PUBLIC_API_URL}/${data.errorFile}`;
+  link.download = "Error_Report.xlsx";
+  link.click();
+}
 
       // 🔥 RELOAD AFTER SUCCESS
       window.location.reload();
@@ -467,7 +476,7 @@ const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
 
     {/* DELETE */}
     <button
-      onClick={() => handleDelete(item.id)}
+      onClick={() => item.id && handleDelete(item.id)}
       className="w-[80px] px-3 py-1 text-xs rounded-lg text-white shadow-md transition-all duration-200 hover:scale-105 active:scale-95"
       style={{
         background: "linear-gradient(135deg, #C8102E, #EF4444)",
