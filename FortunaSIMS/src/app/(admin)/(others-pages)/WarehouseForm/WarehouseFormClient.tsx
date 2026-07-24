@@ -324,8 +324,8 @@ const hasFetched = useRef(false);
 const fetchWarehouseByCode = async () => {
   try {
     const res = await axios.get(
-  `http://localhost:5000/api/warehouses/full/${code}`
-  );
+      `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full/${code}`
+    );
 
     const { warehouse, settings, zones, aisles, racks, bins } = res.data;
 
@@ -497,13 +497,13 @@ const onSave = async () => {
 if (isEdit) {
   // 🔥 UPDATE
   res = await axios.put(
-    `http://localhost:5000/api/warehouses/full-update/${code}`,
+    `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full-update/${code}`,
     payload
   );
 } else {
   // 🔥 CREATE
   res = await axios.post(
-    "http://localhost:5000/api/warehouses/full-create",
+    `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full-create`,
     payload
   );
 }

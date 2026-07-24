@@ -30,7 +30,15 @@ const StatRow = ({ label, value, badge }: any) => {
 interface Warehouse {
   code: string;
   name: string;
-  warehouseType: "DC" | "Plant" | "Hub" | "Store";
+  warehouseType:
+    | "DC"
+    | "Plant"
+    | "Hub"
+    | "Store"
+    | "General DC"
+    | "Manufacturing Store"
+    | "Cold Chain"
+    | "Yard";
   city: string;
   state: string;
   capacitySqft: number;
@@ -40,7 +48,7 @@ interface Warehouse {
 export default function WarehouseMasterPage() {
   const router = useRouter();
 
-  const handleview = (code) => {
+  const handleview = (code: string) => {
     router.push(`/WarehouseForm?code=${code}&mode=view`);
   }
 
@@ -97,12 +105,14 @@ useEffect(() => {
 
 const fetchWarehouses = async () => {
   try {
-    const res = await axios.get("http://localhost:5000/api/warehouses");
+    const res = await axios.get(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
+);
 
     console.log("API DATA:", res.data);
 
     // 🔥 MAP backend → frontend structure
-    const mapped = res.data.map((item) => ({
+    const mapped = res.data.map((item: any) => ({
       code: item.warehouse_code,
       name: item.warehouse_name,
       warehouseType: item.warehouse_type,
