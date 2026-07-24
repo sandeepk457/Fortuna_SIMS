@@ -25,7 +25,9 @@ export default function UomMasterPage() {
 
 const fetchUoms = async () => {
   try {
-    const res = await axios.get("http://localhost:5000/api/uoms");
+    const res = await axios.get(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/uoms`
+    );
     setData(res.data);
   } catch (err) {
     console.error("Error fetching UOMs:", err);
@@ -122,13 +124,19 @@ const openEdit = (u: Uom) => {
       name,
     };
 
-    if (editingId) {
-      // ✅ UPDATE API
-      await axios.put(`http://localhost:5000/api/uoms/${editingId}`, payload);
-    } else {
-      // ✅ CREATE API
-      await axios.post("http://localhost:5000/api/uoms", payload);
-    }
+if (editingId) {
+  // ✅ UPDATE API
+  await axios.put(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/uoms/${editingId}`,
+    payload
+  );
+} else {
+  // ✅ CREATE API
+  await axios.post(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/uoms`,
+    payload
+  );
+}
 
     alert("Saved successfully ✅");
 
