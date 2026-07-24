@@ -1,4 +1,5 @@
 "use client";
+import { API_BASE_URL } from "@/app/utils/apiBase";
 import React, { useMemo, useState, useEffect } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
@@ -33,7 +34,7 @@ export default function VendorMasterListPage() {
 
   // ✅ FETCH FUNCTION (Reusable)
   const fetchVendors = () => {
-    fetch("http://localhost:5000/api/vendors")
+    fetch(`${API_BASE_URL}/api/vendors`)
       .then((res) => res.json())
       .then((apiData) => {
         const mapped = apiData.map((v: any) => ({
@@ -63,7 +64,7 @@ export default function VendorMasterListPage() {
     if (!confirmDelete) return;
 
     try {
-      await fetch(`http://localhost:5000/api/vendors/${id}`, {
+      await fetch(`${API_BASE_URL}/api/vendors/${id}`, {
         method: "DELETE",
       });
 
@@ -239,7 +240,7 @@ const onDelete = async (id: string) => {
   const ok = confirm("Are you sure?");
   if (!ok) return;
 
-  await fetch(`http://localhost:5000/api/vendors/${id}`, {
+  await fetch(`${API_BASE_URL}/api/vendors/${id}`, {
     method: "DELETE",
   });
 
@@ -262,7 +263,7 @@ const onDelete = async (id: string) => {
       return;
     }
 
-    setData((p) => [{ ...newVendor }, ...p]);
+    setData((p) => [{ ...newVendor, id: crypto.randomUUID() }, ...p]);
     setIsModalOpen(false);
 
     setNewVendor({

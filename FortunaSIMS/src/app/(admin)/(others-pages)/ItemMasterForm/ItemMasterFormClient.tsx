@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "@/app/utils/api";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useSearchParams } from "next/navigation";
 
@@ -163,7 +163,7 @@ const binOptions = bins
 
 useEffect(() => {
   if (id) {
-    fetch(`http://localhost:5000/api/items/${id}`)
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/items/${id}`)
       .then(res => {
         if (!res.ok) throw new Error("Failed to fetch item");
         return res.json();
