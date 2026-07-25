@@ -97,7 +97,9 @@ export default function PurchaseRequisitionListPage() {
 
 const fetchApprovals = async (pr_id: string) => {
   try {
-    const res = await fetch(`http://localhost:5000/api/pr/${pr_id}/approvals`);
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/pr/${pr_id}/approvals`
+    );
     const data = await res.json();
     return data.data || [];
   } catch (err) {
@@ -110,7 +112,9 @@ const fetchPRs = async () => {
   setLoading(true);
 
   try {
-    const res = await fetch("http://localhost:5000/api/pr/list");
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/pr/list`
+);
     const data = await res.json();
 
     if (data.success) {
@@ -162,7 +166,9 @@ useEffect(() => {
 
 const handleApprove = async (pr_id: string, level: number) => {
   try {
-    const res = await fetch("http://localhost:5000/api/pr/approve", {
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/pr/approve`,
+  {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -194,18 +200,21 @@ const handleApprove = async (pr_id: string, level: number) => {
 
 const handleReject = async (pr_id: string, level: number) => {
   try {
-    const res = await fetch("http://localhost:5000/api/pr/approve", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        pr_id,
-        level,
-        decision: "Rejected",
-        remarks: "Rejected",
-      }),
-    });
+    const res = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/pr/approve`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          pr_id,
+          level,
+          decision: "Rejected",
+          remarks: "Rejected",
+        }),
+      }
+    );
 
     const data = await res.json();
 
@@ -229,9 +238,12 @@ const handleDelete = async (id: string) => {
   if (!ok) return;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/pr/delete/${id}`, {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/pr/delete/${id}`,
+    {
       method: "DELETE",
-    });
+    }
+  );
 
     const data = await res.json();
 
@@ -382,8 +394,9 @@ const [loading, setLoading] = useState(false);
   const openApproval = async (pr: any) => {
   try {
     // 🔥 fetch latest approvals
-    const res = await fetch(`http://localhost:5000/api/pr/${pr.pr_id}/approvals`);
-    const result = await res.json();
+const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/pr/${pr.pr_id}/approvals`
+);    const result = await res.json();
 
     const latestApprovals = (result.data || []).map((a: any) => ({
   level: a.level,
@@ -422,7 +435,9 @@ const [loading, setLoading] = useState(false);
   if (!selectedPR) return;
 
   try {
-    const res = await fetch("http://localhost:5000/api/pr/approve", {
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/pr/approve`,
+  {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -478,7 +493,9 @@ const [loading, setLoading] = useState(false);
   if (!ok) return;
 
   try {
-    const res = await fetch("http://localhost:5000/api/pr/submit", {
+    const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/pr/submit`,
+  {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -801,7 +818,7 @@ const [loading, setLoading] = useState(false);
               {
                 pr.approvalRoute.find(
                   (s) => s.level === pr.currentApprovalLevel
-                )?.approverRole
+                )?.role
               }
             </div>
           )}
@@ -1013,7 +1030,7 @@ const [loading, setLoading] = useState(false);
                   PR: <span className="font-semibold">{selectedPR.prNo}</span> • Level{" "}
                   <span className="font-semibold">{selectedPR.currentApprovalLevel}</span> •{" "}
                   <span className="font-semibold">
-                    {selectedPR.approvalRoute.find((s) => s.level === selectedPR.currentApprovalLevel)?.approverRole}
+                    {selectedPR.approvalRoute.find((s: ApprovalStep) => s.level === selectedPR.currentApprovalLevel)?.approverRole}
                   </span>
                 </p>
               </div>
@@ -1065,7 +1082,7 @@ const [loading, setLoading] = useState(false);
                 </div>
 
                 <div className="mt-3 space-y-2 text-sm dark:text-gray-200">
-                  {selectedPR.approvalRoute.map((s) => {
+                  {selectedPR.approvalRoute.map((s: any) => {
                     const isCurrent =
                       s.level === selectedPR.currentApprovalLevel &&
                       (selectedPR.status === "Submitted" || selectedPR.status === "Pending Approval");
