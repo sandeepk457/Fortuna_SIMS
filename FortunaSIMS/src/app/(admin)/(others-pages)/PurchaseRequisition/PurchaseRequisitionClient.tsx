@@ -203,7 +203,7 @@ useEffect(() => {
 
   if (!prId) return;
 
-  fetch(`http://localhost:5000/api/pr/${prId}`)
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pr/${prId}`)
     .then(res => res.json())
     .then(res => {
       console.log("🔥 PR DATA:", res);
@@ -281,10 +281,10 @@ console.log("MODE:", mode);
 
 const [itemsMaster, setItemsMaster] = useState<any[]>([]);
 useEffect(() => {
-  fetch("http://localhost:5000/api/items")
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/items`)
     .then(res => res.json())
     .then(data => {
-      setItemsMaster(data); // ✅ correct for your current API
+      setItemsMaster(data);
     })
     .catch(err => console.error(err));
 }, []);
@@ -341,20 +341,22 @@ useEffect(() => {
 // }, [prId]);
 
 
-const [vendors, setVendors] = useState([]);
+const [vendors, setVendors] = useState<Array<{ id?: string; vendor_id?: string; name: string }>>([]);
+
 useEffect(() => {
-  fetch("http://localhost:5000/api/vendors")
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`)
     .then(res => res.json())
     .then(data => {
-      console.log("VENDORS API:", data); // 🔥 CHECK THIS
-      setVendors(data);// 🔥 check your API format
+      console.log("VENDORS API:", data);
+      setVendors(data);
     })
     .catch(err => console.error(err));
 }, []);
 
-const [warehouses, setWarehouses] = useState<typeof WAREHOUSES>([]);
+const [warehouses, setWarehouses] = useState<any[]>([]);
+
 useEffect(() => {
-  fetch("http://localhost:5000/api/warehouses")
+  fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`)
     .then(res => res.json())
     .then(data => {
       console.log("WAREHOUSE OBJECT:", warehouses[0]);
@@ -380,11 +382,11 @@ useEffect(() => {
 
 //item search popup states
 const [showItemModal, setShowItemModal] = useState(false);
-const [activeIndex, setActiveIndex] = useState(null);
+const [activeIndex, setActiveIndex] = useState<number | null>(null);
 const [itemSearch, setItemSearch] = useState("");
 
 const [showVendorModal, setShowVendorModal] = useState(false);
-const [activeVendorIndex, setActiveVendorIndex] = useState(null);
+const [activeVendorIndex, setActiveVendorIndex] = useState<number | null>(null);
 const [vendorSearch, setVendorSearch] = useState("");
 
 const [showWarehouseModal, setShowWarehouseModal] = useState(false);
@@ -743,10 +745,9 @@ form.attachments.forEach((a) => {
   }
 });
 
-  const url = isEdit
-  ? `http://localhost:5000/api/pr/update/${prId}`
-  : `http://localhost:5000/api/pr/create`;
-
+const url = isEdit
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/pr/update/${prId}`
+  : `${process.env.NEXT_PUBLIC_API_URL}/api/pr/create`;
 const method = isEdit ? "PUT" : "POST";
 
 const res = await fetch(url, {
@@ -789,14 +790,17 @@ const res = await fetch(url, {
     return;
   }
 
-  try {
-    const res = await fetch("http://localhost:5000/api/pr/submit", {
+try {
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/pr/submit`,
+    {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({ pr_id: prId }),
-    });
+    }
+  );
 
     const data = await res.json();
 
@@ -1311,7 +1315,7 @@ const res = await fetch(url, {
       "cursor-pointer flex items-center"
     )}
   >
-    {vendors.find((v) => (v.id || v.vendor_id) === line.preferred_vendor)?.name || (
+    {vendors.find((v: any) => (v.id || v.vendor_id) === line.preferred_vendor)?.name || (
       <span className="text-gray-400">Select Vendor</span>
     )}
   </div>
@@ -1775,9 +1779,11 @@ const res = await fetch(url, {
               <div
                 key={i.code}
                 onClick={() => {
-                  handleItemSelect(activeIndex, i.code);
-                  setShowItemModal(false);
-                  setItemSearch("");
+                  if (activeIndex !== null) {
+                    handleItemSelect(activeIndex, i.code);
+                    setShowItemModal(false);
+                    setItemSearch("");
+                  }
                 }}
                 className="px-3 py-2 hover:bg-blue-50 hover:text-blue-700 cursor-pointer transition"
               >
@@ -1838,9 +1844,11 @@ const res = await fetch(url, {
               <div
                 key={v.vendor_id || v.id}
                 onClick={() => {
-                  updateItem(activeVendorIndex, {
-                    preferred_vendor: v.vendor_id || v.id,
-                  });
+                  if (activeVendorIndex !== null) {
+                    updateItem(activeVendorIndex, {
+                      preferred_vendor: v.vendor_id || v.id,
+                    });
+                  }
                   setShowVendorModal(false);
                   setVendorSearch("");
                 }}
