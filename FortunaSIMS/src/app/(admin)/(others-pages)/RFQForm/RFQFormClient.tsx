@@ -299,8 +299,8 @@ const loadRFQById = async (id: string) => {
   try {
 
     const res = await fetch(
-      `http://localhost:5000/api/rfq/${id}`
-    );
+  `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${id}`
+);
     console.log("STEP-2 RESPONSE STATUS =", res.status);
 
     const result = await res.json();
@@ -479,7 +479,7 @@ useEffect(() => {
 const loadApprovedPRs = async () => {
   try {
     const res = await fetch(
-      "http://localhost:5000/api/rfq/approved-prs"
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/approved-prs`
     );
 
     const data = await res.json();
@@ -495,7 +495,7 @@ const loadApprovedPRs = async () => {
 const loadVendors = async () => {
   try {
     const res = await fetch(
-      "http://localhost:5000/api/rfq/vendors"
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/vendors`
     );
 
     const data = await res.json();
@@ -614,9 +614,9 @@ estimated_value: selectedPR.estimated_pr_value
 
     if (!selectedPR) return;
 
-    const itemRes = await fetch(
-      `http://localhost:5000/api/rfq/pr/${pr_id}/items`
-    );
+const itemRes = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/pr/${pr_id}/items`
+);
 
     const itemData = await itemRes.json();
 
@@ -891,8 +891,8 @@ form.attachments.forEach((a) => {
 
 
 const apiUrl = isEditMode
-  ? `http://localhost:5000/api/rfq/${form.rfq_id}`
-  : "http://localhost:5000/api/rfq/create";
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${form.rfq_id}`
+  : `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/create`;
 
 const apiMethod = isEditMode
   ? "PUT"
@@ -1011,7 +1011,7 @@ form.attachments.forEach((a) => {
 });
 
 const response = await fetch(
-  "http://localhost:5000/api/rfq/create",
+  `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/create`,
   {
     method: "POST",
     body: formData,
@@ -1830,8 +1830,8 @@ updateAttachment(idx, {
             className="text-blue-600"
             onClick={() =>
              window.open(
-  `http://localhost:5000/${att.file_path}`,
-  "_blank"
+`${process.env.NEXT_PUBLIC_API_URL}/${att.file_path}`,
+"_blank"
 )
             }
           >
@@ -1839,12 +1839,12 @@ updateAttachment(idx, {
           </button>
 
           <a
-            href={`http://localhost:5000/${att.file_path}`}
-            download
-            className="text-green-600"
-          >
-            Download
-          </a>
+  href={`${process.env.NEXT_PUBLIC_API_URL}/${att.file_path}`}
+  download
+  className="text-green-600"
+>
+  Download
+</a>
 
         </div>
       </div>

@@ -147,9 +147,9 @@ export default function RFQListPage() {
 const loadRFQs = async () => {
   try {
 
-    const res = await fetch(
-      "http://localhost:5000/api/rfq/list"
-    );
+  const res = await fetch(
+  `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/list`
+);
 
     const result = await res.json();
 
