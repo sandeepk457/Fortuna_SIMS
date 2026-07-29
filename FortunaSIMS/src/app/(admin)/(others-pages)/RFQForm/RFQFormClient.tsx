@@ -768,10 +768,71 @@ const addVendorFromMaster = (vendorId: string) => {
     });
   };
 
-  const removeAttachment = (idx: number) => {
-    if (isLocked) return;
-    setForm((p) => ({ ...p, attachments: p.attachments.filter((_, i) => i !== idx) }));
-  };
+    const removeAttachment = async (idx: number) => {
+  if (isLocked || isViewMode) return;
+
+  const attachment = form.attachments[idx];
+
+  if (!attachment) return;
+
+  const confirmed = window.confirm(
+    `Are you sure you want to remove "${attachment.file_name || "this attachment"}"?`
+  );
+
+  if (!confirmed) return;
+
+  // New attachment - DB lo inka save avvaledu
+  // UI nunchi remove chesthe saripothundi
+  if (!isEditMode || !attachment.file_path) {
+    setForm((p) => ({
+      ...p,
+      attachments: p.attachments.filter((_, i) => i !== idx),
+    }));
+
+    return;
+  }
+
+  // Existing DB attachment
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${form.rfq_id}/attachments/${attachment.attachment_id}`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to remove attachment"
+      );
+    }
+
+    // Delete success ayyaka UI nunchi remove
+    setForm((p) => ({
+      ...p,
+      attachments: p.attachments.filter(
+        (_, i) => i !== idx
+      ),
+    }));
+
+    alert("Attachment removed successfully");
+
+  } catch (error) {
+    const message =
+      error instanceof Error
+        ? error.message
+        : "Failed to remove attachment";
+
+    console.error(
+      "RFQ ATTACHMENT DELETE ERROR =",
+      error
+    );
+
+    alert(message);
+  }
+};
 
   /** Quote totals for comparison */
   const vendorTotals = useMemo(() => {
@@ -1775,16 +1836,16 @@ const response = await fetch(
                         accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={(e) => {
 
-  const file =
-  e.target.files?.[0] || null;
+                          const file =
+                          e.target.files?.[0] || null;
 
-updateAttachment(idx, {
-  attachment_file: file,
-  file_name: file?.name || "",
-  file_path: ""
-});
+                        updateAttachment(idx, {
+                          attachment_file: file,
+                          file_name: file?.name || "",
+                          file_path: ""
+                        });
 
-}}
+                        }}
                         className={classNames(inputBase, "px-2 py-2", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       />
                     </div>
