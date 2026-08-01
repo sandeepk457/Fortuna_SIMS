@@ -1209,6 +1209,599 @@ const deleteRFQAttachment = async (
 };
 
 // ======================================================
+// SEND RFQ FOR APPROVAL
+// ======================================================
+
+const submitRFQForApproval = async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rfqId } = req.params;
+
+    // 1. Get RFQ
+    const rfqResult = await client.query(
+      `
+      SELECT
+        rfq_id,
+        rfq_number,
+        status,
+        estimated_value,
+        department
+      FROM rfq
+      WHERE rfq_id = $1
+      FOR UPDATE
+      `,
+      [rfqId]
+    );
+
+    if (rfqResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found",
+      });
+    }
+
+    const rfq = rfqResult.rows[0];
+
+    if (rfq.status !== "Draft") {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "Only Draft RFQ can be sent for approval",
+      });
+    }
+
+    // 2. Read dynamic approval hierarchy
+    const workflowResult = await client.query(
+      `
+      SELECT
+        level,
+        approver_role
+      FROM approval_workflow_config
+      WHERE document_type = 'RFQ'
+        AND is_active = TRUE
+        AND COALESCE(min_amount, 0) <= $1
+        AND (max_amount IS NULL OR max_amount >= $1)
+        AND (
+          department IS NULL
+          OR department = ''
+          OR department = $2
+        )
+      ORDER BY level ASC
+      `,
+      [
+        Number(rfq.estimated_value || 0),
+        rfq.department,
+      ]
+    );
+
+    if (workflowResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "No RFQ approval workflow configured",
+      });
+    }
+
+    // 3. Safety check - don't create duplicate approval rows
+    const existingApprovals = await client.query(
+      `
+      SELECT COUNT(*)::int AS count
+      FROM rfq_approvals
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    if (existingApprovals.rows[0].count > 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "Approval workflow already exists for this RFQ",
+      });
+    }
+
+    // 4. Generate RFQ approval transaction rows
+    for (const step of workflowResult.rows) {
+      await client.query(
+        `
+        INSERT INTO rfq_approvals
+        (
+          approval_id,
+          rfq_id,
+          level,
+          approver_role,
+          decision,
+          remarks,
+          decided_at
+        )
+        VALUES
+        (
+          gen_random_uuid(),
+          $1,
+          $2,
+          $3,
+          'Pending',
+          NULL,
+          NULL
+        )
+        `,
+        [
+          rfqId,
+          step.level,
+          step.approver_role,
+        ]
+      );
+    }
+
+    // 5. Lock RFQ and point to Level 1
+    const firstLevel = workflowResult.rows[0].level;
+
+    await client.query(
+      `
+      UPDATE rfq
+      SET
+        status = 'Pending Approval',
+        current_approval_level = $1,
+        updated_at = NOW()
+      WHERE rfq_id = $2
+      `,
+      [firstLevel, rfqId]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      success: true,
+      message: "RFQ sent for approval successfully",
+      currentApprovalLevel: firstLevel,
+      approvalLevels: workflowResult.rows.length,
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error(
+      "SEND RFQ FOR APPROVAL ERROR =",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
+
+// ======================================================
+// APPROVE / REJECT RFQ
+// ======================================================
+
+const decideRFQApproval = async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const { rfqId } = req.params;
+    const { decision, remarks, approved_by } = req.body;
+
+    // -----------------------------------------------
+    // VALIDATE DECISION
+    // -----------------------------------------------
+
+    if (!["Approved", "Rejected"].includes(decision)) {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "Decision must be Approved or Rejected",
+      });
+    }
+
+    // -----------------------------------------------
+    // GET RFQ + CURRENT LEVEL
+    // -----------------------------------------------
+
+    const rfqResult = await client.query(
+      `
+      SELECT
+        rfq_id,
+        rfq_number,
+        status,
+        current_approval_level
+      FROM rfq
+      WHERE rfq_id = $1
+      FOR UPDATE
+      `,
+      [rfqId]
+    );
+
+    if (rfqResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found",
+      });
+    }
+
+    const rfq = rfqResult.rows[0];
+
+    if (rfq.status !== "Pending Approval") {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "RFQ is not pending approval",
+      });
+    }
+
+    const currentLevel = rfq.current_approval_level;
+
+    // -----------------------------------------------
+    // GET CURRENT APPROVAL ROW
+    // -----------------------------------------------
+
+    const approvalResult = await client.query(
+      `
+      SELECT
+        approval_id,
+        level,
+        approver_role,
+        decision
+      FROM rfq_approvals
+      WHERE rfq_id = $1
+        AND level = $2
+      FOR UPDATE
+      `,
+      [rfqId, currentLevel]
+    );
+
+    if (approvalResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "Current approval level not found",
+      });
+    }
+
+    const approval = approvalResult.rows[0];
+
+    if (approval.decision !== "Pending") {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "This approval level is already decided",
+      });
+    }
+
+    // -----------------------------------------------
+    // SAVE DECISION + REMARKS
+    // -----------------------------------------------
+
+    await client.query(
+      `
+      UPDATE rfq_approvals
+      SET
+        decision = $1,
+        remarks = $2,
+        decided_at = NOW()
+      WHERE approval_id = $3
+      `,
+      [
+        decision,
+        remarks || "",
+        approval.approval_id,
+      ]
+    );
+
+    // -----------------------------------------------
+    // REJECTED → CLOSE RFQ IMMEDIATELY
+    // -----------------------------------------------
+
+    if (decision === "Rejected") {
+      await client.query(
+        `
+        UPDATE rfq
+        SET
+          status = 'Rejected',
+          updated_by = $1,
+          updated_at = NOW()
+        WHERE rfq_id = $2
+        `,
+        [approved_by || approval.approver_role, rfqId]
+      );
+
+      await client.query("COMMIT");
+
+      return res.json({
+        success: true,
+        message: `RFQ rejected at Level ${currentLevel}`,
+        status: "Rejected",
+        currentApprovalLevel: currentLevel,
+      });
+    }
+
+    // -----------------------------------------------
+    // FIND NEXT PENDING LEVEL
+    // -----------------------------------------------
+
+    const nextApprovalResult = await client.query(
+      `
+      SELECT
+        level,
+        approver_role
+      FROM rfq_approvals
+      WHERE rfq_id = $1
+        AND decision = 'Pending'
+        AND level > $2
+      ORDER BY level ASC
+      LIMIT 1
+      `,
+      [rfqId, currentLevel]
+    );
+
+    // -----------------------------------------------
+    // NEXT LEVEL EXISTS
+    // -----------------------------------------------
+
+    if (nextApprovalResult.rows.length > 0) {
+      const nextApproval = nextApprovalResult.rows[0];
+
+      await client.query(
+        `
+        UPDATE rfq
+        SET
+          current_approval_level = $1,
+          updated_by = $2,
+          updated_at = NOW()
+        WHERE rfq_id = $3
+        `,
+        [
+          nextApproval.level,
+          approved_by || approval.approver_role,
+          rfqId,
+        ]
+      );
+
+      await client.query("COMMIT");
+
+      return res.json({
+        success: true,
+        message:
+          `Level ${currentLevel} approved. ` +
+          `Moved to Level ${nextApproval.level}`,
+        status: "Pending Approval",
+        currentApprovalLevel: nextApproval.level,
+        nextApproverRole: nextApproval.approver_role,
+      });
+    }
+
+    // -----------------------------------------------
+    // NO NEXT LEVEL → FINAL APPROVAL
+    // -----------------------------------------------
+
+    await client.query(
+      `
+      UPDATE rfq
+      SET
+        status = 'Approved',
+        current_approval_level = $1,
+        approved_by = $2,
+        approved_at = NOW(),
+        updated_by = $2,
+        updated_at = NOW()
+      WHERE rfq_id = $3
+      `,
+      [
+        currentLevel,
+        approved_by || approval.approver_role,
+        rfqId,
+      ]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      success: true,
+      message: "RFQ fully approved",
+      status: "Approved",
+      currentApprovalLevel: currentLevel,
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error(
+      "RFQ APPROVAL DECISION ERROR =",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  } finally {
+    client.release();
+  }
+};
+
+// ======================================================
+// GET RFQ APPROVAL ROUTE / HISTORY
+// ======================================================
+
+const getRFQApprovalRoute = async (req, res) => {
+  try {
+    const { rfqId } = req.params;
+
+    // Get RFQ header
+    const rfqResult = await db.query(
+      `
+      SELECT
+        rfq_id,
+        rfq_number,
+        status,
+        current_approval_level
+      FROM rfq
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    if (rfqResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found",
+      });
+    }
+
+    // Get approval hierarchy + history
+    const approvalResult = await db.query(
+      `
+      SELECT
+        approval_id,
+        level,
+        approver_role,
+        decision,
+        remarks,
+        decided_at
+      FROM rfq_approvals
+      WHERE rfq_id = $1
+      ORDER BY level ASC
+      `,
+      [rfqId]
+    );
+
+    return res.json({
+      success: true,
+      data: {
+        rfq_id: rfqResult.rows[0].rfq_id,
+        rfq_number: rfqResult.rows[0].rfq_number,
+        status: rfqResult.rows[0].status,
+        current_approval_level:
+          rfqResult.rows[0].current_approval_level,
+
+        approval_route: approvalResult.rows,
+      },
+    });
+
+  } catch (error) {
+    console.error(
+      "GET RFQ APPROVAL ROUTE ERROR =",
+      error
+    );
+
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+
+// ======================================================
+// CLOSE RFQ
+// ======================================================
+
+const closeRFQ = async (req, res) => {
+  const client = await db.connect();
+
+  try {
+    const { rfqId } = req.params;
+
+    await client.query("BEGIN");
+
+    const rfqResult = await client.query(
+      `
+      SELECT
+        rfq_id,
+        rfq_number,
+        status
+      FROM rfq
+      WHERE rfq_id = $1
+      FOR UPDATE
+      `,
+      [rfqId]
+    );
+
+    if (rfqResult.rows.length === 0) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found",
+      });
+    }
+
+    const rfq = rfqResult.rows[0];
+
+    if (rfq.status === "Closed") {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "RFQ is already closed",
+      });
+    }
+
+    if (rfq.status !== "Approved") {
+      await client.query("ROLLBACK");
+
+      return res.status(400).json({
+        success: false,
+        message: "Only an Approved RFQ can be closed",
+      });
+    }
+
+    await client.query(
+      `
+      UPDATE rfq
+      SET
+        status = 'Closed',
+        updated_at = CURRENT_TIMESTAMP
+      WHERE rfq_id = $1
+      `,
+      [rfqId]
+    );
+
+    await client.query("COMMIT");
+
+    return res.json({
+      success: true,
+      message: `${rfq.rfq_number} closed successfully`,
+      status: "Closed",
+    });
+
+  } catch (error) {
+    await client.query("ROLLBACK");
+
+    console.error("CLOSE RFQ ERROR =", error);
+
+    return res.status(500).json({
+      success: false,
+      message: error.message || "Failed to close RFQ",
+    });
+
+  } finally {
+    client.release();
+  }
+};
+
+
+// ======================================================
 // EXPORTS
 // ======================================================
 
@@ -1221,4 +1814,8 @@ module.exports = {
   getRFQById,
   updateRFQ,
   deleteRFQAttachment,
+  submitRFQForApproval,
+  decideRFQApproval,
+  getRFQApprovalRoute,
+  closeRFQ,
 };

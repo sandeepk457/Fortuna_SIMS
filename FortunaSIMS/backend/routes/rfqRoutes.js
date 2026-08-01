@@ -64,6 +64,35 @@ router.get(
 );
 
 // ======================================================
+// SEND RFQ FOR APPROVAL
+// ======================================================
+
+router.post(
+  "/:rfqId/submit-for-approval",
+  rfqController.submitRFQForApproval
+);
+
+// ======================================================
+// APPROVE / REJECT RFQ
+// ======================================================
+
+router.post(
+  "/:rfqId/approval-decision",
+  rfqController.decideRFQApproval
+);
+
+
+// ======================================================
+// CLOSE RFQ
+// ======================================================
+
+router.post(
+  "/:rfqId/close",
+  rfqController.closeRFQ
+);
+
+
+// ======================================================
 // DELETE SINGLE RFQ ATTACHMENT
 // ======================================================
 
@@ -81,6 +110,14 @@ router.put(
   upload.array("attachments"),
   rfqController.updateRFQ
 );
+
+// Get RFQ approval hierarchy / history
+router.get(
+  "/:rfqId/approval-route",
+  rfqController.getRFQApprovalRoute
+);
+
+
 
 // ======================================================
 // GET RFQ BY ID

@@ -207,6 +207,7 @@ const loadRFQs = async () => {
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [selectedRfqNo, setSelectedRfqNo] = useState("");
   const [approvalRemarks, setApprovalRemarks] = useState("");
+  const [approvalLoading, setApprovalLoading] = useState(false);
 
   /** Tab base filter */
   const tabFilteredBase = useMemo(() => {
@@ -332,57 +333,155 @@ const loadRFQs = async () => {
   };
 
   /** Approval actions */
-  const openApproval = (rfqNo: string) => {
-    setSelectedRfqNo(rfqNo);
-    setApprovalRemarks("");
-    setApprovalModalOpen(true);
-  };
+  /** Approval actions */
+const openApproval = async (rfqNo: string) => {
+  const rfq = data.find((x) => x.rfqNo === rfqNo);
 
-  const applyDecision = (decision: ApprovalDecision) => {
-    if (!selectedRfqNo) return;
+  if (!rfq) {
+    alert("RFQ not found.");
+    return;
+  }
 
-    setData((prev) =>
-      prev.map((rfq) => {
-        if (rfq.rfqNo !== selectedRfqNo) return rfq;
+  setSelectedRfqNo(rfqNo);
+  setApprovalRemarks("");
+  setApprovalModalOpen(true);
+  setApprovalLoading(true);
 
-        // Only pending/submitted actionable (demo)
-        if (!(rfq.status === "Pending Approval" || rfq.status === "Submitted")) return rfq;
+  try {
+    console.log("LOADING APPROVAL ROUTE FOR =", rfq.rfqId);
 
-        const now = todayISO();
-        const lvl = rfq.currentApprovalLevel;
-
-        const nextRoute = rfq.approvalRoute.map((s) => {
-          if (s.level !== lvl) return s;
-          return {
-            ...s,
-            decision,
-            decidedAt: now,
-            remarks: approvalRemarks?.trim() ? approvalRemarks.trim() : undefined,
-          };
-        });
-
-        if (decision === "Rejected") {
-          return { ...rfq, status: "Rejected", approvalRoute: nextRoute };
-        }
-
-        const nextLevel = (lvl + 1) as ApprovalLevel;
-        const hasNext = rfq.approvalRoute.some((s) => s.level === nextLevel);
-
-        if (hasNext) {
-          return {
-            ...rfq,
-            status: "Pending Approval",
-            approvalRoute: nextRoute,
-            currentApprovalLevel: nextLevel,
-          };
-        }
-
-        return { ...rfq, status: "Approved", approvalRoute: nextRoute };
-      })
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${rfq.rfqId}/approval-route`
     );
 
+    const result = await response.json();
+
+    console.log("APPROVAL ROUTE RESPONSE =", result);
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to load approval route"
+      );
+    }
+
+    setData((prev) =>
+      prev.map((item) =>
+        item.rfqId === rfq.rfqId
+          ? {
+              ...item,
+
+              status: result.data.status,
+
+              currentApprovalLevel:
+                Number(
+                  result.data.current_approval_level || 1
+                ) as ApprovalLevel,
+
+              approvalRoute:
+                (result.data.approval_route || []).map(
+                  (step: any) => ({
+                    level: Number(step.level) as ApprovalLevel,
+
+                    approverRole:
+                      step.approver_role,
+
+                    decision:
+                      step.decision === "Approved" ||
+                      step.decision === "Rejected"
+                        ? step.decision
+                        : undefined,
+
+                    remarks:
+                      step.remarks || undefined,
+
+                    decidedAt:
+                      step.decided_at || undefined,
+                  })
+                ),
+            }
+          : item
+      )
+    );
+
+  } catch (error) {
+    console.error(
+      "LOAD APPROVAL ROUTE ERROR =",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to load approval route"
+    );
+
+  } finally {
+    setApprovalLoading(false);
+  }
+};
+
+const applyDecision = async (decision: ApprovalDecision) => {
+  if (!selectedRFQ) return;
+
+  const actionText =
+    decision === "Approved" ? "approve" : "reject";
+
+  const ok = confirm(
+    `Are you sure you want to ${actionText} ${selectedRFQ.rfqNo}?`
+  );
+
+  if (!ok) return;
+
+  try {
+    setApprovalLoading(true);
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${selectedRFQ.rfqId}/approval-decision`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          decision,
+          remarks: approvalRemarks.trim(),
+        }),
+      }
+    );
+
+    const result = await response.json();
+
+    console.log("APPROVAL DECISION RESPONSE =", result);
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Approval decision failed"
+      );
+    }
+
+    alert(result.message);
+
     setApprovalModalOpen(false);
-  };
+    setApprovalRemarks("");
+
+    // Reload RFQ list so status/current level comes from DB
+    await loadRFQs();
+
+  } catch (error) {
+    console.error(
+      "RFQ APPROVAL DECISION ERROR =",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Approval decision failed"
+    );
+  } finally {
+    setApprovalLoading(false);
+  }
+};
 
   /** ✅ Draft actions */
   const onEditDraft = (rfq: RFQRecord) => {
@@ -401,27 +500,61 @@ const loadRFQs = async () => {
     alert(`Edit Draft RFQ: navigate to RFQ form with prefill for ${rfq.rfqNo} (demo)`);
   };
 
-  const onSendDraftForApproval = (rfqNo: string) => {
-    const ok = confirm(`Send ${rfqNo} for approval?`);
-    if (!ok) return;
+ const onSendDraftForApproval = async (rfqNo: string) => {
+  const rfq = data.find((r) => r.rfqNo === rfqNo);
 
-    setData((prev) =>
-      prev.map((rfq) => {
-        if (rfq.rfqNo !== rfqNo) return rfq;
-        if (rfq.status !== "Draft") return rfq;
+  if (!rfq) {
+    alert("RFQ not found.");
+    return;
+  }
 
-        // Draft -> Submitted (then approval flow can pick it up)
-        return {
-          ...rfq,
-          status: "Submitted",
-          currentApprovalLevel: 1,
-        };
-      })
+  if (rfq.status !== "Draft") {
+    alert("Only Draft RFQs can be sent for approval.");
+    return;
+  }
+
+  const ok = window.confirm(
+    `Send ${rfqNo} for approval?`
+  );
+
+  if (!ok) return;
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${rfq.rfqId}/submit-for-approval`,
+      {
+        method: "POST",
+      }
     );
+
+    const result = await response.json();
+
+    console.log("SEND FOR APPROVAL =", result);
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to send RFQ for approval"
+      );
+    }
+
+    alert(result.message);
+
+    // Reload latest RFQ list from DB
+    await loadRFQs();
 
     setActiveTab("all");
     setCurrentPage(1);
-  };
+
+  } catch (error) {
+    console.error(error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to send RFQ for approval"
+    );
+  }
+};
 
   /** ✅ FIX REQUIRED: Delete Draft (ONLY in Drafts tab) */
   const onDeleteDraft = (rfqNo: string) => {
@@ -714,71 +847,75 @@ const loadRFQs = async () => {
                       <td className="px-4 py-3">{rfq.totalItems}</td>
                       <td className="px-4 py-3 font-semibold">{formatMoney(rfq.estimatedValue, rfq.currency)}</td>
 
-                      <td className="px-4 py-3 space-x-3">
-                        <button
-                          className="font-semibold text-blue-600 hover:underline"
-                          onClick={() =>
-                            router.push(
-                              `/RFQForm?rfqId=${rfq.rfqId}&mode=view`
-                            )
-                          }
-                            >
-                            View
-                        </button>
+                    <td className="px-2 py-3">
+  <div className="flex w-[95px] flex-col gap-1 mx-auto">
 
+    {/* VIEW */}
+    <button
+      type="button"
+      className="h-8 w-full rounded-lg text-[12px] font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 active:scale-95"
+      style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+      onClick={() =>
+        router.push(`/RFQForm?rfqId=${rfq.rfqId}&mode=view`)
+      }
+    >
+      View
+    </button>
 
-                        <button
-  className="font-semibold text-green-600 hover:underline"
-  onClick={() =>
-    router.push(
-      `/RFQForm?rfqId=${rfq.rfqId}&mode=edit`
-    )
-  }
->
-  Edit
-</button>
+    {/* EDIT */}
+    {rfq.status === "Draft" && (
+      <button
+        type="button"
+        className="h-8 w-full rounded-lg text-[12px] font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 active:scale-95"
+        style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+        onClick={() =>
+          router.push(`/RFQForm?rfqId=${rfq.rfqId}&mode=edit`)
+        }
+      >
+        Edit
+      </button>
+    )}
 
-                        {/* ✅ EXISTING APPROVAL FLOW stays SAME */}
-                        {(rfq.status === "Submitted" || rfq.status === "Pending Approval") && (
-                          <button
-                            className="font-semibold hover:underline"
-                            style={{ color: FORTUNA_SECONDARY_BLUE }}
-                            onClick={() => openApproval(rfq.rfqNo)}
-                          >
-                            Approve / Reject
-                          </button>
-                        )}
+    {/* APPROVE / REJECT */}
+    {rfq.status === "Pending Approval" && (
+      <button
+        type="button"
+        className="h-8 w-full rounded-lg text-[11px] font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 active:scale-95"
+        style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+        onClick={() => openApproval(rfq.rfqNo)}
+      >
+        Approve
+      </button>
+    )}
 
-                        {/* ✅ Draft-specific actions: Edit / Send / Delete ONLY in Drafts tab */}
-                        {activeTab === "drafts" && rfq.status === "Draft" && (
-                          <>
-                            <button
-                              className="font-semibold hover:underline"
-                              style={{ color: FORTUNA_SECONDARY_BLUE }}
-                              onClick={() => onEditDraft(rfq)}
-                            >
-                              Edit
-                            </button>
+    {/* SEND FOR APPROVAL */}
+    {activeTab === "drafts" && rfq.status === "Draft" && (
+      <button
+        type="button"
+        className="h-8 w-full rounded-lg text-[10px] font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 active:scale-95"
+        style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+        onClick={() => onSendDraftForApproval(rfq.rfqNo)}
+      >
+        Send
+      </button>
+    )}
 
-                            <button
-                              className="font-semibold hover:underline text-emerald-700"
-                              onClick={() => onSendDraftForApproval(rfq.rfqNo)}
-                            >
-                              Send for Approval
-                            </button>
+    {/* DELETE */}
+    {activeTab === "drafts" && rfq.status === "Draft" && (
+      <button
+        type="button"
+        className="h-8 w-full rounded-lg text-[12px] font-semibold text-white shadow-md transition-all duration-200 hover:opacity-90 active:scale-95"
+        style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+        onClick={() => onDeleteDraft(rfq.rfqNo)}
+      >
+        Delete
+      </button>
+    )}
 
-                            {/* ✅ FIX: Delete ONLY in Drafts tab */}
-                            <button
-                              className="font-semibold text-rose-600 hover:underline"
-                              onClick={() => onDeleteDraft(rfq.rfqNo)}
-                            >
-                              Delete
-                            </button>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+  </div>
+</td>
+                        </tr>
+                       ))}
 
                   {paginatedData.length === 0 && (
                     <tr>
@@ -931,8 +1068,8 @@ const loadRFQs = async () => {
                 <div className="mt-3 space-y-2 text-sm dark:text-gray-200">
                   {selectedRFQ.approvalRoute.map((s) => {
                     const isCurrent =
-                      s.level === selectedRFQ.currentApprovalLevel &&
-                      (selectedRFQ.status === "Submitted" || selectedRFQ.status === "Pending Approval");
+                    s.level === selectedRFQ.currentApprovalLevel &&
+                    selectedRFQ.status === "Pending Approval";
                     const decision = s.decision ?? "Pending";
 
                     return (

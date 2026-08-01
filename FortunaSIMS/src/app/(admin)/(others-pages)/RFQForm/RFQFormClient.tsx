@@ -997,138 +997,153 @@ const response = await fetch(apiUrl, {
   }
 };
 
-  /**
-   * "Send RFQ" – internal action:
-   * Phase-1: procurement team sends email/portal link externally later.
-   * Here we only mark invitation_status = Sent and status = Sent.
-   */
-  const onSendRFQ = async () => {
-    if (isLocked) return;
-    touchAll();
 
-    if (!form.pr_id) {
-      setActiveTab("basic");
-      alert("Select Approved PR first.");
-      return;
-    }
-    if (form.vendors.length === 0) {
-      setActiveTab("vendors");
-      alert("Select at least 1 verified vendor.");
-      return;
-    }
-    if (form.items.length === 0) {
-      setActiveTab("basic");
-      alert("PR has no items to quote.");
-      return;
-    }
-    if (hasErrors) {
-      setActiveTab(firstErrorTab());
-      alert("Please fix validation errors before sending RFQ.");
-      return;
-    }
-
-  const payload = {
-  ...form,
-
-  status: "Submitted",
-  rfq_status: "Submitted",
-
-  vendors: form.vendors.map((v) => ({
-    ...v,
-    invitation_status: "Sent",
-  })),
-
-  attachments: form.attachments.map((a) => ({
-    attachment_type: a.attachment_type,
-
-    file_name:
-      a.attachment_file?.name || "",
-
-    file_path:
-      a.file_path || "",
-  })),
-};
-
-
-
-
-
-try {
-
-  const formData = new FormData();
-
-formData.append(
-  "rfqData",
-  JSON.stringify(payload)
-);
-
-form.attachments.forEach((a) => {
-  if (a.attachment_file) {
-    formData.append(
-      "attachments",
-      a.attachment_file
-    );
-  }
-});
-
-const response = await fetch(
-  `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/create`,
-  {
-    method: "POST",
-    body: formData,
-  }
-);
-
-  const result = await response.json();
-
-  if (!response.ok) {
-    throw new Error(result.message);
-  }
-
-  alert(
-    `RFQ Submitted Successfully\n${result.rfqNumber}`
-  );
-
-  router.push("/RFQ");
-
-} catch (error: any) {
-
-  alert(error.message || "Failed to submit RFQ");
-
-}
-  };
 
   /** Move to Pending Approval (internal approval before convert to PO) */
-  const onSendForApproval = () => {
-    if (form.rfq_status !== "Sent" && form.rfq_status !== "Quotes Stage") {
-      alert("RFQ must be Sent / Quotes Stage before Approval.");
-      return;
+  const onSendForApproval = async () => {
+  if (!isEditMode || !form.rfq_id || form.rfq_id === "Auto-generated") {
+    alert("Please save the RFQ as Draft before sending for approval.");
+    return;
+  }
+
+  if (form.rfq_status !== "Draft") {
+    alert("Only Draft RFQ can be sent for approval.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Are you sure you want to send ${form.rfq_number} for approval?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    console.log(
+      "SEND FOR APPROVAL RFQ ID =",
+      form.rfq_id
+    );
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${form.rfq_id}/submit-for-approval`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const result = await response.json();
+
+    console.log(
+      "SEND FOR APPROVAL API RESPONSE =",
+      result
+    );
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message ||
+        "Failed to send RFQ for approval"
+      );
     }
-    setForm((p) => ({ ...p, rfq_status: "Pending Approval" }));
-    setActiveTab("approval");
-  };
+
+    setForm((prev) => ({
+      ...prev,
+      rfq_status: "Pending Approval",
+    }));
+
+    alert(
+      `RFQ sent for approval successfully.\n\n` +
+      `Current Approval Level: ${result.currentApprovalLevel}\n` +
+      `Total Approval Levels: ${result.approvalLevels}`
+    );
+
+    router.push("/RFQ");
+
+  } catch (error) {
+    console.error(
+      "SEND RFQ FOR APPROVAL ERROR =",
+      error
+    );
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to send RFQ for approval"
+    );
+  }
+};
 
   /** Approve / Reject / Close */
-  const onApprove = () => {
-    if (form.rfq_status !== "Pending Approval") return;
-    setForm((p) => ({ ...p, rfq_status: "Approved" }));
-    alert("RFQ Approved (demo). Next: Convert to PO.");
-  };
+  // const onApprove = () => {
+  //   if (form.rfq_status !== "Pending Approval") return;
+  //   setForm((p) => ({ ...p, rfq_status: "Approved" }));
+  //   alert("RFQ Approved (demo). Next: Convert to PO.");
+  // };
 
-  const onReject = () => {
-    if (form.rfq_status !== "Pending Approval") return;
-    setForm((p) => ({ ...p, rfq_status: "Rejected" }));
-    alert("RFQ Rejected (demo).");
-  };
+  // const onReject = () => {
+  //   if (form.rfq_status !== "Pending Approval") return;
+  //   setForm((p) => ({ ...p, rfq_status: "Rejected" }));
+  //   alert("RFQ Rejected (demo).");
+  // };
 
-  const onClose = () => {
-    if (form.rfq_status !== "Approved") {
-      alert("Only Approved RFQ can be Closed.");
-      return;
+  const onClose = async () => {
+  if (!form.rfq_id || form.rfq_id === "Auto-generated") {
+    alert("Invalid RFQ.");
+    return;
+  }
+
+  if (form.rfq_status !== "Approved") {
+    alert("Only Approved RFQ can be Closed.");
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Are you sure you want to close ${form.rfq_number}?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/rfq/${form.rfq_id}/close`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    const result = await response.json();
+
+    console.log("CLOSE RFQ RESPONSE =", result);
+
+    if (!response.ok || !result.success) {
+      throw new Error(
+        result.message || "Failed to close RFQ"
+      );
     }
-    setForm((p) => ({ ...p, rfq_status: "Closed" }));
-    alert("RFQ Closed (demo).");
-  };
+
+    setForm((prev) => ({
+      ...prev,
+      rfq_status: "Closed",
+    }));
+
+    alert(result.message);
+
+    router.push("/RFQ");
+
+  } catch (error) {
+    console.error("CLOSE RFQ ERROR =", error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Failed to close RFQ"
+    );
+  }
+};
 
   const statusPill = (s: RFQStatus) =>
     classNames(
@@ -1159,7 +1174,7 @@ const response = await fetch(
             <span className={statusPill(form.rfq_status)}>{form.rfq_status}</span>
             {isLocked && (
               <span className="text-xs font-semibold" style={{ color: FORTUNA_PRIMARY_RED }}>
-                Locked: RFQ cannot be edited after Send RFQ
+                Locked: RFQ cannot be edited after Approved/ Rejected.
               </span>
             )}
           </div>
@@ -1180,15 +1195,27 @@ const response = await fetch(
             Save Draft
           </button>
 
-          <button
-            type="button"
-            className={classNames(primaryBtn, "active:scale-95")}
-            style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
-            onClick={onSendRFQ}
-            disabled={isLocked || isViewMode}
-          >
-            Send RFQ
-          </button>
+            <button
+  type="button"
+  className={classNames(primaryBtn, "active:scale-95")}
+  style={{
+    backgroundColor: FORTUNA_PRIMARY_RED,
+    opacity:
+      form.rfq_status === "Draft" &&
+      isEditMode &&
+      !isViewMode
+        ? 1
+        : 0.6,
+  }}
+  onClick={onSendForApproval}
+  disabled={
+    form.rfq_status !== "Draft" ||
+    !isEditMode ||
+    isViewMode
+  }
+>
+  Send for Approval
+</button>
         </div>
       </div>
 
@@ -2035,7 +2062,7 @@ const response = await fetch(
                     />
                   </div>
 
-                  <div className="mt-4 flex gap-2">
+                  {/* <div className="mt-4 flex gap-2">
                     <button
                       type="button"
                       className={classNames(primaryBtn, "active:scale-95")}
@@ -2055,7 +2082,7 @@ const response = await fetch(
                     >
                       Approve
                     </button>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
@@ -2101,14 +2128,26 @@ const response = await fetch(
         </button>
 
         <button
-          type="button"
-          className={classNames(primaryBtn, "active:scale-95")}
-          style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
-          onClick={onSendRFQ}
-          disabled={isLocked || isViewMode}
-        >
-          Send RFQ
-        </button>
+  type="button"
+  className={classNames(primaryBtn, "active:scale-95")}
+  style={{
+    backgroundColor: FORTUNA_PRIMARY_RED,
+    opacity:
+      form.rfq_status === "Draft" &&
+      isEditMode &&
+      !isViewMode
+        ? 1
+        : 0.6,
+  }}
+  onClick={onSendForApproval}
+  disabled={
+    form.rfq_status !== "Draft" ||
+    !isEditMode ||
+    isViewMode
+  }
+>
+  Send for Approval
+</button>
       </div>
     </div>
   );
