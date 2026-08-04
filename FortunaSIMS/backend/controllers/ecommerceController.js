@@ -65,7 +65,7 @@ const getEcommerceMetrics = async (req, res) => {
       totalPO: Number(metrics.total_po || 0),
       totalGRN: Number(metrics.total_grn || 0),
 
-      // Reserved for future Sales Dashboard
+      // Future Modules
       totalOrders: 0,
       totalRevenue: 0,
     });
@@ -82,6 +82,55 @@ const getEcommerceMetrics = async (req, res) => {
   }
 };
 
+/**
+ * ======================================================
+ * GET DEMOGRAPHIC ANALYTICS
+ * ======================================================
+ */
+
+const getDemographics = async (req, res) => {
+
+  try {
+
+    const type = req.query.type || "customer";
+
+    const table =
+      type === "vendor"
+        ? "vendors"
+        : "customers";
+
+    const result = await db.query(`
+      SELECT
+        country,
+        COUNT(*)::int AS total
+      FROM ${table}
+      WHERE country IS NOT NULL
+        AND TRIM(country) <> ''
+      GROUP BY country
+      ORDER BY total DESC
+    `);
+
+    res.json({
+      success: true,
+      type,
+      data: result.rows,
+    });
+
+  } catch (err) {
+
+    console.error("Demographic API Error:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+
+  }
+
+};
+
 module.exports = {
   getEcommerceMetrics,
+  getDemographics,
+  
 };

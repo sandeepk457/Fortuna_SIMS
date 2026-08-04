@@ -9,6 +9,7 @@ import { DropdownItem } from "../ui/dropdown/DropdownItem";
 
 export default function DemographicCard() {
   const [isOpen, setIsOpen] = useState(false);
+  const [selectedType, setSelectedType] = useState("customer");
 
   function toggleDropdown() {
     setIsOpen(!isOpen);
@@ -23,36 +24,51 @@ export default function DemographicCard() {
       <div className="flex justify-between">
         <div>
           <h3 className="text-lg font-semibold text-gray-800 dark:text-white/90">
-            Customers Demographic
+            Demographic Analytics
           </h3>
           <p className="mt-1 text-gray-500 text-theme-sm dark:text-gray-400">
-            Number of customer based on country
+            Global Customer & Vendor Distribution
           </p>
         </div>
 
-        <div className="relative inline-block">
-          <button onClick={toggleDropdown} className="dropdown-toggle">
-            <MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
-          </button>
-          <Dropdown
-            isOpen={isOpen}
-            onClose={closeDropdown}
-            className="w-40 p-2"
-          >
-            <DropdownItem
-              onItemClick={closeDropdown}
-              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-            >
-              View More
-            </DropdownItem>
-            <DropdownItem
-              onItemClick={closeDropdown}
-              className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
-            >
-              Delete
-            </DropdownItem>
-          </Dropdown>
-        </div>
+        <div className="flex items-center gap-3">
+
+  <select
+    value={selectedType}
+    onChange={(e) => setSelectedType(e.target.value)}
+    className="rounded-xl border border-[#C8102E]/20 bg-white px-3 py-2 text-sm font-medium text-[#C8102E] shadow-sm outline-none transition focus:border-[#005F99] dark:bg-gray-900 dark:text-white"
+  >
+    <option value="customer">Customers</option>
+    <option value="vendor">Vendors</option>
+  </select>
+
+  <div className="relative inline-block">
+    <button onClick={toggleDropdown} className="dropdown-toggle">
+      <MoreDotIcon className="text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" />
+    </button>
+
+    <Dropdown
+      isOpen={isOpen}
+      onClose={closeDropdown}
+      className="w-40 p-2"
+    >
+      <DropdownItem
+        onItemClick={closeDropdown}
+        className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+      >
+        View More
+      </DropdownItem>
+
+      <DropdownItem
+        onItemClick={closeDropdown}
+        className="flex w-full font-normal text-left text-gray-500 rounded-lg hover:bg-gray-100 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-white/5 dark:hover:text-gray-300"
+      >
+        Delete
+      </DropdownItem>
+    </Dropdown>
+  </div>
+
+</div>
       </div>
       <div className="px-4 py-6 my-6 overflow-hidden border border-gary-200 rounded-2xl bg-gray-50 dark:border-gray-800 dark:bg-gray-900 sm:px-6">
         <div

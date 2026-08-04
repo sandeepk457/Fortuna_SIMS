@@ -2,14 +2,15 @@ import type { Metadata } from "next";
 import React from "react";
 
 import ExecutiveKPICards from "@/components/dashboard/executive/ExecutiveKPICards";
+
 import InventoryAnalytics from "@/components/dashboard/analytics/InventoryAnalytics";
 import RFQStatusDashboard from "@/components/dashboard/analytics/RFQStatusDashboard";
+import EnterpriseDemographics from "@/components/dashboard/analytics/EnterpriseDemographics";
 
 import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
 import MonthlyProcurementTrend from "@/components/ecommerce/MonthlyProcurementTrend";
 import StatisticsChart from "@/components/ecommerce/StatisticsChart";
 import RecentOrders from "@/components/ecommerce/RecentOrders";
-import DemographicCard from "@/components/ecommerce/DemographicCard";
 
 export const metadata: Metadata = {
   title: "Fortuna SIMS | Supply & Inventory Management System",
@@ -28,7 +29,7 @@ export default function Ecommerce() {
       </div>
 
       {/* =========================
-          Procurement Analytics Row
+          Procurement Analytics
       ========================== */}
       <div className="col-span-12 xl:col-span-7">
         <MonthlyProcurementTrend />
@@ -39,7 +40,7 @@ export default function Ecommerce() {
       </div>
 
       {/* =========================
-          Inventory & Sales Row
+          Inventory & Sales Analytics
       ========================== */}
       <div className="col-span-12 xl:col-span-6">
         <InventoryAnalytics />
@@ -57,12 +58,15 @@ export default function Ecommerce() {
       </div>
 
       {/* =========================
-          Bottom Widgets
+          Enterprise Demographics
       ========================== */}
       <div className="col-span-12 xl:col-span-5">
-        <DemographicCard />
+        <EnterpriseDemographics />
       </div>
 
+      {/* =========================
+          Recent Orders
+      ========================== */}
       <div className="col-span-12 xl:col-span-7">
         <RecentOrders />
       </div>
