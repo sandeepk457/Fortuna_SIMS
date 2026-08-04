@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import axios from "axios";
-
+import { API_BASE_URL } from "@/app/utils/apiBase";
 import {
   GroupIcon,
   BoxIconLine,
@@ -48,8 +48,8 @@ const [metrics, setMetrics] = useState<DashboardMetrics>({
   const fetchMetrics = async () => {
     try {
       const res = await axios.get(
-        "http://localhost:5000/api/ecommerce/metrics"
-      );
+  `${API_BASE_URL}/api/ecommerce/metrics`
+);
 
       setMetrics(res.data);
     } catch (err) {
