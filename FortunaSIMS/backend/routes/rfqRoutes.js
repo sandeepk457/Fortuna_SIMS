@@ -63,6 +63,17 @@ router.get(
   rfqController.getRFQList
 );
 
+
+// ======================================================
+// RFQ DASHBOARD SUMMARY
+// ======================================================
+
+router.get(
+  "/dashboard-summary",
+  rfqController.getRFQDashboardSummary
+);
+
+
 // ======================================================
 // SEND RFQ FOR APPROVAL
 // ======================================================

@@ -928,6 +928,47 @@ button:active {
   }
 }
 
+
+@keyframes fortunaGradient {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.fortuna-gradient-live {
+  background-size: 250% 250%;
+  animation: fortunaGradient 8s ease infinite;
+}
+
+/* ===============================
+   🎥 FORTUNA shimmer
+   =============================== */
+
+
+@keyframes fortunaShimmer {
+  0% {
+    transform: translateX(-250%);
+  }
+
+  100% {
+    transform: translateX(450%);
+  }
+}
+
+.fortuna-shimmer {
+  animation: fortunaShimmer 8s linear infinite;
+}
+
+
+
 /* ===============================
    🧊 CARD HOVER
    =============================== */
@@ -1382,7 +1423,7 @@ button:active {
    🎨 FORTUNA COLOR SWITCH (LAYER BASED - FINAL)
    ====================================================== */
 
-.fortuna-red-layer {
+/* .fortuna-red-layer {
   background: #C8102E;
   animation: redFade 4s infinite;
 }
@@ -1391,9 +1432,9 @@ button:active {
   background: #005F99;
   opacity: 0;
   animation: blueFade 4s infinite;
-}
+} */
 
-@keyframes redFade {
+/* @keyframes redFade {
   0% { opacity: 1; }
   45% { opacity: 1; }
   50% { opacity: 0; }
@@ -1407,7 +1448,7 @@ button:active {
   50% { opacity: 1; }
   95% { opacity: 1; }
   100% { opacity: 0; }
-}
+} */
 /* ===============================
    🧊 FORTUNA FLOATING CUBES (DUAL COLOR)
    =============================== */
@@ -1448,7 +1489,7 @@ button:active {
    🎨 HARD COLOR SWITCH (FINAL FIXED)
    =============================== */
 
-@keyframes fortunaColorSwitchFinal {
+/* @keyframes fortunaColorSwitchFinal {
   0% {
     background-color: #C8102E;
   }
@@ -1472,7 +1513,7 @@ button:active {
 
 .fortuna-color-switch {
   animation: fortunaColorSwitchFinal 4s ease-in-out infinite;
-}
+} */
 
 
 /* ===============================
@@ -1568,3 +1609,4 @@ button:active {
 .fortuna-heading {
   color: #5A1E1E;
 }
+

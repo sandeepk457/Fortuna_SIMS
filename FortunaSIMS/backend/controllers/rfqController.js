@@ -1800,6 +1800,45 @@ const closeRFQ = async (req, res) => {
   }
 };
 
+// ======================================================
+// RFQ DASHBOARD SUMMARY
+// ======================================================
+
+const getRFQDashboardSummary = async (req, res) => {
+  try {
+    const result = await db.query(`
+      SELECT
+        COUNT(*) AS total_rfqs,
+
+        COUNT(*) FILTER (WHERE status = 'Draft') AS draft,
+
+        COUNT(*) FILTER (WHERE status = 'Submitted') AS submitted,
+
+        COUNT(*) FILTER (WHERE status = 'Pending Approval') AS pending,
+
+        COUNT(*) FILTER (WHERE status = 'Approved') AS approved,
+
+        COUNT(*) FILTER (WHERE status = 'Rejected') AS rejected
+
+      FROM rfq
+    `);
+
+    res.json({
+      success: true,
+      data: result.rows[0],
+    });
+
+  } catch (error) {
+
+    console.error(error);
+
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+
+  }
+};
 
 // ======================================================
 // EXPORTS
@@ -1818,4 +1857,5 @@ module.exports = {
   decideRFQApproval,
   getRFQApprovalRoute,
   closeRFQ,
+  getRFQDashboardSummary,
 };
