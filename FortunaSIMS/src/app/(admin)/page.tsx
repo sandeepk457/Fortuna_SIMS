@@ -21,53 +21,50 @@ export default function Ecommerce() {
   return (
     <div className="grid grid-cols-12 gap-6">
 
-      {/* =========================
+      {/* ======================================================
           Executive KPI Cards
-      ========================== */}
+      ====================================================== */}
       <div className="col-span-12">
         <ExecutiveKPICards />
       </div>
 
-      {/* =========================
+      {/* ======================================================
           Procurement Analytics
-      ========================== */}
-      <div className="col-span-12 xl:col-span-7">
+      ====================================================== */}
+      <div className="col-span-12 xl:col-span-8">
         <MonthlyProcurementTrend />
       </div>
 
-      <div className="col-span-12 xl:col-span-5">
+      <div className="col-span-12 xl:col-span-4">
         <RFQStatusDashboard />
       </div>
 
-      {/* =========================
-          Inventory & Sales Analytics
-      ========================== */}
+      {/* ======================================================
+          Operations Analytics
+      ====================================================== */}
       <div className="col-span-12 xl:col-span-6">
         <InventoryAnalytics />
+      </div>
+
+      <div className="col-span-12 xl:col-span-6">
+        <StatisticsChart />
+      </div>
+
+      {/* ======================================================
+          Enterprise Analytics
+      ====================================================== */}
+      <div className="col-span-12 xl:col-span-6">
+        <EnterpriseDemographics />
       </div>
 
       <div className="col-span-12 xl:col-span-6">
         <MonthlySalesChart />
       </div>
 
-      {/* =========================
-          Statistics
-      ========================== */}
-      <div className="col-span-12">
-        <StatisticsChart />
-      </div>
-
-      {/* =========================
-          Enterprise Demographics
-      ========================== */}
-      <div className="col-span-12 xl:col-span-5">
-        <EnterpriseDemographics />
-      </div>
-
-      {/* =========================
+      {/* ======================================================
           Recent Orders
-      ========================== */}
-      <div className="col-span-12 xl:col-span-7">
+      ====================================================== */}
+      <div className="col-span-12">
         <RecentOrders />
       </div>
 
