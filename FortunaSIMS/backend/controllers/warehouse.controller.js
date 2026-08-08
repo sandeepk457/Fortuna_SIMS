@@ -43,6 +43,246 @@ exports.getWarehouses = async (req, res) => {
   }
 };
 
+
+// ======================================================
+// WAREHOUSE DASHBOARD ANALYTICS
+// ======================================================
+
+exports.getWarehouseDashboard = async (req, res) => {
+
+  try {
+
+    const { code } = req.params;
+
+    // =====================================================
+    // Warehouse
+    // =====================================================
+
+    const warehouseResult = await pool.query(
+      `
+      SELECT *
+      FROM warehouses
+      WHERE warehouse_code=$1
+      `,
+      [code]
+    );
+
+    if (warehouseResult.rows.length === 0) {
+
+      return res.status(404).json({
+        success:false,
+        message:"Warehouse not found"
+      });
+
+    }
+
+    const warehouse = warehouseResult.rows[0];
+
+    const warehouseId = warehouse.warehouse_id;
+
+    // =====================================================
+    // Statistics
+    // =====================================================
+
+    const zoneCount = await pool.query(
+      `
+      SELECT COUNT(*)::int count
+      FROM warehouse_zones
+      WHERE warehouse_id=$1
+      `,
+      [warehouseId]
+    );
+
+    const aisleCount = await pool.query(
+      `
+      SELECT COUNT(*)::int count
+      FROM warehouse_aisles
+      WHERE zone_id IN
+      (
+        SELECT zone_id
+        FROM warehouse_zones
+        WHERE warehouse_id=$1
+      )
+      `,
+      [warehouseId]
+    );
+
+    const rackCount = await pool.query(
+      `
+      SELECT COUNT(*)::int count
+      FROM warehouse_racks
+      WHERE aisle_id IN
+      (
+        SELECT aisle_id
+        FROM warehouse_aisles
+        WHERE zone_id IN
+        (
+          SELECT zone_id
+          FROM warehouse_zones
+          WHERE warehouse_id=$1
+        )
+      )
+      `,
+      [warehouseId]
+    );
+
+    const binCount = await pool.query(
+      `
+      SELECT COUNT(*)::int count
+      FROM warehouse_bins
+      WHERE rack_id IN
+      (
+        SELECT rack_id
+        FROM warehouse_racks
+        WHERE aisle_id IN
+        (
+          SELECT aisle_id
+          FROM warehouse_aisles
+          WHERE zone_id IN
+          (
+            SELECT zone_id
+            FROM warehouse_zones
+            WHERE warehouse_id=$1
+          )
+        )
+      )
+      `,
+      [warehouseId]
+    );
+
+    // =====================================================
+    // Zone Analytics
+    // =====================================================
+
+    const zoneResult = await pool.query(
+
+      `
+      SELECT
+
+      z.zone_id,
+      z.zone_name,
+      z.zone_type,
+
+      COUNT(DISTINCT a.aisle_id)::int AS aisles,
+
+      COUNT(DISTINCT r.rack_id)::int AS racks,
+
+      COUNT(DISTINCT b.bin_id)::int AS bins
+
+      FROM warehouse_zones z
+
+      LEFT JOIN warehouse_aisles a
+      ON a.zone_id=z.zone_id
+
+      LEFT JOIN warehouse_racks r
+      ON r.aisle_id=a.aisle_id
+
+      LEFT JOIN warehouse_bins b
+      ON b.rack_id=r.rack_id
+
+      WHERE z.warehouse_id=$1
+
+      GROUP BY
+      z.zone_id,
+      z.zone_name,
+      z.zone_type
+
+      ORDER BY z.zone_name
+
+      `,
+      [warehouseId]
+
+    );
+
+
+    // =====================================================
+// Capacity Metrics
+// =====================================================
+
+// Currently inventory is not mapped to bins,
+// so assume all bins are available.
+
+const totalBins = binCount.rows[0].count;
+
+const occupiedBins = 0;
+
+const availableBins = totalBins - occupiedBins;
+
+const occupancyPercentage =
+  totalBins > 0
+    ? Number(((occupiedBins / totalBins) * 100).toFixed(2))
+    : 0;
+
+const rackUtilization =
+  rackCount.rows[0].count > 0
+    ? Number(
+        (
+          (occupiedBins / rackCount.rows[0].count) *
+          100
+        ).toFixed(2)
+      )
+    : 0;
+
+const capacity = {
+  totalBins,
+  availableBins,
+  occupiedBins,
+  occupancyPercentage,
+  rackUtilization,
+};
+
+
+
+
+
+    // =====================================================
+    // Final Response
+    // =====================================================
+
+    res.json({
+
+      success: true,
+
+      warehouse,
+
+      statistics: {
+
+        zones: zoneCount.rows[0].count,
+
+        aisles: aisleCount.rows[0].count,
+
+        racks: rackCount.rows[0].count,
+
+        bins: binCount.rows[0].count
+
+      },
+
+      capacity,
+
+      zones: zoneResult.rows
+
+    });
+
+  } catch (err) {
+
+    console.error(err);
+
+    res.status(500).json({
+
+      success: false,
+
+      message: "Dashboard API Failed",
+
+      error: err.message
+
+    });
+
+  }
+
+};
+
+
+
 // 🔥 FULL CREATE (Stored Procedure)
 exports.createFullWarehouse = async (req, res) => {
   try {
@@ -293,4 +533,5 @@ exports.updateFullWarehouse = async (req, res) => {
   } finally {
     client.release();
   }
+  
 };

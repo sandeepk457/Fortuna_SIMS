@@ -8,6 +8,7 @@ import RFQStatusDashboard from "@/components/dashboard/analytics/RFQStatusDashbo
 import EnterpriseDemographics from "@/components/dashboard/analytics/EnterpriseDemographics";
 import ModuleHealthDashboard from "@/components/dashboard/analytics/ModuleHealthDashboard";
 import TopInventoryItems from "@/components/dashboard/analytics/TopInventoryItems";
+import WarehouseCapacityDashboard from "@/components/dashboard/analytics/WarehouseCapacityDashboard";
 
 import MonthlySalesChart from "@/components/ecommerce/MonthlySalesChart";
 import MonthlyProcurementTrend from "@/components/ecommerce/MonthlyProcurementTrend";
@@ -82,6 +83,13 @@ export default function Ecommerce() {
       ====================================================== */}
       <div className="col-span-12">
         <TopInventoryItems />
+      </div>
+
+      {/* ======================================================
+          Warehouse Capacity Dashboard
+      ====================================================== */}
+      <div className="col-span-12">
+        <WarehouseCapacityDashboard />
       </div>
 
     </div>
