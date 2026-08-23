@@ -117,7 +117,6 @@ export default function DemandForecastAIPage() {
               </div>
             )}
 
-            {/* ✅ Auto scroll anchor */}
             <div ref={chatEndRef} />
           </div>
 
@@ -143,7 +142,9 @@ export default function DemandForecastAIPage() {
                 boxShadow: "0 6px 15px rgba(200,16,46,0.3)",
               }}
             >
-              Send
+              {isTyping
+                ? "Thinking..."
+                : "Send"}
             </button>
           </div>
 
