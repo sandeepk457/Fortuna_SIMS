@@ -487,16 +487,96 @@ export default function StockAlertsDashboard() {
 }
 
 /** Components */
-function KPI({ title, value, accent }: { title: string; value: string | number; accent: string }) {
+function KPI({
+  title,
+  value,
+  accent,
+}: {
+  title: string;
+  value: string | number;
+  accent: string;
+}) {
+  const isRed = accent === FORTUNA_RED;
+  const isBlue = accent === FORTUNA_BLUE;
+
+  const gradient = isRed
+    ? "from-[#C8102E] via-[#D51F3D] to-[#9F0D25]"
+    : isBlue
+    ? "from-[#005F99] via-[#087DBA] to-[#00466F]"
+    : "from-[#C8102E] via-[#7A3150] to-[#005F99]";
+
+  const glow = isRed
+    ? "shadow-[0_12px_35px_rgba(200,16,46,0.20)] hover:shadow-[0_18px_45px_rgba(200,16,46,0.30)]"
+    : "shadow-[0_12px_35px_rgba(0,95,153,0.20)] hover:shadow-[0_18px_45px_rgba(0,95,153,0.30)]";
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">{title}</div>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
-      </div>
-      <div className="mt-3 text-2xl font-semibold text-gray-900 dark:text-white">{value}</div>
-      <div className="mt-2 h-1 w-full rounded-full bg-gray-100 dark:bg-white/10">
-        <div className="h-1 rounded-full" style={{ width: "38%", backgroundColor: accent, opacity: 0.9 }} />
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-white/20",
+        "bg-gradient-to-br",
+        gradient,
+        "p-5 text-white",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-1",
+        glow
+      )}
+    >
+      {/* Premium background glow */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10 blur-2xl transition-all duration-500 group-hover:scale-125" />
+
+      <div className="pointer-events-none absolute -bottom-10 -left-8 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+
+      {/* Subtle shine */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent opacity-70" />
+
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 backdrop-blur-md ring-1 ring-white/20">
+              <span className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
+            </span>
+
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-white/80">
+              {title}
+            </span>
+          </div>
+
+          {/* Status indicator */}
+          <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/80 backdrop-blur-md">
+            LIVE
+          </span>
+        </div>
+
+        {/* Value */}
+        <div className="mt-5">
+          <div className="text-3xl font-bold tracking-tight text-white drop-shadow-sm">
+            {value}
+          </div>
+
+          <div className="mt-1 text-[11px] font-medium text-white/65">
+            Current inventory intelligence
+          </div>
+        </div>
+
+        {/* Progress */}
+        <div className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
+              Alert monitoring
+            </span>
+
+            <span className="text-[10px] font-semibold text-white/80">
+              Active
+            </span>
+          </div>
+
+          <div className="h-1.5 overflow-hidden rounded-full bg-black/15 ring-1 ring-white/10">
+            <div
+              className="h-full w-[38%] rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.65)] transition-all duration-700 group-hover:w-[52%]"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -510,30 +590,102 @@ function AlertCard({
 }: {
   title: string;
   accent: string;
-  rows: Array<{ key: string; title: string; meta: string; right: string }>;
+  rows: Array<{
+    key: string;
+    title: string;
+    meta: string;
+    right: string;
+  }>;
   emptyText?: string;
 }) {
+  const isRed = accent === FORTUNA_RED;
+
+  const gradient = isRed
+    ? "from-[#C8102E] via-[#B51634] to-[#8F1025]"
+    : "from-[#005F99] via-[#087DBA] to-[#00466F]";
+
+  const shadow = isRed
+    ? "shadow-[0_14px_40px_rgba(200,16,46,0.18)] hover:shadow-[0_20px_50px_rgba(200,16,46,0.28)]"
+    : "shadow-[0_14px_40px_rgba(0,95,153,0.18)] hover:shadow-[0_20px_50px_rgba(0,95,153,0.28)]";
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl",
+        "border border-white/20 bg-gradient-to-br",
+        gradient,
+        "p-5 text-white",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-1",
+        shadow
+      )}
+    >
+      {/* Background glow */}
+      <div className="pointer-events-none absolute -right-12 -top-12 h-36 w-36 rounded-full bg-white/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+
+      <div className="pointer-events-none absolute -bottom-12 -left-12 h-32 w-32 rounded-full bg-black/10 blur-3xl" />
+
+      {/* Header */}
+      <div className="relative z-10 flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20 backdrop-blur-md">
+            <span className="h-3 w-3 rounded-full bg-white shadow-[0_0_14px_rgba(255,255,255,0.9)]" />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-bold text-white">
+              {title}
+            </h3>
+
+            <p className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-white/60">
+              Inventory intelligence
+            </p>
+          </div>
+        </div>
+
+        <span className="rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/80 backdrop-blur-md">
+          {rows.length} ALERT{rows.length === 1 ? "" : "S"}
+        </span>
       </div>
 
-      <div className="mt-4 space-y-3">
+      {/* Alert list */}
+      <div className="relative z-10 mt-5 space-y-2.5">
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-            {emptyText ?? "No data."}
+          <div className="rounded-xl border border-white/15 bg-black/10 p-4 backdrop-blur-sm">
+            <div className="flex items-center gap-3">
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
+                <span className="text-sm">✓</span>
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-white">
+                  All clear
+                </p>
+
+                <p className="mt-0.5 text-[11px] text-white/60">
+                  {emptyText ?? "No alerts detected."}
+                </p>
+              </div>
+            </div>
           </div>
         ) : (
           rows.slice(0, 5).map((r) => (
-            <div key={r.key} className="rounded-xl border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+            <div
+              key={r.key}
+              className="rounded-xl border border-white/15 bg-white/10 p-3 backdrop-blur-md transition-all duration-200 hover:bg-white/15"
+            >
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">{r.title}</div>
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">{r.meta}</div>
+                <div className="min-w-0">
+                  <div className="truncate text-xs font-bold text-white">
+                    {r.title}
+                  </div>
+
+                  <div className="mt-1 text-[10px] leading-4 text-white/60">
+                    {r.meta}
+                  </div>
                 </div>
-                <div className="text-sm font-semibold" style={{ color: accent }}>
+
+                <div className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-white ring-1 ring-white/10">
                   {r.right}
                 </div>
               </div>
@@ -542,8 +694,13 @@ function AlertCard({
         )}
       </div>
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-        <span className="font-semibold">Insight:</span> Act early to prevent stockouts, avoid excess, and protect shelf life.
+      {/* Insight footer */}
+      <div className="relative z-10 mt-4 flex items-center gap-2 border-t border-white/15 pt-4">
+        <span className="h-1.5 w-1.5 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]" />
+
+        <span className="text-[10px] font-medium text-white/60">
+          Act early to maintain optimal inventory health.
+        </span>
       </div>
     </div>
   );

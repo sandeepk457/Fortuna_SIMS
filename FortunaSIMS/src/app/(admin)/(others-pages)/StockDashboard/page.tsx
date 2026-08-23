@@ -399,21 +399,113 @@ export default function StockDashboardCorporateV2() {
         </div>
 
         {/* Warehouse breakdown cards */}
-        <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
-          {whBreakdown.map((x) => (
-            <div key={x.wh} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-semibold text-gray-900 dark:text-white">{x.wh}</div>
-                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: FORTUNA_BLUE }} />
+{/* Warehouse Breakdown - Fortuna Premium */}
+<div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
+  {whBreakdown.map((x, index) => {
+    const isRed = index === 1;
+
+    const gradient = isRed
+      ? "from-[#C8102E] via-[#D51F3D] to-[#9F0D25]"
+      : "from-[#005F99] via-[#087DBA] to-[#00466F]";
+
+    const shadow = isRed
+      ? "shadow-[0_12px_35px_rgba(200,16,46,0.18)] hover:shadow-[0_18px_45px_rgba(200,16,46,0.28)]"
+      : "shadow-[0_12px_35px_rgba(0,95,153,0.18)] hover:shadow-[0_18px_45px_rgba(0,95,153,0.28)]";
+
+    return (
+      <div
+        key={x.wh}
+        className={cn(
+          "group relative overflow-hidden rounded-2xl",
+          "border border-white/20 bg-gradient-to-br",
+          gradient,
+          "p-5 text-white",
+          "transition-all duration-300 ease-out",
+          "hover:-translate-y-1",
+          shadow
+        )}
+      >
+        {/* Background glow */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-3xl transition-transform duration-500 group-hover:scale-125" />
+
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-black/10 blur-3xl" />
+
+        {/* Premium shine */}
+        <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent" />
+
+        <div className="relative z-10">
+
+          {/* Warehouse Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20 backdrop-blur-md">
+                <span className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
               </div>
-              <div className="mt-3 text-2xl font-semibold text-gray-900 dark:text-white">{inr(x.value)}</div>
-              <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">Total Qty: <span className="font-semibold">{x.qty}</span></div>
-              <div className="mt-3 h-1 w-full rounded-full bg-gray-100 dark:bg-white/10">
-                <div className="h-1 rounded-full" style={{ width: "45%", backgroundColor: FORTUNA_BLUE, opacity: 0.9 }} />
+
+              <div>
+                <div className="text-sm font-bold text-white">
+                  {x.wh}
+                </div>
+
+                <div className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-white/60">
+                  Warehouse Intelligence
+                </div>
               </div>
+
             </div>
-          ))}
+
+            <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/80 backdrop-blur-md">
+              LIVE
+            </span>
+          </div>
+
+          {/* Stock Value */}
+          <div className="mt-5">
+            <div className="text-3xl font-bold tracking-tight text-white drop-shadow-sm">
+              {inr(x.value)}
+            </div>
+
+            <div className="mt-1 text-xs font-medium text-white/65">
+              Current Stock Value
+            </div>
+          </div>
+
+          {/* Quantity */}
+          <div className="mt-4 flex items-center justify-between">
+            <span className="text-[11px] font-medium uppercase tracking-wider text-white/60">
+              Total Quantity
+            </span>
+
+            <span className="rounded-lg bg-white/10 px-2.5 py-1 text-sm font-bold text-white ring-1 ring-white/10">
+              {x.qty}
+            </span>
+          </div>
+
+          {/* Stock indicator */}
+          <div className="mt-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-white/55">
+                Stock Utilization
+              </span>
+
+              <span className="text-[10px] font-semibold text-white/75">
+                Active
+              </span>
+            </div>
+
+            <div className="h-1.5 overflow-hidden rounded-full bg-black/15 ring-1 ring-white/10">
+              <div
+                className="h-full w-[45%] rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.65)] transition-all duration-700 group-hover:w-[60%]"
+              />
+            </div>
+          </div>
+
         </div>
+      </div>
+    );
+  })}
+</div>
 
         {/* Clean KPI grid */}
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-7">
@@ -588,29 +680,160 @@ export default function StockDashboardCorporateV2() {
 }
 
 /** Components */
-function KPI({ title, value, accent }: { title: string; value: string | number; accent: string }) {
+function KPI({
+  title,
+  value,
+  accent,
+}: {
+  title: string;
+  value: string | number;
+  accent: string;
+}) {
+  const isRed = accent === FORTUNA_RED;
+  const isBlue = accent === FORTUNA_BLUE;
+
+  const gradient = isRed
+    ? "from-[#C8102E] via-[#D51F3D] to-[#9F0D25]"
+    : isBlue
+    ? "from-[#005F99] via-[#087DBA] to-[#00466F]"
+    : "from-[#C8102E] via-[#7A3150] to-[#005F99]";
+
+  const glow = isRed
+    ? "shadow-[0_12px_35px_rgba(200,16,46,0.20)] hover:shadow-[0_18px_45px_rgba(200,16,46,0.30)]"
+    : "shadow-[0_12px_35px_rgba(0,95,153,0.20)] hover:shadow-[0_18px_45px_rgba(0,95,153,0.30)]";
+
   return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">{title}</div>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
-      </div>
-      <div className="mt-3 text-2xl font-semibold text-gray-900 dark:text-white">{value}</div>
-      <div className="mt-2 h-1 w-full rounded-full bg-gray-100 dark:bg-white/10">
-        <div className="h-1 rounded-full" style={{ width: "38%", backgroundColor: accent, opacity: 0.9 }} />
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl border border-white/20",
+        "bg-gradient-to-br",
+        gradient,
+        "p-5 text-white",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-1",
+        glow
+      )}
+    >
+      {/* Background glow */}
+      <div className="pointer-events-none absolute -right-8 -top-8 h-28 w-28 rounded-full bg-white/10 blur-2xl transition-all duration-500 group-hover:scale-125" />
+
+      <div className="pointer-events-none absolute -bottom-10 -left-8 h-24 w-24 rounded-full bg-white/10 blur-2xl" />
+
+      {/* Subtle shine */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent opacity-70" />
+
+      <div className="relative z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/15 backdrop-blur-md ring-1 ring-white/20">
+              <span className="h-2.5 w-2.5 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
+            </span>
+
+            <span className="text-xs font-semibold uppercase tracking-[0.08em] text-white/80">
+              {title}
+            </span>
+          </div>
+
+          <span className="rounded-full border border-white/20 bg-white/10 px-2 py-1 text-[10px] font-semibold text-white/80 backdrop-blur-md">
+            LIVE
+          </span>
+        </div>
+
+        <div className="mt-5">
+          <div className="text-3xl font-bold tracking-tight text-white drop-shadow-sm">
+            {value}
+          </div>
+
+          <div className="mt-1 text-[11px] font-medium text-white/65">
+            Current inventory intelligence
+          </div>
+        </div>
+
+        <div className="mt-5">
+          <div className="mb-2 flex items-center justify-between">
+            <span className="text-[10px] font-medium uppercase tracking-wider text-white/60">
+              Stock monitoring
+            </span>
+
+            <span className="text-[10px] font-semibold text-white/80">
+              Active
+            </span>
+          </div>
+
+          <div className="h-1.5 overflow-hidden rounded-full bg-black/15 ring-1 ring-white/10">
+            <div className="h-full w-[38%] rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.65)] transition-all duration-700 group-hover:w-[52%]" />
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
-function AgeChip({ label, value, accent }: { label: string; value: number; accent: string }) {
+function AgeChip({
+  label,
+  value,
+  accent,
+}: {
+  label: string;
+  value: number;
+  accent: string;
+}) {
+  const isRed = accent === FORTUNA_RED;
+
+  const gradient = isRed
+    ? "from-[#C8102E] via-[#D51F3D] to-[#9F0D25]"
+    : "from-[#005F99] via-[#087DBA] to-[#00466F]";
+
+  const shadow = isRed
+    ? "shadow-[0_8px_25px_rgba(200,16,46,0.16)] hover:shadow-[0_12px_32px_rgba(200,16,46,0.25)]"
+    : "shadow-[0_8px_25px_rgba(0,95,153,0.16)] hover:shadow-[0_12px_32px_rgba(0,95,153,0.25)]";
+
   return (
-    <div className="rounded-xl border border-gray-200 bg-white p-3 dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">{label}</span>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-xl",
+        "border border-white/20 bg-gradient-to-br",
+        gradient,
+        "p-4 text-white",
+        "transition-all duration-300 ease-out",
+        "hover:-translate-y-0.5",
+        shadow
+      )}
+    >
+      {/* Background glow */}
+      <div className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-white/10 blur-2xl transition-transform duration-500 group-hover:scale-125" />
+
+      {/* Subtle shine */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent" />
+
+      <div className="relative z-10">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-[0.08em] text-white/80">
+            {label}
+          </span>
+
+          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/20 backdrop-blur-md">
+            <span className="h-2 w-2 rounded-full bg-white shadow-[0_0_10px_rgba(255,255,255,0.9)]" />
+          </span>
+        </div>
+
+        {/* Value */}
+        <div className="mt-3 flex items-end justify-between">
+          <div className="text-2xl font-bold tracking-tight text-white">
+            {value}
+          </div>
+
+          <span className="text-[10px] font-medium uppercase tracking-wider text-white/55">
+            SKUs
+          </span>
+        </div>
+
+        {/* Progress accent */}
+        <div className="mt-3 h-1 overflow-hidden rounded-full bg-black/15 ring-1 ring-white/10">
+          <div className="h-full w-[42%] rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.6)] transition-all duration-500 group-hover:w-[60%]" />
+        </div>
       </div>
-      <div className="mt-2 text-xl font-semibold text-gray-900 dark:text-white">{value}</div>
     </div>
   );
 }
@@ -623,41 +846,123 @@ function RankCard({
 }: {
   title: string;
   accent: string;
-  rows: Array<{ key: string; title: string; meta: string; right: string }>;
+  rows: {
+    key: string;
+    title: string;
+    meta: string;
+    right: string;
+  }[];
   emptyText?: string;
 }) {
-  return (
-    <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
-      <div className="flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{title}</h3>
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: accent }} />
-      </div>
+  const isRed = accent === FORTUNA_RED;
 
-      <div className="mt-4 space-y-3">
-        {rows.length === 0 ? (
-          <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-            {emptyText ?? "No data."}
+  const gradientClass = isRed
+    ? "from-[#C8102E] via-[#D51F3D] to-[#9F0D25]"
+    : "from-[#005F99] via-[#087DBA] to-[#00466F]";
+
+  const shadowClass = isRed
+    ? "shadow-[0_12px_35px_rgba(200,16,46,0.20)] hover:shadow-[0_18px_45px_rgba(200,16,46,0.30)]"
+    : "shadow-[0_12px_35px_rgba(0,95,153,0.20)] hover:shadow-[0_18px_45px_rgba(0,95,153,0.30)]";
+
+  return (
+    <div
+      className={cn(
+        "group relative overflow-hidden rounded-2xl",
+        "border border-white/20",
+        "bg-gradient-to-br",
+        gradientClass,
+        "p-5 text-white",
+        "transition-all duration-300",
+        "hover:-translate-y-1",
+        shadowClass
+      )}
+    >
+      {/* Decorative glow */}
+      <div className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-white/10 blur-3xl" />
+
+      <div className="pointer-events-none absolute -bottom-10 -left-10 h-28 w-28 rounded-full bg-black/10 blur-3xl" />
+
+      {/* Shine */}
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/15 via-transparent to-transparent" />
+
+      <div className="relative z-10">
+
+        {/* Header */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex min-w-0 items-center gap-3">
+
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+              <span className="h-3 w-3 rounded-full bg-white shadow-[0_0_12px_rgba(255,255,255,0.9)]" />
+            </div>
+
+            <div className="min-w-0">
+              <h3 className="text-sm font-bold leading-5 text-white">
+                {title}
+              </h3>
+
+              <p className="mt-1 text-[10px] uppercase tracking-[0.12em] text-white/60">
+                Inventory intelligence
+              </p>
+            </div>
+
           </div>
-        ) : (
-          rows.map((r) => (
-            <div key={r.key} className="rounded-xl border border-gray-200 p-3 hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-gray-900 dark:text-white">{r.title}</div>
-                  <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">{r.meta}</div>
-                </div>
-                <div className="text-sm font-semibold" style={{ color: accent }}>
-                  {r.right}
+
+          <span className="shrink-0 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 text-[10px] font-semibold text-white/80">
+            {rows.length}
+          </span>
+        </div>
+
+        {/* Rows */}
+        <div className="mt-5 space-y-2.5">
+
+          {rows.length === 0 ? (
+            <div className="rounded-xl border border-white/15 bg-black/10 p-4">
+              <p className="text-xs font-semibold text-white">
+                All clear
+              </p>
+
+              <p className="mt-1 text-[11px] text-white/60">
+                {emptyText || "No records found."}
+              </p>
+            </div>
+          ) : (
+            rows.slice(0, 5).map((row) => (
+              <div
+                key={row.key}
+                className="rounded-xl border border-white/15 bg-white/10 p-3 transition-all duration-200 hover:bg-white/15"
+              >
+                <div className="flex items-start justify-between gap-3">
+
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-xs font-bold text-white">
+                      {row.title}
+                    </div>
+
+                    <div className="mt-1 text-[10px] leading-4 text-white/65">
+                      {row.meta}
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 rounded-lg bg-white/10 px-2 py-1 text-xs font-bold text-white ring-1 ring-white/10">
+                    {row.right}
+                  </div>
+
                 </div>
               </div>
-            </div>
-          ))
-        )}
-      </div>
+            ))
+          )}
 
-      <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-        <span className="font-semibold">Tip:</span> Dead stock list can trigger liquidation / transfer workflows.
+        </div>
+
+        {/* Footer */}
+        <div className="mt-4 border-t border-white/15 pt-4">
+          <p className="text-[10px] font-medium text-white/60">
+            Review inventory movement and optimize stock efficiency.
+          </p>
+        </div>
+
       </div>
     </div>
   );
 }
+
