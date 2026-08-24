@@ -1,6 +1,11 @@
 /** @type {import('next').NextConfig} */
+
+const createNextIntlPlugin = require("next-intl/plugin");
+
+const withNextIntl = createNextIntlPlugin("./src/i18n/request.ts");
+
 const nextConfig = {
-  /* 
+  /*
    * TEMPORARY:
    * Allow production deployment even when pending
    * TypeScript errors exist in undeveloped/static screens.
@@ -28,4 +33,4 @@ const nextConfig = {
   },
 };
 
-module.exports = nextConfig;
+module.exports = withNextIntl(nextConfig);

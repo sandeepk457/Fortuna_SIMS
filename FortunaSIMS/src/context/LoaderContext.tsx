@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect } from "react";
 import FortunaLoader from "@/components/common/FortunaLoader";
-import api from "@/utils/api";
+import api from "../utils/api";
 
 export const LoaderContext = createContext<any>(null);
 

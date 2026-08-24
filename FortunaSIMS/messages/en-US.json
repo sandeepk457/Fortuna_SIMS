@@ -1,0 +1,36 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit",
+    "delete": "Delete",
+    "search": "Search",
+    "loading": "Loading",
+    "submit": "Submit",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next"
+  },
+  "navigation": {
+    "dashboard": "Dashboard",
+    "inventory": "Inventory",
+    "procurement": "Procurement",
+    "vendors": "Vendors",
+    "customers": "Customers",
+    "reports": "Reports",
+    "settings": "Settings"
+  },
+  "settings": {
+  "title": "Account Settings",
+  "description": "Manage your account preferences and language settings.",
+  "languageRegion": "Language & Region",
+  "languageDescription": "Select the language you prefer to use in Fortuna SIMS.",
+  "selectLanguage": "Select Language",
+  "saveDescription": "Your selected language preference will be saved to this account.",
+  "chooseLanguage": "Choose your preferred interface language.",
+  "saveChanges": "Save Changes",
+  "saved": "Language preference saved",
+  "multilingualSupport": "Multilingual Support",
+  "multilingualDescription": "Fortuna SIMS is being designed with global language support. Additional languages can be enabled as the platform expands globally."
+}
+}

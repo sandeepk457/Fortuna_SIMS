@@ -1,0 +1,36 @@
+{
+  "common": {
+    "save": "保存",
+    "cancel": "取消",
+    "edit": "编辑",
+    "delete": "删除",
+    "search": "搜索",
+    "loading": "加载中",
+    "submit": "提交",
+    "close": "关闭",
+    "back": "返回",
+    "next": "下一步"
+  },
+  "navigation": {
+    "dashboard": "仪表板",
+    "inventory": "库存",
+    "procurement": "采购",
+    "vendors": "供应商",
+    "customers": "客户",
+    "reports": "报告",
+    "settings": "设置"
+  },
+  "settings": {
+  "title": "账户设置",
+  "description": "管理您的账户偏好和语言设置。",
+  "languageRegion": "语言和地区",
+  "languageDescription": "选择您在 Fortuna SIMS 中使用的语言。",
+  "selectLanguage": "选择语言",
+  "saveDescription": "您选择的语言偏好将保存到此账户。",
+  "chooseLanguage": "选择您偏好的界面语言。",
+  "saveChanges": "保存更改",
+  "saved": "语言偏好已保存",
+  "multilingualSupport": "多语言支持",
+  "multilingualDescription": "Fortuna SIMS 正在构建全球多语言支持。随着平台在全球范围内扩展，我们将逐步增加更多语言。"
+}
+}
