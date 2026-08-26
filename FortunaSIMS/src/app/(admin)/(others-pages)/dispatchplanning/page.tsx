@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   ArrowRight,
@@ -2348,6 +2348,9 @@ function AssignmentTab({
       capacity: "20 Ton",
       status: "Assigned",
       driver: "Ravi Kumar",
+      location: "Visakhapatnam",
+      dispatch: "DSP-2026-0001",
+      utilization: "82%",
     },
     {
       no: "AP32XX5678",
@@ -2355,6 +2358,9 @@ function AssignmentTab({
       capacity: "16 Ton",
       status: "Available",
       driver: "Unassigned",
+      location: "Vijayawada",
+      dispatch: "—",
+      utilization: "0%",
     },
     {
       no: "TN09AB7821",
@@ -2362,6 +2368,9 @@ function AssignmentTab({
       capacity: "12 Ton",
       status: "Assigned",
       driver: "Arun Kumar",
+      location: "Chennai",
+      dispatch: "DSP-2026-0002",
+      utilization: "74%",
     },
     {
       no: "TS08CD4432",
@@ -2369,182 +2378,1170 @@ function AssignmentTab({
       capacity: "25 Ton",
       status: "Assigned",
       driver: "Mahesh",
+      location: "Hyderabad",
+      dispatch: "DSP-2026-0003",
+      utilization: "91%",
+    },
+    {
+      no: "KA01MN9012",
+      type: "Multi Axle",
+      capacity: "18 Ton",
+      status: "Available",
+      driver: "Unassigned",
+      location: "Bengaluru",
+      dispatch: "—",
+      utilization: "0%",
     },
   ];
 
+  const [selectedVehicle, setSelectedVehicle] =
+    useState<(typeof vehicles)[number] | null>(null);
+
+  const [showAssignModal, setShowAssignModal] =
+    useState(false);
+
+  const [assignmentForm, setAssignmentForm] = useState({
+    vehicle: "",
+    driver: "",
+    dispatch: "",
+    assignmentDate: "25-Aug-2026",
+    shift: "General",
+    notes: "",
+  });
+
+  const openAssignModal = (
+    vehicle: (typeof vehicles)[number]
+  ) => {
+    setSelectedVehicle(vehicle);
+
+    setAssignmentForm({
+      vehicle: vehicle.no,
+      driver:
+        vehicle.driver === "Unassigned"
+          ? ""
+          : vehicle.driver,
+      dispatch:
+        vehicle.dispatch === "—"
+          ? ""
+          : vehicle.dispatch,
+      assignmentDate: "25-Aug-2026",
+      shift: "General",
+      notes: "",
+    });
+
+    setShowAssignModal(true);
+  };
+
+  const closeAssignModal = () => {
+    setShowAssignModal(false);
+    setSelectedVehicle(null);
+  };
+
+  const handleAssignmentSubmit = (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    if (
+      !assignmentForm.vehicle ||
+      !assignmentForm.driver ||
+      !assignmentForm.dispatch
+    ) {
+      alert(
+        "Please select Vehicle, Driver and Dispatch."
+      );
+      return;
+    }
+
+    alert(
+      `Assignment created successfully for ${assignmentForm.vehicle}`
+    );
+
+    closeAssignModal();
+  };
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
 
-      <div className="grid grid-cols-1 gap-5 lg:grid-cols-3">
+        {/* ====================================================
+            ASSIGNMENT KPIs
+        ==================================================== */}
 
-        <AssignmentKpi
-          title="Available Vehicles"
-          value="18"
-          icon={
-            <Truck size={19} />
-          }
-          variant="blue"
-        />
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-4">
 
-        <AssignmentKpi
-          title="Available Drivers"
-          value="24"
-          icon={
-            <Users size={19} />
-          }
-          variant="red"
-        />
+          <AssignmentKpi
+            title="Available Vehicles"
+            value="18"
+            icon={
+              <Truck size={19} />
+            }
+            variant="blue"
+          />
 
-        <AssignmentKpi
-          title="Assignment Conflicts"
-          value="02"
-          icon={
-            <AlertTriangle
-              size={19}
-            />
-          }
-          variant="blue"
-        />
+          <AssignmentKpi
+            title="Available Drivers"
+            value="24"
+            icon={
+              <Users size={19} />
+            }
+            variant="red"
+          />
 
-      </div>
+          <AssignmentKpi
+            title="Assigned Today"
+            value="31"
+            icon={
+              <CheckCircle2
+                size={19}
+              />
+            }
+            variant="blue"
+          />
 
-      <Panel
-        title="Vehicle & Driver Assignment"
-        subtitle="Manage fleet resources against planned dispatches."
-        action={
-          <button className="inline-flex items-center gap-2 rounded-lg bg-[#C8102E] px-3 py-2 text-xs font-bold text-white">
-            <Settings2 size={14} />
-            Manage Assignment
-          </button>
-        }
-      >
-
-        <div className="overflow-x-auto">
-
-          <table className="w-full min-w-[900px]">
-
-            <thead>
-
-              <tr className="border-b border-gray-200 dark:border-gray-800">
-
-                {[
-                  "Vehicle",
-                  "Type",
-                  "Capacity",
-                  "Driver",
-                  "Availability",
-                  "Action",
-                ].map((head) => (
-                  <th
-                    key={head}
-                    className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-gray-400"
-                  >
-                    {head}
-                  </th>
-                ))}
-
-              </tr>
-
-            </thead>
-
-            <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
-
-              {vehicles.map(
-                (vehicle) => (
-                  <tr
-                    key={
-                      vehicle.no
-                    }
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/30"
-                  >
-
-                    <td className="px-4 py-4">
-
-                      <div className="flex items-center gap-2">
-
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#005F99]/10 text-[#005F99]">
-                          <Truck
-                            size={16}
-                          />
-                        </div>
-
-                        <span className="font-bold">
-                          {
-                            vehicle.no
-                          }
-                        </span>
-
-                      </div>
-
-                    </td>
-
-                    <td className="px-4 py-4 text-sm text-gray-600 dark:text-gray-300">
-                      {
-                        vehicle.type
-                      }
-                    </td>
-
-                    <td className="px-4 py-4 text-sm font-semibold">
-                      {
-                        vehicle.capacity
-                      }
-                    </td>
-
-                    <td className="px-4 py-4">
-
-                      <div className="flex items-center gap-2">
-
-                        <Users
-                          size={14}
-                          className="text-[#C8102E]"
-                        />
-
-                        <span className="text-sm font-semibold">
-                          {
-                            vehicle.driver
-                          }
-                        </span>
-
-                      </div>
-
-                    </td>
-
-                    <td className="px-4 py-4">
-
-                      {vehicle.status ===
-                      "Available" ? (
-                        <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-600">
-                          Available
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-[#005F99]">
-                          Assigned
-                        </span>
-                      )}
-
-                    </td>
-
-                    <td className="px-4 py-4">
-
-                      <button className="rounded-lg border border-gray-200 px-3 py-2 text-xs font-semibold text-gray-600 hover:border-[#005F99] hover:text-[#005F99] dark:border-gray-700 dark:text-gray-300">
-                        Assign
-                      </button>
-
-                    </td>
-
-                  </tr>
-                )
-              )}
-
-            </tbody>
-
-          </table>
+          <AssignmentKpi
+            title="Assignment Conflicts"
+            value="02"
+            icon={
+              <AlertTriangle
+                size={19}
+              />
+            }
+            variant="red"
+          />
 
         </div>
 
-      </Panel>
+        {/* ====================================================
+            RESOURCE SUMMARY
+        ==================================================== */}
 
-    </div>
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+
+          {/* Vehicle Utilization */}
+
+          <div className="overflow-hidden rounded-2xl border border-[#005F99]/15 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="border-b border-gray-100 p-5 dark:border-gray-800">
+
+              <div className="flex items-center justify-between">
+
+                <div>
+
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#005F99]">
+                    Fleet Capacity
+                  </p>
+
+                  <h3 className="mt-1 text-base font-bold text-gray-900 dark:text-white">
+                    Vehicle Utilization
+                  </h3>
+
+                </div>
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#005F99]/10 text-[#005F99]">
+                  <Truck size={18} />
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="space-y-4 p-5">
+
+              <div>
+
+                <div className="mb-1.5 flex items-center justify-between">
+
+                  <span className="text-xs font-semibold text-gray-500">
+                    Fleet Utilization
+                  </span>
+
+                  <span className="text-xs font-bold text-[#005F99]">
+                    72%
+                  </span>
+
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#005F99] to-[#C8102E]"
+                    style={{
+                      width: "72%",
+                    }}
+                  />
+
+                </div>
+
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+
+                <div className="rounded-xl bg-[#005F99]/5 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    Total
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-[#005F99]">
+                    42
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl bg-emerald-50 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    Active
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-emerald-600">
+                    31
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl bg-[#C8102E]/5 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    Idle
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-[#C8102E]">
+                    11
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Driver Availability */}
+
+          <div className="overflow-hidden rounded-2xl border border-[#C8102E]/15 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="border-b border-gray-100 p-5 dark:border-gray-800">
+
+              <div className="flex items-center justify-between">
+
+                <div>
+
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#C8102E]">
+                    Driver Capacity
+                  </p>
+
+                  <h3 className="mt-1 text-base font-bold text-gray-900 dark:text-white">
+                    Driver Availability
+                  </h3>
+
+                </div>
+
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#C8102E]/10 text-[#C8102E]">
+                  <Users size={18} />
+                </div>
+
+              </div>
+
+            </div>
+
+            <div className="space-y-4 p-5">
+
+              <div>
+
+                <div className="mb-1.5 flex items-center justify-between">
+
+                  <span className="text-xs font-semibold text-gray-500">
+                    Driver Availability
+                  </span>
+
+                  <span className="text-xs font-bold text-[#C8102E]">
+                    86%
+                  </span>
+
+                </div>
+
+                <div className="h-2 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#C8102E] to-[#005F99]"
+                    style={{
+                      width: "86%",
+                    }}
+                  />
+
+                </div>
+
+              </div>
+
+              <div className="grid grid-cols-3 gap-3">
+
+                <div className="rounded-xl bg-[#005F99]/5 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    Total
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-[#005F99]">
+                    28
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl bg-emerald-50 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    Available
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-emerald-600">
+                    24
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl bg-[#C8102E]/5 p-3">
+
+                  <p className="text-[10px] text-gray-500">
+                    On Trip
+                  </p>
+
+                  <p className="mt-1 text-lg font-bold text-[#C8102E]">
+                    04
+                  </p>
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* ====================================================
+            VEHICLE & DRIVER ASSIGNMENT
+        ==================================================== */}
+
+        <Panel
+          title="Vehicle & Driver Assignment"
+          subtitle="Manage fleet resources against planned dispatches."
+          action={
+            <button
+              onClick={() => {
+                const firstAvailable =
+                  vehicles.find(
+                    (v) =>
+                      v.status ===
+                      "Available"
+                  );
+
+                if (firstAvailable) {
+                  openAssignModal(
+                    firstAvailable
+                  );
+                }
+              }}
+              className="inline-flex items-center gap-2 rounded-xl bg-[#C8102E] px-4 py-2.5 text-xs font-bold text-white shadow-md shadow-[#C8102E]/20 transition hover:-translate-y-0.5 hover:bg-[#A80D26]"
+            >
+              <Settings2 size={14} />
+              Manage Assignment
+            </button>
+          }
+        >
+
+          {/* Search / Filters */}
+
+          <div className="mb-5 grid grid-cols-1 gap-3 rounded-xl bg-gradient-to-r from-[#005F99]/5 to-[#C8102E]/5 p-4 md:grid-cols-3">
+
+            <div>
+
+              <label className="mb-1.5 block text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                Vehicle
+              </label>
+
+              <select className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-xs outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+
+                <option>
+                  All Vehicles
+                </option>
+
+                {vehicles.map(
+                  (vehicle) => (
+                    <option
+                      key={
+                        vehicle.no
+                      }
+                    >
+                      {
+                        vehicle.no
+                      }
+                    </option>
+                  )
+                )}
+
+              </select>
+
+            </div>
+
+            <div>
+
+              <label className="mb-1.5 block text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                Availability
+              </label>
+
+              <select className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-xs outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+
+                <option>
+                  All Status
+                </option>
+
+                <option>
+                  Available
+                </option>
+
+                <option>
+                  Assigned
+                </option>
+
+              </select>
+
+            </div>
+
+            <div>
+
+              <label className="mb-1.5 block text-[11px] font-bold text-gray-600 dark:text-gray-300">
+                Driver
+              </label>
+
+              <select className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-xs outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white">
+
+                <option>
+                  All Drivers
+                </option>
+
+                <option>
+                  Ravi Kumar
+                </option>
+
+                <option>
+                  Arun Kumar
+                </option>
+
+                <option>
+                  Mahesh
+                </option>
+
+              </select>
+
+            </div>
+
+          </div>
+
+          {/* Table */}
+
+          <div className="overflow-x-auto">
+
+            <table className="w-full min-w-[1100px]">
+
+              <thead>
+
+                <tr className="border-b border-gray-200 bg-gradient-to-r from-[#005F99] to-[#C8102E] dark:border-gray-800">
+
+                  {[
+                    "Vehicle",
+                    "Type",
+                    "Capacity",
+                    "Driver",
+                    "Location",
+                    "Dispatch",
+                    "Utilization",
+                    "Status",
+                    "Action",
+                  ].map(
+                    (head) => (
+                      <th
+                        key={
+                          head
+                        }
+                        className="px-4 py-3 text-left text-[10px] font-bold uppercase tracking-wider text-white"
+                      >
+                        {
+                          head
+                        }
+                      </th>
+                    )
+                  )}
+
+                </tr>
+
+              </thead>
+
+              <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
+
+                {vehicles.map(
+                  (vehicle) => (
+                    <tr
+                      key={
+                        vehicle.no
+                      }
+                      className="group transition hover:bg-[#005F99]/5 dark:hover:bg-gray-800/40"
+                    >
+
+                      {/* Vehicle */}
+
+                      <td className="px-4 py-4">
+
+                        <div className="flex items-center gap-3">
+
+                          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-[#005F99] to-[#C8102E] text-white shadow-sm">
+
+                            <Truck
+                              size={16}
+                            />
+
+                          </div>
+
+                          <div>
+
+                            <p className="text-sm font-bold text-gray-900 dark:text-white">
+                              {
+                                vehicle.no
+                              }
+                            </p>
+
+                            <p className="text-[10px] text-gray-400">
+                              Fleet Vehicle
+                            </p>
+
+                          </div>
+
+                        </div>
+
+                      </td>
+
+                      {/* Type */}
+
+                      <td className="px-4 py-4">
+
+                        <span className="text-xs font-semibold text-gray-600 dark:text-gray-300">
+                          {
+                            vehicle.type
+                          }
+                        </span>
+
+                      </td>
+
+                      {/* Capacity */}
+
+                      <td className="px-4 py-4">
+
+                        <span className="rounded-lg bg-[#005F99]/10 px-2.5 py-1 text-xs font-bold text-[#005F99]">
+                          {
+                            vehicle.capacity
+                          }
+                        </span>
+
+                      </td>
+
+                      {/* Driver */}
+
+                      <td className="px-4 py-4">
+
+                        <div className="flex items-center gap-2">
+
+                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#C8102E]/10 text-[#C8102E]">
+
+                            <Users
+                              size={14}
+                            />
+
+                          </div>
+
+                          <span className="text-xs font-semibold text-gray-700 dark:text-gray-200">
+                            {
+                              vehicle.driver
+                            }
+                          </span>
+
+                        </div>
+
+                      </td>
+
+                      {/* Location */}
+
+                      <td className="px-4 py-4">
+
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600 dark:text-gray-300">
+
+                          <MapPin
+                            size={13}
+                            className="text-[#005F99]"
+                          />
+
+                          {
+                            vehicle.location
+                          }
+
+                        </div>
+
+                      </td>
+
+                      {/* Dispatch */}
+
+                      <td className="px-4 py-4">
+
+                        {vehicle.dispatch !==
+                        "—" ? (
+                          <span className="text-xs font-bold text-[#005F99]">
+                            {
+                              vehicle.dispatch
+                            }
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400">
+                            Not Assigned
+                          </span>
+                        )}
+
+                      </td>
+
+                      {/* Utilization */}
+
+                      <td className="px-4 py-4">
+
+                        <div className="w-24">
+
+                          <div className="mb-1 flex justify-between text-[9px]">
+
+                            <span className="text-gray-400">
+                              Usage
+                            </span>
+
+                            <span className="font-bold text-[#005F99]">
+                              {
+                                vehicle.utilization
+                              }
+                            </span>
+
+                          </div>
+
+                          <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-[#005F99] to-[#C8102E]"
+                              style={{
+                                width:
+                                  vehicle.utilization,
+                              }}
+                            />
+
+                          </div>
+
+                        </div>
+
+                      </td>
+
+                      {/* Status */}
+
+                      <td className="px-4 py-4">
+
+                        {vehicle.status ===
+                        "Available" ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-600">
+
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+
+                            Available
+
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#005F99]/20 bg-[#005F99]/5 px-2.5 py-1 text-[10px] font-bold text-[#005F99]">
+
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#005F99]" />
+
+                            Assigned
+
+                          </span>
+                        )}
+
+                      </td>
+
+                      {/* Action */}
+
+                      <td className="px-4 py-4">
+
+                        <button
+                          onClick={() =>
+                            openAssignModal(
+                              vehicle
+                            )
+                          }
+                          className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-[10px] font-bold transition ${
+                            vehicle.status ===
+                            "Available"
+                              ? "bg-[#C8102E] text-white shadow-sm hover:bg-[#A80D26]"
+                              : "border border-[#005F99]/20 bg-[#005F99]/5 text-[#005F99] hover:bg-[#005F99]/10"
+                          }`}
+                        >
+
+                          <Settings2
+                            size={13}
+                          />
+
+                          {vehicle.status ===
+                          "Available"
+                            ? "Assign"
+                            : "Reassign"}
+
+                        </button>
+
+                      </td>
+
+                    </tr>
+                  )
+                )}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        </Panel>
+
+      </div>
+
+      {/* ====================================================
+          ASSIGNMENT MODAL
+      ==================================================== */}
+
+      {showAssignModal && (
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+
+          <div className="max-h-[92vh] w-full max-w-2xl overflow-y-auto overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+
+            {/* Header */}
+
+            <div className="relative overflow-hidden bg-gradient-to-br from-[#005F99] to-[#C8102E] p-6 text-white">
+
+              <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10 blur-3xl" />
+
+              <div className="relative flex items-center justify-between">
+
+                <div className="flex items-center gap-3">
+
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-white/15 ring-1 ring-white/20">
+
+                    <Settings2
+                      size={20}
+                    />
+
+                  </div>
+
+                  <div>
+
+                    <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/60">
+                      Fleet & Logistics
+                    </p>
+
+                    <h2 className="mt-1 text-xl font-bold">
+                      Vehicle Assignment
+                    </h2>
+
+                  </div>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={
+                    closeAssignModal
+                  }
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 transition hover:bg-white/20"
+                >
+                  <X size={18} />
+                </button>
+
+              </div>
+
+            </div>
+
+            {/* Form */}
+
+            <form
+              onSubmit={
+                handleAssignmentSubmit
+              }
+              className="p-6"
+            >
+
+              {/* Selected Vehicle */}
+
+              {selectedVehicle && (
+                <div className="mb-6 rounded-xl border border-[#005F99]/15 bg-gradient-to-r from-[#005F99]/5 to-[#C8102E]/5 p-4">
+
+                  <div className="flex items-center gap-3">
+
+                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#005F99] to-[#C8102E] text-white">
+
+                      <Truck
+                        size={18}
+                      />
+
+                    </div>
+
+                    <div>
+
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                        Selected Vehicle
+                      </p>
+
+                      <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+                        {
+                          selectedVehicle.no
+                        }
+                        <span className="ml-2 text-xs font-medium text-gray-400">
+                          {
+                            selectedVehicle.type
+                          }
+                        </span>
+                      </p>
+
+                    </div>
+
+                  </div>
+
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+
+                {/* Vehicle */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Vehicle
+                  </label>
+
+                  <select
+                    value={
+                      assignmentForm.vehicle
+                    }
+                    onChange={(e) =>
+                      setAssignmentForm(
+                        (prev) => ({
+                          ...prev,
+                          vehicle:
+                            e.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-[#005F99] focus:ring-2 focus:ring-[#005F99]/10 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  >
+
+                    <option value="">
+                      Select Vehicle
+                    </option>
+
+                    {vehicles.map(
+                      (vehicle) => (
+                        <option
+                          key={
+                            vehicle.no
+                          }
+                          value={
+                            vehicle.no
+                          }
+                        >
+                          {
+                            vehicle.no
+                          }{" "}
+                          •{" "}
+                          {
+                            vehicle.capacity
+                          }
+                        </option>
+                      )
+                    )}
+
+                  </select>
+
+                </div>
+
+                {/* Driver */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Driver
+                  </label>
+
+                  <select
+                    value={
+                      assignmentForm.driver
+                    }
+                    onChange={(e) =>
+                      setAssignmentForm(
+                        (prev) => ({
+                          ...prev,
+                          driver:
+                            e.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-[#005F99] focus:ring-2 focus:ring-[#005F99]/10 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  >
+
+                    <option value="">
+                      Select Driver
+                    </option>
+
+                    <option>
+                      Ravi Kumar
+                    </option>
+
+                    <option>
+                      Arun Kumar
+                    </option>
+
+                    <option>
+                      Mahesh
+                    </option>
+
+                    <option>
+                      Suresh Rao
+                    </option>
+
+                    <option>
+                      Prakash
+                    </option>
+
+                  </select>
+
+                </div>
+
+                {/* Dispatch */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Dispatch Order
+                  </label>
+
+                  <select
+                    value={
+                      assignmentForm.dispatch
+                    }
+                    onChange={(e) =>
+                      setAssignmentForm(
+                        (prev) => ({
+                          ...prev,
+                          dispatch:
+                            e.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none transition focus:border-[#005F99] focus:ring-2 focus:ring-[#005F99]/10 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  >
+
+                    <option value="">
+                      Select Dispatch
+                    </option>
+
+                    <option>
+                      DSP-2026-0001
+                    </option>
+
+                    <option>
+                      DSP-2026-0002
+                    </option>
+
+                    <option>
+                      DSP-2026-0003
+                    </option>
+
+                    <option>
+                      DSP-2026-0004
+                    </option>
+
+                  </select>
+
+                </div>
+
+                {/* Date */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Assignment Date
+                  </label>
+
+                  <input
+                    type="text"
+                    value={
+                      assignmentForm.assignmentDate
+                    }
+                    onChange={(e) =>
+                      setAssignmentForm(
+                        (prev) => ({
+                          ...prev,
+                          assignmentDate:
+                            e.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  />
+
+                </div>
+
+                {/* Shift */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Shift
+                  </label>
+
+                  <select
+                    value={
+                      assignmentForm.shift
+                    }
+                    onChange={(e) =>
+                      setAssignmentForm(
+                        (prev) => ({
+                          ...prev,
+                          shift:
+                            e.target
+                              .value,
+                        })
+                      )
+                    }
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  >
+
+                    <option>
+                      General
+                    </option>
+
+                    <option>
+                      Morning
+                    </option>
+
+                    <option>
+                      Afternoon
+                    </option>
+
+                    <option>
+                      Night
+                    </option>
+
+                  </select>
+
+                </div>
+
+                {/* Assignment Type */}
+
+                <div>
+
+                  <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                    Assignment Type
+                  </label>
+
+                  <select
+                    className="h-11 w-full rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-[#005F99] dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                  >
+
+                    <option>
+                      Primary Assignment
+                    </option>
+
+                    <option>
+                      Backup Vehicle
+                    </option>
+
+                    <option>
+                      Replacement
+                    </option>
+
+                  </select>
+
+                </div>
+
+              </div>
+
+              {/* Notes */}
+
+              <div className="mt-5">
+
+                <label className="mb-1.5 block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                  Assignment Notes
+                </label>
+
+                <textarea
+                  rows={3}
+                  value={
+                    assignmentForm.notes
+                  }
+                  onChange={(e) =>
+                    setAssignmentForm(
+                      (prev) => ({
+                        ...prev,
+                        notes:
+                          e.target
+                            .value,
+                      })
+                    )
+                  }
+                  placeholder="Add operational notes..."
+                  className="w-full resize-none rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-[#005F99] focus:ring-2 focus:ring-[#005F99]/10 dark:border-gray-700 dark:bg-gray-950 dark:text-white"
+                />
+
+              </div>
+
+              {/* Footer */}
+
+              <div className="mt-6 flex justify-end gap-3 border-t border-gray-100 pt-5 dark:border-gray-800">
+
+                <button
+                  type="button"
+                  onClick={
+                    closeAssignModal
+                  }
+                  className="rounded-xl border border-gray-200 px-5 py-2.5 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="submit"
+                  className="inline-flex items-center gap-2 rounded-xl bg-[#C8102E] px-6 py-2.5 text-sm font-bold text-white shadow-md shadow-[#C8102E]/20 transition hover:-translate-y-0.5 hover:bg-[#A80D26]"
+                >
+                  <CheckCircle2
+                    size={16}
+                  />
+                  Confirm Assignment
+                </button>
+
+              </div>
+
+            </form>
+
+          </div>
+
+        </div>
+      )}
+
+    </>
   );
 }
 
@@ -2559,43 +3556,339 @@ function ExecutionTab({
   dispatches: Dispatch[];
   onView: (item: Dispatch) => void;
 }) {
+  const [executionDispatches, setExecutionDispatches] =
+    useState<Dispatch[]>(dispatches);
+
+  const [selectedDispatch, setSelectedDispatch] =
+    useState<Dispatch | null>(null);
+
+  const [drawerOpen, setDrawerOpen] =
+    useState(false);
+
+  const [progressValue, setProgressValue] =
+    useState(0);
+
+  const [showDeliveryConfirm, setShowDeliveryConfirm] =
+    useState(false);
+
+  useEffect(() => {
+    setExecutionDispatches(dispatches);
+  }, [dispatches]);
+
+  /* ============================================================
+     OPEN EXECUTION DRAWER
+  ============================================================ */
+
+  const openExecutionDrawer = (item: Dispatch) => {
+    setSelectedDispatch(item);
+    setProgressValue(item.progress);
+    setDrawerOpen(true);
+  };
+
+  /* ============================================================
+     CLOSE DRAWER
+  ============================================================ */
+
+  const closeExecutionDrawer = () => {
+    setDrawerOpen(false);
+    setSelectedDispatch(null);
+    setShowDeliveryConfirm(false);
+  };
+
+  /* ============================================================
+     UPDATE DISPATCH
+  ============================================================ */
+
+  const updateDispatch = (
+    id: number,
+    updates: Partial<Dispatch>
+  ) => {
+    setExecutionDispatches((current) =>
+      current.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              ...updates,
+            }
+          : item
+      )
+    );
+
+    setSelectedDispatch((current) =>
+      current && current.id === id
+        ? {
+            ...current,
+            ...updates,
+          }
+        : current
+    );
+  };
+
+  /* ============================================================
+     PREPARE DISPATCH
+  ============================================================ */
+
+  const handlePrepareDispatch = () => {
+    if (!selectedDispatch) return;
+
+    updateDispatch(selectedDispatch.id, {
+      status: "Ready",
+      progress: 10,
+    });
+  };
+
+  /* ============================================================
+     START TRIP
+  ============================================================ */
+
+  const handleStartTrip = () => {
+    if (!selectedDispatch) return;
+
+    updateDispatch(selectedDispatch.id, {
+      status: "In Transit",
+      progress:
+        selectedDispatch.progress < 25
+          ? 25
+          : selectedDispatch.progress,
+    });
+  };
+
+  /* ============================================================
+     UPDATE PROGRESS
+  ============================================================ */
+
+  const handleUpdateProgress = () => {
+    if (!selectedDispatch) return;
+
+    updateDispatch(selectedDispatch.id, {
+      status:
+        progressValue >= 100
+          ? "Completed"
+          : "In Transit",
+      progress: progressValue,
+    });
+
+    if (progressValue >= 100) {
+      setShowDeliveryConfirm(true);
+    }
+  };
+
+  /* ============================================================
+     MARK DELIVERED
+  ============================================================ */
+
+  const handleMarkDelivered = () => {
+    if (!selectedDispatch) return;
+
+    updateDispatch(selectedDispatch.id, {
+      status: "Completed",
+      progress: 100,
+    });
+
+    setShowDeliveryConfirm(false);
+  };
+
+  /* ============================================================
+     STAGES
+  ============================================================ */
+
   const executionStages: {
     status: DispatchStatus;
     color: string;
+    gradient: string;
   }[] = [
     {
       status: "Planned",
       color: FORTUNA_BLUE,
+      gradient: "from-[#005F99] to-[#0077B8]",
     },
     {
       status: "Ready",
       color: FORTUNA_RED,
+      gradient: "from-[#C8102E] to-[#E52A45]",
     },
     {
       status: "In Transit",
       color: "#D97706",
+      gradient: "from-[#D97706] to-[#F59E0B]",
     },
     {
       status: "Completed",
       color: "#059669",
+      gradient: "from-[#059669] to-[#10B981]",
     },
   ];
 
+  const totalDispatches =
+    executionDispatches.length;
+
+  const plannedCount =
+    executionDispatches.filter(
+      (item) => item.status === "Planned"
+    ).length;
+
+  const readyCount =
+    executionDispatches.filter(
+      (item) => item.status === "Ready"
+    ).length;
+
+  const transitCount =
+    executionDispatches.filter(
+      (item) => item.status === "In Transit"
+    ).length;
+
+  const completedCount =
+    executionDispatches.filter(
+      (item) => item.status === "Completed"
+    ).length;
+
   return (
-    <div className="space-y-6">
+    <>
+      <div className="space-y-6">
 
-      <Panel
-        title="Dispatch Execution Board"
-        subtitle="Live operational status of today's dispatches."
-      >
+        {/* =====================================================
+            KPI CARDS
+        ===================================================== */}
 
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
 
-          {executionStages.map(
-            (stage) => {
+          {/* Total */}
+
+          <div className="relative overflow-hidden rounded-2xl border border-[#005F99]/15 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#005F99]/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between">
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#005F99]">
+                  Total Dispatches
+                </p>
+
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  {totalDispatches}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Today's execution volume
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#005F99] to-[#0077B8] text-white shadow-md">
+                <Truck size={19} />
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Ready */}
+
+          <div className="relative overflow-hidden rounded-2xl border border-[#C8102E]/15 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#C8102E]/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between">
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#C8102E]">
+                  Ready
+                </p>
+
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  {readyCount}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Ready for execution
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#C8102E] to-[#E52A45] text-white shadow-md">
+                <CheckCircle2 size={19} />
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Transit */}
+
+          <div className="relative overflow-hidden rounded-2xl border border-[#005F99]/15 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-[#005F99]/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between">
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[#005F99]">
+                  In Transit
+                </p>
+
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  {transitCount}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Active fleet movement
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-[#005F99] to-[#C8102E] text-white shadow-md">
+                <Navigation size={19} />
+              </div>
+
+            </div>
+
+          </div>
+
+          {/* Completed */}
+
+          <div className="relative overflow-hidden rounded-2xl border border-emerald-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-950">
+
+            <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-emerald-500/10 blur-2xl" />
+
+            <div className="relative flex items-center justify-between">
+
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-600">
+                  Completed
+                </p>
+
+                <p className="mt-2 text-2xl font-bold text-gray-900 dark:text-white">
+                  {completedCount}
+                </p>
+
+                <p className="mt-1 text-xs text-gray-500">
+                  Successfully delivered
+                </p>
+              </div>
+
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-400 text-white shadow-md">
+                <CheckCircle2 size={19} />
+              </div>
+
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* =====================================================
+            EXECUTION BOARD
+        ===================================================== */}
+
+        <Panel
+          title="Dispatch Execution Board"
+          subtitle="Live operational status of today's dispatches."
+        >
+
+          <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+
+            {executionStages.map((stage) => {
 
               const items =
-                dispatches.filter(
+                executionDispatches.filter(
                   (item) =>
                     item.status ===
                     stage.status
@@ -2603,210 +3896,657 @@ function ExecutionTab({
 
               return (
                 <div
-                  key={
-                    stage.status
-                  }
-                  className="rounded-2xl border border-gray-200 bg-gray-50/60 p-3 dark:border-gray-800 dark:bg-gray-950"
+                  key={stage.status}
+                  className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900"
                 >
 
-                  <div className="mb-3 flex items-center justify-between">
+                  {/* Header */}
 
-                    <div className="flex items-center gap-2">
+                  <div
+                    className={`bg-gradient-to-r ${stage.gradient} p-4 text-white`}
+                  >
 
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{
-                          backgroundColor:
-                            stage.color,
-                        }}
-                      />
+                    <div className="flex items-center justify-between">
 
-                      <span className="text-xs font-bold text-gray-700 dark:text-gray-300">
-                        {
-                          stage.status
-                        }
+                      <div className="flex items-center gap-2.5">
+
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15">
+                          <Truck size={15} />
+                        </div>
+
+                        <div>
+                          <p className="text-xs font-bold">
+                            {stage.status}
+                          </p>
+
+                          <p className="text-[10px] text-white/70">
+                            Dispatch stage
+                          </p>
+                        </div>
+
+                      </div>
+
+                      <span className="flex h-8 min-w-8 items-center justify-center rounded-full bg-white/15 px-2 text-xs font-bold">
+                        {items.length}
                       </span>
 
                     </div>
 
-                    <span className="rounded-full bg-white px-2 py-1 text-[10px] font-bold text-gray-500 shadow-sm dark:bg-gray-900">
-                      {
-                        items.length
-                      }
-                    </span>
-
                   </div>
 
-                  <div className="space-y-2">
+                  {/* Cards */}
 
-                    {items.length ===
-                    0 ? (
-                      <div className="rounded-xl border border-dashed border-gray-200 p-5 text-center text-[11px] text-gray-400 dark:border-gray-700">
-                        No dispatches
+                  <div className="space-y-3 p-3">
+
+                    {items.length === 0 ? (
+
+                      <div className="rounded-xl border border-dashed border-gray-200 bg-gray-50 p-7 text-center dark:border-gray-700 dark:bg-gray-950">
+
+                        <div
+                          className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full"
+                          style={{
+                            backgroundColor:
+                              `${stage.color}15`,
+                            color:
+                              stage.color,
+                          }}
+                        >
+                          <PackageCheck size={16} />
+                        </div>
+
+                        <p className="text-[11px] font-medium text-gray-400">
+                          No dispatches
+                        </p>
+
                       </div>
+
                     ) : (
-                      items.map(
-                        (item) => (
-                          <button
-                            key={
-                              item.id
-                            }
-                            onClick={() =>
-                              onView(
-                                item
-                              )
-                            }
-                            className="w-full rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition hover:-translate-y-0.5 hover:border-[#005F99]/30 hover:shadow-md dark:border-gray-800 dark:bg-gray-900"
-                          >
 
-                            <div className="flex items-center justify-between">
+                      items.map((item) => (
 
-                              <span className="text-xs font-bold text-gray-800 dark:text-white">
-                                {
-                                  item.dispatchNo
-                                }
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() =>
+                            openExecutionDrawer(
+                              item
+                            )
+                          }
+                          className="group w-full rounded-xl border border-gray-200 bg-white p-3 text-left shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-[#005F99]/30 hover:shadow-md dark:border-gray-800 dark:bg-gray-950"
+                        >
+
+                          <div className="flex items-center justify-between">
+
+                            <span className="text-xs font-bold text-gray-800 dark:text-white">
+                              {item.dispatchNo}
+                            </span>
+
+                            <span
+                              className="rounded-full px-2 py-1 text-[10px] font-bold"
+                              style={{
+                                backgroundColor:
+                                  `${stage.color}12`,
+                                color:
+                                  stage.color,
+                              }}
+                            >
+                              {item.progress}%
+                            </span>
+
+                          </div>
+
+                          <p className="mt-2 truncate text-xs font-semibold text-gray-700 dark:text-gray-300">
+                            {item.customer}
+                          </p>
+
+                          <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-400">
+
+                            <span className="truncate">
+                              {item.origin}
+                            </span>
+
+                            <ArrowRight
+                              size={10}
+                              className="shrink-0 text-[#C8102E]"
+                            />
+
+                            <span className="truncate">
+                              {item.destination}
+                            </span>
+
+                          </div>
+
+                          <div className="mt-3">
+
+                            <div className="mb-1 flex items-center justify-between">
+
+                              <span className="text-[9px] text-gray-400">
+                                Progress
                               </span>
 
-                              <span className="text-[10px] font-bold text-[#005F99]">
-                                {
-                                  item.progress
-                                }
-                                %
+                              <span
+                                className="text-[9px] font-bold"
+                                style={{
+                                  color:
+                                    stage.color,
+                                }}
+                              >
+                                {item.progress}%
                               </span>
 
                             </div>
 
-                            <p className="mt-2 text-xs font-semibold text-gray-700 dark:text-gray-300">
-                              {
-                                item.customer
-                              }
-                            </p>
-
-                            <div className="mt-2 flex items-center gap-1 text-[10px] text-gray-400">
-
-                              {
-                                item.origin
-                              }
-
-                              <ArrowRight
-                                size={10}
-                              />
-
-                              {
-                                item.destination
-                              }
-
-                            </div>
-
-                            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
+                            <div className="h-1.5 overflow-hidden rounded-full bg-gray-100 dark:bg-gray-800">
 
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-[#005F99] to-[#C8102E]"
                                 style={{
-                                  width: `${item.progress}%`,
+                                  width:
+                                    `${item.progress}%`,
                                 }}
                               />
 
                             </div>
 
-                          </button>
-                        )
-                      )
+                          </div>
+
+                          <div className="mt-3 flex justify-end">
+
+                            <span className="text-[10px] font-semibold text-[#005F99] opacity-0 transition group-hover:opacity-100">
+                              Manage Trip →
+                            </span>
+
+                          </div>
+
+                        </button>
+
+                      ))
+
                     )}
 
                   </div>
 
                 </div>
               );
-            }
-          )}
+            })}
 
-        </div>
+          </div>
 
-      </Panel>
+        </Panel>
 
-      {/* TIMELINE */}
+        {/* =====================================================
+            OPERATIONAL TIMELINE
+        ===================================================== */}
 
-      <Panel
-        title="Operational Timeline"
-        subtitle="Latest dispatch milestones."
-      >
+        <Panel
+          title="Operational Timeline"
+          subtitle="Latest dispatch milestones."
+        >
 
-        <div className="space-y-5">
+          <div className="space-y-1">
 
-          {dispatches
-            .slice(0, 5)
-            .map((item, index) => (
-              <div
-                key={item.id}
-                className="flex gap-4"
-              >
+            {executionDispatches
+              .slice(0, 5)
+              .map((item, index, array) => (
 
-                <div className="flex flex-col items-center">
+                <div
+                  key={item.id}
+                  className="flex gap-4 rounded-xl p-3 transition hover:bg-gray-50 dark:hover:bg-gray-800/40"
+                >
 
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-[#005F99] to-[#C8102E] text-white">
-                    <Truck
-                      size={15}
-                    />
+                  <div className="flex flex-col items-center">
+
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-[#005F99] to-[#C8102E] text-white shadow-md">
+                      <Truck size={16} />
+                    </div>
+
+                    {index < array.length - 1 && (
+                      <div className="mt-1 min-h-[45px] w-px bg-gradient-to-b from-[#005F99]/40 to-[#C8102E]/20" />
+                    )}
+
                   </div>
 
-                  {index !==
-                    dispatches.length -
-                      1 && (
-                    <div className="mt-1 h-full w-px bg-gray-200 dark:bg-gray-800" />
-                  )}
+                  <div className="min-w-0 flex-1 pb-4">
+
+                    <div className="flex flex-wrap items-center gap-2">
+
+                      <span className="text-sm font-bold text-gray-800 dark:text-white">
+                        {item.dispatchNo}
+                      </span>
+
+                      <StatusBadge
+                        status={item.status}
+                      />
+
+                    </div>
+
+                    <p className="mt-1 text-xs text-gray-500">
+                      {item.origin}
+                      {" → "}
+                      {item.destination}
+                    </p>
+
+                    <p className="mt-1 text-[10px] text-gray-400">
+                      Driver: {item.driver}
+                      {" • "}
+                      Vehicle: {item.vehicle}
+                    </p>
+
+                  </div>
 
                 </div>
 
-                <div className="pb-5">
+              ))}
 
-                  <div className="flex flex-wrap items-center gap-2">
+          </div>
 
-                    <span className="text-sm font-bold text-gray-800 dark:text-white">
-                      {
-                        item.dispatchNo
-                      }
-                    </span>
+        </Panel>
 
-                    <StatusBadge
-                      status={
-                        item.status
-                      }
+      </div>
+
+      {/* =====================================================
+          EXECUTION DRAWER
+      ===================================================== */}
+
+      {drawerOpen && selectedDispatch && (
+
+        <div className="fixed inset-0 z-[99999]">
+
+          {/* Backdrop */}
+
+          <button
+            type="button"
+            aria-label="Close execution drawer"
+            onClick={closeExecutionDrawer}
+            className="absolute inset-0 h-full w-full cursor-default bg-black/40 backdrop-blur-[2px]"
+          />
+
+          {/* Drawer */}
+
+          <div className="absolute right-0 top-0 h-full w-full max-w-[520px] overflow-y-auto bg-white shadow-2xl dark:bg-gray-950">
+
+            {/* Drawer Header */}
+
+            <div className="sticky top-0 z-10 bg-gradient-to-r from-[#005F99] to-[#C8102E] px-6 py-5 text-white">
+
+              <div className="flex items-start justify-between">
+
+                <div>
+
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-white/70">
+                    Trip Execution
+                  </p>
+
+                  <h2 className="mt-1 text-xl font-bold">
+                    {selectedDispatch.dispatchNo}
+                  </h2>
+
+                  <p className="mt-1 text-xs text-white/75">
+                    {selectedDispatch.customer}
+                  </p>
+
+                </div>
+
+                <button
+                  type="button"
+                  onClick={closeExecutionDrawer}
+                  className="flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white transition hover:bg-white/20"
+                >
+                  <X size={18} />
+                </button>
+
+              </div>
+
+            </div>
+
+            {/* Drawer Body */}
+
+            <div className="space-y-6 p-6">
+
+              {/* Status */}
+
+              <div className="flex items-center justify-between rounded-xl border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
+
+                <div>
+
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Current Status
+                  </p>
+
+                  <p className="mt-1 text-sm font-bold text-gray-900 dark:text-white">
+                    {selectedDispatch.status}
+                  </p>
+
+                </div>
+
+                <StatusBadge
+                  status={
+                    selectedDispatch.status
+                  }
+                />
+
+              </div>
+
+              {/* Route */}
+
+              <div>
+
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Route
+                </p>
+
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+
+                  <div className="flex items-center gap-3">
+
+                    <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#005F99]/10 text-[#005F99]">
+                      <MapPin size={16} />
+                    </div>
+
+                    <div className="min-w-0">
+
+                      <p className="text-[10px] text-gray-400">
+                        Origin
+                      </p>
+
+                      <p className="truncate text-sm font-bold text-gray-800 dark:text-white">
+                        {selectedDispatch.origin}
+                      </p>
+
+                    </div>
+
+                    <ArrowRight
+                      size={18}
+                      className="shrink-0 text-[#C8102E]"
                     />
+
+                    <div className="min-w-0">
+
+                      <p className="text-[10px] text-gray-400">
+                        Destination
+                      </p>
+
+                      <p className="truncate text-sm font-bold text-gray-800 dark:text-white">
+                        {selectedDispatch.destination}
+                      </p>
+
+                    </div>
 
                   </div>
 
-                  <p className="mt-1 text-xs text-gray-500">
-                    {
-                      item.origin
-                    }{" "}
-                    →{" "}
-                    {
-                      item.destination
-                    }
+                </div>
+
+              </div>
+
+              {/* Driver / Vehicle */}
+
+              <div className="grid grid-cols-2 gap-3">
+
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+
+                  <Users
+                    size={17}
+                    className="text-[#C8102E]"
+                  />
+
+                  <p className="mt-3 text-[10px] text-gray-400">
+                    Driver
                   </p>
 
-                  <p className="mt-1 text-[10px] text-gray-400">
-                    Driver:{" "}
-                    {
-                      item.driver
-                    }{" "}
-                    • Vehicle:{" "}
-                    {
-                      item.vehicle
-                    }
+                  <p className="mt-1 truncate text-sm font-bold text-gray-800 dark:text-white">
+                    {selectedDispatch.driver}
+                  </p>
+
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+
+                  <Truck
+                    size={17}
+                    className="text-[#005F99]"
+                  />
+
+                  <p className="mt-3 text-[10px] text-gray-400">
+                    Vehicle
+                  </p>
+
+                  <p className="mt-1 truncate text-sm font-bold text-gray-800 dark:text-white">
+                    {selectedDispatch.vehicle}
                   </p>
 
                 </div>
 
               </div>
-            ))}
+
+              {/* Progress */}
+
+              <div>
+
+                <div className="mb-3 flex items-center justify-between">
+
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                    Trip Progress
+                  </p>
+
+                  <span className="text-sm font-bold text-[#005F99]">
+                    {progressValue}%
+                  </span>
+
+                </div>
+
+                <div className="rounded-xl border border-gray-200 p-4 dark:border-gray-800">
+
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={progressValue}
+                    onChange={(e) =>
+                      setProgressValue(
+                        Number(e.target.value)
+                      )
+                    }
+                    disabled={
+                      selectedDispatch.status ===
+                      "Completed"
+                    }
+                    className="w-full accent-[#C8102E]"
+                  />
+
+                  <div className="mt-2 flex justify-between text-[9px] text-gray-400">
+                    <span>0%</span>
+                    <span>25%</span>
+                    <span>50%</span>
+                    <span>75%</span>
+                    <span>100%</span>
+                  </div>
+
+                </div>
+
+              </div>
+
+              {/* =================================================
+                  ACTIONS
+              ================================================= */}
+
+              <div>
+
+                <p className="mb-3 text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                  Execution Actions
+                </p>
+
+                <div className="space-y-2">
+
+                  {selectedDispatch.status ===
+                    "Planned" && (
+
+                    <button
+                      type="button"
+                      onClick={
+                        handlePrepareDispatch
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#005F99] to-[#0077B8] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+                    >
+                      <CheckCircle2
+                        size={16}
+                      />
+                      Prepare Dispatch
+                    </button>
+
+                  )}
+
+                  {selectedDispatch.status ===
+                    "Ready" && (
+
+                    <button
+                      type="button"
+                      onClick={
+                        handleStartTrip
+                      }
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#C8102E] to-[#E52A45] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+                    >
+                      <Navigation
+                        size={16}
+                      />
+                      Start Trip
+                    </button>
+
+                  )}
+
+                  {selectedDispatch.status ===
+                    "In Transit" && (
+
+                    <>
+
+                      <button
+                        type="button"
+                        onClick={
+                          handleUpdateProgress
+                        }
+                        className="flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#005F99] to-[#C8102E] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+                      >
+                        <RefreshCw
+                          size={16}
+                        />
+                        Update Trip Progress
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setShowDeliveryConfirm(
+                            true
+                          )
+                        }
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#C8102E]/20 bg-[#C8102E]/5 px-4 py-3 text-sm font-bold text-[#C8102E] transition hover:bg-[#C8102E]/10"
+                      >
+                        <CheckCircle2
+                          size={16}
+                        />
+                        Mark Delivered
+                      </button>
+
+                    </>
+
+                  )}
+
+                  {selectedDispatch.status ===
+                    "Completed" && (
+
+                    <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-center">
+
+                      <CheckCircle2
+                        size={24}
+                        className="mx-auto text-emerald-600"
+                      />
+
+                      <p className="mt-2 text-sm font-bold text-emerald-700">
+                        Delivery Completed
+                      </p>
+
+                      <p className="mt-1 text-[10px] text-emerald-600">
+                        This dispatch has completed its execution cycle.
+                      </p>
+
+                    </div>
+
+                  )}
+
+                </div>
+
+              </div>
+
+            </div>
+
+          </div>
 
         </div>
 
-      </Panel>
+      )}
 
-    </div>
+      {/* =====================================================
+          DELIVERY CONFIRMATION
+      ===================================================== */}
+
+      {showDeliveryConfirm &&
+        selectedDispatch && (
+
+          <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl dark:bg-gray-950">
+
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-[#C8102E]/10 text-[#C8102E]">
+                <CheckCircle2
+                  size={23}
+                />
+              </div>
+
+              <h3 className="mt-4 text-center text-lg font-bold text-gray-900 dark:text-white">
+                Confirm Delivery
+              </h3>
+
+              <p className="mt-2 text-center text-xs leading-5 text-gray-500">
+                Are you sure you want to mark{" "}
+                <span className="font-bold text-gray-800 dark:text-gray-200">
+                  {selectedDispatch.dispatchNo}
+                </span>{" "}
+                as delivered?
+              </p>
+
+              <div className="mt-6 grid grid-cols-2 gap-3">
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setShowDeliveryConfirm(
+                      false
+                    )
+                  }
+                  className="rounded-xl border border-gray-200 px-4 py-3 text-sm font-semibold text-gray-600 transition hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-900"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  onClick={
+                    handleMarkDelivered
+                  }
+                  className="rounded-xl bg-gradient-to-r from-[#C8102E] to-[#E52A45] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:shadow-lg"
+                >
+                  Confirm Delivery
+                </button>
+
+              </div>
+
+            </div>
+
+          </div>
+
+        )}
+
+    </>
   );
 }
 
