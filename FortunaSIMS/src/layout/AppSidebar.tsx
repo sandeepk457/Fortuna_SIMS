@@ -126,7 +126,7 @@ const navItems: NavItem[] = [
           { name: "Driver Master", path: "/drivermaster" },
           { name: "Dispatch Planning", path: "/dispatchplanning" },
           { name: "Live Tracking", path: "/LiveTracking" },
-          { name: "Trip Sheet Management", path: "sims/logistics/trip-sheet" },
+          { name: "Trip Sheet Management", path: "/Tripsheetmanagement" },
           { name: "Fuel & Maintenance Logs", path: "sims/logistics/maintenance" },
         ],
       },
