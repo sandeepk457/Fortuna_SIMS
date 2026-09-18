@@ -3,11 +3,10 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 
 const pool = new Pool({
-  host: "localhost",
-  port: 5432,
-  user: "postgres",
-  password: process.env.DB_PASSWORD,
-  database: "fortuna_sims_db",
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false,
+  },
 });
 
 const transporter = nodemailer.createTransport({
@@ -54,8 +53,11 @@ export async function POST(req) {
     // const resetLink =
     //   `http://localhost:3000/reset-password?token=${token}`;
 
-      const resetLink =
-   `http://localhost:3000/reset-password?token=${token}`;
+      const appUrl =
+  process.env.APP_URL || "http://localhost:3000";
+
+const resetLink =
+  `${appUrl}/reset-password?token=${token}`;
 
     await transporter.sendMail({
       to: email,

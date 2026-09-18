@@ -1,11 +1,20 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { SubmitEvent } from "react";
+import type { CSSProperties } from "react";
+
+interface ForgotPasswordPopupProps {
+  open: boolean;
+  onClose?: () => void;
+  onSent?: () => void;
+}
 
 const FORTUNA_PRIMARY = "#C8102E";
 const FORTUNA_BLUE = "#005F99";
 
-export default function ForgotPasswordPopup({ open, onClose, onSent }) {
+export default function ForgotPasswordPopup({ open, onClose, onSent }: ForgotPasswordPopupProps) {
+  
 
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
@@ -27,13 +36,13 @@ export default function ForgotPasswordPopup({ open, onClose, onSent }) {
   }, [open]);
 
   useEffect(() => {
-    const onEsc = (e) => e.key === "Escape" && open && onClose?.();
+    const onEsc = (e: KeyboardEvent) => e.key === "Escape" && open && onClose?.();
     window.addEventListener("keydown", onEsc);
     return () => window.removeEventListener("keydown", onEsc);
   }, [open, onClose]);
 
   // ✅ ADD THIS FUNCTION
-  const handleSend = async (e) => {
+  const handleSend = async (e: SubmitEvent<HTMLFormElement>) => {
     e.preventDefault();
 
     if (!isValidEmail) {
@@ -130,7 +139,11 @@ export default function ForgotPasswordPopup({ open, onClose, onSent }) {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="yourname@company.com"
               className="mt-2 w-full rounded-xl border border-gray-200 bg-[#EFF6FF] px-4 py-3 outline-none focus:ring-2"
-              style={{ "--tw-ring-color": FORTUNA_BLUE }}
+              style={
+  {
+    "--tw-ring-color": FORTUNA_BLUE,
+  } as CSSProperties
+}
             />
 
             <div className="mt-2 text-xs text-gray-500">
