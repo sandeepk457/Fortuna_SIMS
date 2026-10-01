@@ -59,7 +59,7 @@ export default function VendorMasterListPage() {
   }, []);
 
   // ✅ DELETE FUNCTION
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     const confirmDelete = confirm("Are you sure to Delete this Vendor?");
     if (!confirmDelete) return;
 
@@ -85,11 +85,20 @@ export default function VendorMasterListPage() {
 // edit: moved up for better organization
 
 // GET BY ID (FOR EDIT)
-const getVendorById = async (req, res) => {
+const getVendorById = async (
+  req: { params: { id: string } },
+  res: {
+    status: (code: number) => { json: (payload: any) => any };
+    json: (payload: any) => any;
+  }
+) => {
+  const pool: any = (globalThis as any).pool;
+
   try {
     const { id } = req.params;
 
-    const result = await pool.query(`
+    const result = await pool.query(
+      `
       SELECT 
         v.*,
         vc.currency,
@@ -112,17 +121,18 @@ const getVendorById = async (req, res) => {
       LEFT JOIN vendor_commercials vc ON v.id = vc.vendor_id
       LEFT JOIN vendor_compliance vcom ON v.id = vcom.vendor_id
       WHERE v.id = $1 AND v.is_deleted = false
-    `, [id]);
+    `,
+      [id]
+    );
 
     if (result.rows.length === 0) {
       return res.status(404).json({ error: "Vendor not found" });
     }
 
     res.json(result.rows[0]);
-
-  } catch (err) {
+  } catch (err: any) {
     console.error(err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ error: err.message || "Internal server error" });
   }
 };
 
