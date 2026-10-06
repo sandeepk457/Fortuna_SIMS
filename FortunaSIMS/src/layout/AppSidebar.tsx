@@ -66,6 +66,7 @@ const navItems: NavItem[] = [
       {
         name: "Inventory & (WMS)",
         subItems: [
+          { name: "ASN List", path: "/asn/list" },
           { name: "Goods Inward / Receive", path: "/GoodsInwardList" },
           { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
           {

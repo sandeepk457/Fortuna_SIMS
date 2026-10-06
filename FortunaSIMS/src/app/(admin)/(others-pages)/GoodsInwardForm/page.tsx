@@ -24,6 +24,7 @@ type GIStatus =
   | "QC Pending"
   | "QC Passed"
   | "QC Failed"
+  | "Putaway"
   | "Converted to GRN"
   | "Cancelled";
 
@@ -57,12 +58,45 @@ type PORef = {
 
 type DockDoor = "D1" | "D2" | "D3" | "D4";
 type InboundMode = "ASN/Pre-Receiving" | "Direct (No ASN)";
+type ASNStatus = "Draft" | "Submitted" | "In Transit" | "Arrived" | "Partially Received" | "Fully Received" | "Closed";
+type DeliverySchedule = "Single Delivery" | "Partial Delivery";
+
+type ASNItem = {
+  id: string;
+  lineNo: number;
+  sku: string;
+  description: string;
+  uom: string;
+  poQty: number;
+  previousASNQty: number;
+  shippingQty: number;
+  remainingPOQty: number;
+};
+
+type ASNRef = {
+  id: string;
+  asnNo: string;
+  asnDate: string;
+  shipmentDate?: string;
+  expectedArrival?: string;
+  status: ASNStatus;
+  deliverySchedule: DeliverySchedule;
+  poNo: string;
+  poDate?: string;
+  vendorName: string;
+  vendorCode: string;
+  warehouse: string;
+  items: ASNItem[];
+};
+
 type PutawayStatus = "Not Created" | "Created" | "In Progress" | "Completed";
 
 type InboundShipment = {
   id: string;
   shipmentNo: string;
   mode: InboundMode;
+  asnId?: string;
+  asnNo?: string;
   appointmentNo?: string;
 
   gateEntryNo: string;
@@ -94,6 +128,8 @@ type GIItem = {
   uom: string;
 
   poQty?: number;
+  asnQty?: number;
+  asnNo?: string;
   expectedQty: number;
 
   receivedQty: number; // final (supervisor sync)
@@ -116,6 +152,8 @@ type ReceivingLog = {
 
   shipmentId: string;
   shipmentNo: string;
+  asnId?: string;
+  asnNo?: string;
 
   poNo: string;
 
@@ -139,6 +177,8 @@ type LPN = {
 
   shipmentId: string;
   shipmentNo: string;
+  asnId?: string;
+  asnNo?: string;
 
   poNo: string;
   itemId: string;
@@ -213,6 +253,45 @@ function nowISO() {
 /** Prefill handoff key */
 const LS_PREFILL_TO_GRN_KEY = "FORTUNA_GRN_PREFILL_FROM_GI_V6";
 
+const DEMO_ASNS: ASNRef[] = [
+  {
+    id: "asn-demo-001",
+    asnNo: "ASN-2026-0001",
+    asnDate: "2026-10-06",
+    shipmentDate: "2026-10-06",
+    expectedArrival: "2026-10-07",
+    status: "In Transit",
+    deliverySchedule: "Single Delivery",
+    poNo: "PO-2026-0121",
+    poDate: "2026-02-10",
+    vendorName: "Sri Lakshmi Suppliers",
+    vendorCode: "V-001",
+    warehouse: "WH-002",
+    items: [
+      { id: "asn-item-001", lineNo: 1, sku: "SKU-BOX-5PLY", description: "Corrugated Box (5-ply)", uom: "Nos", poQty: 200, previousASNQty: 0, shippingQty: 200, remainingPOQty: 200 },
+      { id: "asn-item-002", lineNo: 2, sku: "SKU-BUBBLE-L", description: "Bubble Wrap Roll (Large)", uom: "Box", poQty: 20, previousASNQty: 0, shippingQty: 20, remainingPOQty: 20 },
+    ],
+  },
+  {
+    id: "asn-demo-002",
+    asnNo: "ASN-2026-0002",
+    asnDate: "2026-10-06",
+    shipmentDate: "2026-10-06",
+    expectedArrival: "2026-10-08",
+    status: "Submitted",
+    deliverySchedule: "Partial Delivery",
+    poNo: "PO-2026-00110",
+    poDate: "2026-01-25",
+    vendorName: "Sri Lakshmi Suppliers",
+    vendorCode: "V-001",
+    warehouse: "WH-002",
+    items: [
+      { id: "asn-item-003", lineNo: 1, sku: "SKU-TAPE-IND", description: "Industrial Packing Tape", uom: "Nos", poQty: 100, previousASNQty: 40, shippingQty: 60, remainingPOQty: 60 },
+      { id: "asn-item-004", lineNo: 2, sku: "SKU-LABEL-SHIP", description: "Shipping Labels", uom: "Nos", poQty: 250, previousASNQty: 100, shippingQty: 150, remainingPOQty: 150 },
+    ],
+  },
+];
+
 /** UI tokens */
 const inputBase =
   "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 " +
@@ -249,6 +328,12 @@ export default function GoodsInwardCreatePage() {
   /** Modal (for unlink confirm + others) */
   const [modal, setModal] = useState<ModalState>({ open: false });
 
+  /** ASN */
+  const [asnMode, setAsnMode] = useState(false);
+  const [selectedASNId, setSelectedASNId] = useState("");
+  const [asnMaster] = useState<ASNRef[]>(DEMO_ASNS);
+  const selectedASN = useMemo(() => asnMaster.find((x) => x.id === selectedASNId) || null, [asnMaster, selectedASNId]);
+
   /** Basic */
   const [giNo, setGiNo] = useState("GI-2026-0010");
   const [giDate, setGiDate] = useState(formatDateISO());
@@ -284,6 +369,8 @@ export default function GoodsInwardCreatePage() {
       id: uid("shp"),
       shipmentNo: "SHP-2026-0001",
       mode: "Direct (No ASN)",
+      asnId: undefined,
+      asnNo: undefined,
       appointmentNo: "",
       gateEntryNo: "GE-2026-0501",
       vehicleType: "Truck",
@@ -323,6 +410,8 @@ export default function GoodsInwardCreatePage() {
       description: "Corrugated Box (5-ply)",
       uom: "Nos",
       poQty: 200,
+      asnQty: undefined,
+      asnNo: undefined,
       expectedQty: 200,
       receivedQty: 0,
       damageQty: 0,
@@ -341,6 +430,8 @@ export default function GoodsInwardCreatePage() {
       description: "Bubble Wrap Roll (Large)",
       uom: "Box",
       poQty: 20,
+      asnQty: undefined,
+      asnNo: undefined,
       expectedQty: 20,
       receivedQty: 0,
       damageQty: 0,
@@ -379,9 +470,22 @@ export default function GoodsInwardCreatePage() {
   /** UI */
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  /** Locks */
-  const lockedAfterInward = status !== "Live" && status !== "Inward Assigned" && status !== "Inward In-Progress";
+  /** Workflow locks / actions */
+  const lockedAfterInward =
+    status !== "Live" &&
+    status !== "Inward Assigned" &&
+    status !== "Inward In-Progress";
   const isConverted = status === "Converted to GRN";
+
+  // GI can be started only once from the Live state.
+  const canStartInward = status === "Live" && !isConverted;
+
+  // Physical receiving must exist before the GI can be completed.
+  // Short / excess quantities are handled in Item Plan as discrepancies.
+  const canCompleteInward =
+    !isConverted &&
+    status === "Inward In-Progress" &&
+    receivingLogs.length > 0;
 
   /** Live mobile qty per item from logs */
   useEffect(() => {
@@ -409,6 +513,55 @@ export default function GoodsInwardCreatePage() {
     return "Z-A-01-01";
   };
 
+  /** ASN helpers */
+  const getASNItem = (sku: string) => selectedASN?.items.find((x) => x.sku === sku) || null;
+
+  const applyASN = (asnId: string) => {
+    const asn = asnMaster.find((x) => x.id === asnId);
+    if (!asn) return;
+
+    setAsnMode(true);
+    setSelectedASNId(asn.id);
+    setInwardSource("Issued PO");
+    setWarehouse(asn.warehouse);
+    setReceiptType(asn.deliverySchedule === "Partial Delivery" ? "Partial" : "Full");
+    setPoRefs([{ poNo: asn.poNo, poDate: asn.poDate, vendorName: asn.vendorName, vendorCode: asn.vendorCode }]);
+
+    const nextItems: GIItem[] = asn.items.map((x) => ({
+      id: uid("it"), lineNo: x.lineNo, sku: x.sku, description: x.description, uom: x.uom,
+      poQty: x.poQty, asnQty: x.shippingQty, asnNo: asn.asnNo, expectedQty: x.shippingQty,
+      receivedQty: 0, damageQty: 0, shortQty: 0, overQty: 0, overAction: "Quarantine",
+      qcRequired: x.sku === "SKU-BOX-5PLY", qcStatus: "Pending", qcRemarks: "", mobileReceivedQty: 0,
+    }));
+    setItems(nextItems);
+    setMobileItemId(nextItems[0]?.id ?? "");
+    setMobileQty(0);
+
+    setShipments((prev) => prev.map((s) => ({
+      ...s,
+      mode: "ASN/Pre-Receiving",
+      asnId: asn.id,
+      asnNo: asn.asnNo,
+      linkedPOs: [asn.poNo],
+    })));
+
+    setMobilePoNo(asn.poNo);
+    setReceivingLogs([]);
+    setLpns([]);
+    setPutawayTasks([]);
+    setErrors({});
+    setActiveTab("basic");
+    showToast(`${asn.asnNo} loaded. PO, shipments and item plan updated.`);
+  };
+
+  const removeASNLink = () => {
+    if (lockedAfterInward) return showToast("ASN link is locked after receiving starts.");
+    setAsnMode(false);
+    setSelectedASNId("");
+    setShipments((prev) => prev.map((s) => ({ ...s, mode: "Direct (No ASN)", asnId: undefined, asnNo: undefined })));
+    showToast("ASN link removed. Direct receiving enabled.");
+  };
+
   /** Validation */
   const validate = () => {
     const e: Record<string, string> = {};
@@ -427,6 +580,8 @@ export default function GoodsInwardCreatePage() {
       if (!hasPo) e.poNo = "At least 1 PO is required";
     }
 
+    if (asnMode && !selectedASN) e.asn = "Select an eligible ASN";
+
     if (!shipments.length) e.shipments = "At least 1 shipment required";
     shipments.forEach((s) => {
       if (!s.gateEntryNo.trim()) e[`shp_gate_${s.id}`] = "Gate Entry required";
@@ -435,6 +590,8 @@ export default function GoodsInwardCreatePage() {
       if (!s.stagingArea.trim()) e[`shp_stage_${s.id}`] = "Staging area required";
       if (inwardSource === "Issued PO" && (!s.linkedPOs || s.linkedPOs.length === 0))
         e[`shp_pos_${s.id}`] = "Link at least 1 PO to this shipment";
+      if (asnMode && selectedASN && (s.asnId !== selectedASN.id || s.asnNo !== selectedASN.asnNo))
+        e[`shp_asn_${s.id}`] = "Shipment must be linked to the selected ASN";
     });
 
     if (!items.length) e.items = "At least 1 item required";
@@ -443,6 +600,11 @@ export default function GoodsInwardCreatePage() {
       if (safeNum(it.expectedQty) < 0) e[`expected_${it.id}`] = "Expected qty invalid";
       if (safeNum(it.receivedQty) < 0) e[`received_${it.id}`] = "Received qty invalid";
       if (it.overQty > 0 && !it.overAction) e[`overAction_${it.id}`] = "Select over action";
+      if (asnMode && selectedASN) {
+        const ai = getASNItem(it.sku);
+        if (!ai) e[`asn_item_${it.id}`] = "Item is not part of selected ASN";
+        else if (safeNum(it.expectedQty) !== safeNum(ai.shippingQty)) e[`asn_qty_${it.id}`] = `Expected Qty must match ASN Qty (${ai.shippingQty})`;
+      }
     });
 
     setErrors(e);
@@ -560,7 +722,9 @@ export default function GoodsInwardCreatePage() {
       {
         id: uid("shp"),
         shipmentNo: `SHP-2026-${String(p.length + 1).padStart(4, "0")}`,
-        mode: "Direct (No ASN)",
+        mode: asnMode ? "ASN/Pre-Receiving" : "Direct (No ASN)",
+        asnId: asnMode ? selectedASN?.id : undefined,
+        asnNo: asnMode ? selectedASN?.asnNo : undefined,
         appointmentNo: "",
         gateEntryNo,
         vehicleType,
@@ -665,14 +829,18 @@ export default function GoodsInwardCreatePage() {
 
   /** Start live inbound */
   const assignAndStartInward = () => {
+    if (!canStartInward) {
+      showToast("This GI has already started. Continue with Mobile Receiving.");
+      return;
+    }
     if (!validate()) {
       setActiveTab("basic");
-      showToast("Fix errors (PO/Shipment/Vehicle/Assignment) before starting inbound.");
+      showToast("Fix the highlighted Basic / Shipment / Assignment fields first.");
       return;
     }
     setStatus("Inward Assigned");
     setActiveTab("mobile");
-    showToast("Inbound assigned. Go to Mobile Receiving.");
+    showToast("Inward assigned. Start physical receiving from Mobile Receiving.");
   };
 
   /** Mobile receive: creates LPN + log (live) */
@@ -699,6 +867,16 @@ export default function GoodsInwardCreatePage() {
     const qty = safeNum(mobileQty);
     if (qty <= 0) return showToast("Enter valid qty.");
 
+    if (asnMode) {
+      if (!selectedASN) return showToast("Select ASN before receiving.");
+      if (shp.asnId !== selectedASN.id) return showToast("Shipment is not linked to the selected ASN.");
+      const asnItem = selectedASN.items.find((x) => x.sku === it.sku);
+      if (!asnItem) return showToast("Selected item is not part of the ASN.");
+      const alreadyReceived = receivingLogs.filter((l) => l.asnId === selectedASN.id && l.sku === it.sku).reduce((sum, l) => sum + safeNum(l.qty), 0);
+      const remainingASNQty = Math.max(0, safeNum(asnItem.shippingQty) - alreadyReceived);
+      if (qty > remainingASNQty) return showToast(`ASN remaining qty is only ${remainingASNQty}.`);
+    }
+
     const lpnId = uid("lpn");
     const lpnNo = `LPN-${new Date().getFullYear()}-${Math.random().toString(16).slice(2, 6).toUpperCase()}`;
 
@@ -711,6 +889,8 @@ export default function GoodsInwardCreatePage() {
       lpnNo,
       shipmentId: shp.id,
       shipmentNo: shp.shipmentNo,
+      asnId: asnMode ? selectedASN?.id : undefined,
+      asnNo: asnMode ? selectedASN?.asnNo : undefined,
       poNo,
       itemId: it.id,
       sku: it.sku,
@@ -726,6 +906,8 @@ export default function GoodsInwardCreatePage() {
       giNo,
       shipmentId: shp.id,
       shipmentNo: shp.shipmentNo,
+      asnId: asnMode ? selectedASN?.id : undefined,
+      asnNo: asnMode ? selectedASN?.asnNo : undefined,
       poNo,
       receiverId: r.id,
       receiverName: r.name,
@@ -752,23 +934,48 @@ export default function GoodsInwardCreatePage() {
     showToast(`Received ${qty} • ${it.sku} • ${lpnNo}`);
   };
 
-  /** Supervisor finalize: sync mobile totals into final received */
-  const syncMobileToFinal = () => {
+  /** Complete physical receiving and close the inbound stage. */
+  const completeInward = () => {
+    if (!canCompleteInward) {
+      setActiveTab("mobile");
+      if (status === "Live") {
+        showToast("Click Assign & Start before completing the inward.");
+      } else if (status === "Inward Assigned") {
+        showToast("No receiving transaction yet. Receive the material first.");
+      } else {
+        showToast("Receiving is not ready to be completed.");
+      }
+      return;
+    }
+
+    if (!validate()) {
+      setActiveTab("basic");
+      showToast("Fix the highlighted fields before completing the inward.");
+      return;
+    }
+
+    const byItem: Record<string, number> = {};
+    receivingLogs.forEach((l) => {
+      byItem[l.itemId] = (byItem[l.itemId] ?? 0) + safeNum(l.qty);
+    });
+
+    const receivedTotal = Object.values(byItem).reduce((sum, qty) => sum + qty, 0);
+    const expectedTotal = items.reduce((sum, x) => sum + safeNum(x.expectedQty), 0);
+    const discrepancyTotal = Math.max(0, expectedTotal - receivedTotal);
+
     setModal({
       open: true,
-      title: "Supervisor Sync?",
-      message: "Sync live mobile totals to Final Received Qty (demo supervisor action).",
-      confirmText: "Sync",
-      cancelText: "Cancel",
+      title: "Complete Goods Inward?",
+      message:
+        discrepancyTotal > 0
+          ? `Receiving recorded ${receivedTotal} against ${expectedTotal} expected. The difference will remain as a receiving discrepancy for review. Complete inward?`
+          : `Receiving recorded ${receivedTotal} against ${expectedTotal} expected. Complete the gate receiving process and mark this GI Inwarded?`,
+      confirmText: "Complete Inward",
+      cancelText: "Continue Receiving",
       onConfirm: () => {
         setModal({ open: false });
-        const byItem: Record<string, number> = {};
-        receivingLogs.forEach((l) => {
-          byItem[l.itemId] = (byItem[l.itemId] ?? 0) + safeNum(l.qty);
-        });
-
-        setItems((p) =>
-          p.map((x) => {
+        setItems((prev) =>
+          prev.map((x) => {
             const received = byItem[x.id] ?? 0;
             const expected = safeNum(x.expectedQty);
             return {
@@ -779,40 +986,19 @@ export default function GoodsInwardCreatePage() {
             };
           })
         );
-
-        setShipments((p) =>
-          p.map((s) => (s.status === "Receiving" ? { ...s, status: "Receiving Done" } : s))
+        setShipments((prev) =>
+          prev.map((s) => s.status === "Receiving" ? { ...s, status: "Receiving Done" } : s)
         );
-
-        showToast("Final received updated ✅");
-      },
-    });
-  };
-
-  const markInwarded = () => {
-    if (!validate()) {
-      setActiveTab("basic");
-      showToast("Fix validation errors before Mark Inwarded.");
-      return;
-    }
-    setModal({
-      open: true,
-      title: "Mark Inwarded?",
-      message: "Confirm inwarded? (Gate receipt completed)",
-      confirmText: "Confirm",
-      cancelText: "Cancel",
-      onConfirm: () => {
-        setModal({ open: false });
         setStatus("Inwarded");
         setActiveTab("items");
-        showToast("Status updated: Inwarded");
+        showToast("Goods Inward completed successfully.");
       },
     });
   };
 
   /** QC */
   const sendToQC = () => {
-    if (status === "Live") return showToast("Start receiving first.");
+    if (status !== "Inwarded") return showToast("Complete Goods Inward first.");
     const hasQC = items.some((x) => x.qcRequired);
     if (!hasQC) return showToast("No QC required lines. You can convert to GRN.");
     setStatus("QC Pending");
@@ -823,19 +1009,66 @@ export default function GoodsInwardCreatePage() {
   const qcDecision = (decision: "Passed" | "Failed") => {
     const hasQC = items.some((x) => x.qcRequired);
     if (!hasQC) return showToast("No QC required lines.");
+    if (receivingLogs.length === 0 || lpns.length === 0) {
+      return showToast("Complete Mobile Receiving first. QC requires received LPNs.");
+    }
 
     const remark = decision === "Failed" ? (qcFailReason.trim() || "QC Failed") : "QC Passed";
     setItems((p) => p.map((x) => (x.qcRequired ? { ...x, qcStatus: decision, qcRemarks: remark } : x)));
+
+    // QC Passed must release QC-held LPNs so Putaway can consume them.
+    if (decision === "Passed") {
+      setLpns((prev) =>
+        prev.map((l) => {
+          const item = items.find((x) => x.id === l.itemId);
+          if (!item || !item.qcRequired) return l;
+          return {
+            ...l,
+            qcHold: false,
+            fromBin:
+              l.fromBin === "QC_HOLD"
+                ? shipments.find((s) => s.id === l.shipmentId)?.stagingArea || "STG-GEN"
+                : l.fromBin,
+            toBin: l.toBin || suggestBin(l.sku),
+            putawayStatus: "Not Created",
+          };
+        })
+      );
+    }
+
     setStatus(decision === "Passed" ? "QC Passed" : "QC Failed");
-    setActiveTab("status");
-    showToast(`QC ${decision}`);
+    setActiveTab(decision === "Passed" ? "putaway" : "qc");
+    showToast(
+      decision === "Passed"
+        ? "QC Passed. LPNs released for Putaway."
+        : "QC Failed. LPNs remain in QC Hold."
+    );
   };
 
   /** Putaway */
   const generatePutawayTasks = () => {
-    const pending = lpns.filter((l) => l.putawayStatus === "Not Created" && !l.qcHold);
+    if (status === "Live" || status === "Inward Assigned" || status === "Inward In-Progress") {
+      return showToast("Complete Goods Inward before generating Putaway tasks.");
+    }
+    if (status === "QC Pending" || status === "QC Failed") {
+      return showToast("QC must be completed before Putaway.");
+    }
+
+    const qcBlocked = items.some((x) => x.qcRequired && x.qcStatus !== "Passed");
+    if (qcBlocked) return showToast("All QC-required items must pass QC before Putaway.");
+
+    if (!lpns.length) {
+      setActiveTab("mobile");
+      return showToast("No LPNs found. Complete Mobile Receiving first.");
+    }
+
+    const pending = lpns.filter((l) => l.putawayStatus === "Not Created" && !l.qcHold && l.qty > 0);
     if (!pending.length) {
-      return showToast("No LPNs pending for putaway (QC-hold LPNs are excluded).");
+      return showToast(
+        putawayTasks.length > 0
+          ? "Putaway tasks already exist or are completed."
+          : "No eligible LPNs pending for Putaway."
+      );
     }
 
     const tasks: PutawayTask[] = pending.map((l) => ({
@@ -851,11 +1084,10 @@ export default function GoodsInwardCreatePage() {
 
     setPutawayTasks((p) => [...tasks, ...p]);
     setLpns((p) =>
-      p.map((l) =>
-        l.putawayStatus === "Not Created" && !l.qcHold ? { ...l, putawayStatus: "Created" } : l
-      )
+      p.map((l) => (pending.some((x) => x.id === l.id) ? { ...l, putawayStatus: "Created" } : l))
     );
-    showToast(`Putaway tasks created ✅ (${tasks.length})`);
+    setStatus("Putaway");
+    showToast(`Putaway tasks created (${tasks.length})`);
   };
 
   const confirmPutaway = (taskId: string) => {
@@ -874,9 +1106,13 @@ export default function GoodsInwardCreatePage() {
           p.map((x) => (x.id === taskId ? { ...x, status: "Confirmed", confirmedAtISO: nowISO() } : x))
         );
         setLpns((p) =>
-          p.map((l) => (l.id === t.lpnId ? { ...l, fromBin: t.toBin, putawayStatus: "Completed" } : l))
+          p.map((l) =>
+            l.id === t.lpnId
+              ? { ...l, fromBin: t.toBin, toBin: t.toBin, putawayStatus: "Completed" }
+              : l
+          )
         );
-        showToast("Putaway confirmed ✅");
+        showToast("Putaway confirmed");
       },
     });
   };
@@ -884,12 +1120,15 @@ export default function GoodsInwardCreatePage() {
   /** Convert gating */
   const canConvertToGRN = useMemo(() => {
     if (status === "Converted to GRN") return false;
-    if (status !== "Inwarded" && status !== "QC Passed") return false;
+    if (status !== "Putaway") return false;
 
     const qcOk = items.every((x) => (x.qcRequired ? x.qcStatus === "Passed" : true));
     const overOk = items.every((x) => (x.overQty > 0 ? Boolean(x.overAction) : true));
-    return qcOk && overOk;
-  }, [status, items]);
+    const eligibleLpns = lpns.filter((l) => !l.qcHold && l.qty > 0);
+    const putawayOk = eligibleLpns.length > 0 && eligibleLpns.every((l) => l.putawayStatus === "Completed");
+    const tasksOk = putawayTasks.length > 0 && putawayTasks.every((t) => t.status === "Confirmed");
+    return qcOk && overOk && putawayOk && tasksOk;
+  }, [status, items, lpns, putawayTasks]);
 
   const convertToGRN = () => {
     if (!canConvertToGRN) {
@@ -944,9 +1183,9 @@ export default function GoodsInwardCreatePage() {
   /** CSV export logs */
   const exportLogsCSV = () => {
     if (!receivingLogs.length) return showToast("No logs to export.");
-    const header = ["GI", "Shipment", "PO", "Receiver", "SKU", "Qty", "LPN", "ReceivedAt"];
+    const header = ["GI", "ASN", "Shipment", "PO", "Receiver", "SKU", "Qty", "LPN", "ReceivedAt"];
     const rows = receivingLogs.map((l) =>
-      [l.giNo, l.shipmentNo, l.poNo || "-", l.receiverName, l.sku, l.qty, l.lpnNo, l.receivedAtISO]
+      [l.giNo, l.asnNo || "-", l.shipmentNo, l.poNo || "-", l.receiverName, l.sku, l.qty, l.lpnNo, l.receivedAtISO]
         .map((x) => `"${String(x).replace(/"/g, '""')}"`)
         .join(",")
     );
@@ -969,6 +1208,7 @@ export default function GoodsInwardCreatePage() {
       "QC Pending": "bg-amber-100 text-amber-800",
       "QC Passed": "bg-green-100 text-green-700",
       "QC Failed": "bg-rose-100 text-rose-700",
+      Putaway: "bg-cyan-100 text-cyan-700",
       "Converted to GRN": "bg-purple-100 text-purple-700",
       Cancelled: "bg-gray-200 text-gray-700",
     };
@@ -1014,20 +1254,21 @@ export default function GoodsInwardCreatePage() {
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={assignAndStartInward}
-              className={cn(topActionBtn, isConverted && "opacity-60 cursor-not-allowed")}
+              className={cn(topActionBtn, !canStartInward && "opacity-50 cursor-not-allowed")}
               style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-              disabled={isConverted}
+              disabled={!canStartInward}
             >
               Assign & Start
             </button>
 
             <button
-              onClick={markInwarded}
-              className={cn(topActionBtn, lockedAfterInward && "opacity-60 cursor-not-allowed")}
+              onClick={completeInward}
+              className={cn(topActionBtn, !canCompleteInward && "opacity-50 cursor-not-allowed")}
               style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-              disabled={lockedAfterInward || isConverted}
+              disabled={!canCompleteInward}
+              title={canCompleteInward ? "Complete physical receiving and mark this GI Inwarded" : "Receive material first in Mobile Receiving"}
             >
-              Mark Inwarded
+              Complete Inward
             </button>
 
             <button
@@ -1050,13 +1291,23 @@ export default function GoodsInwardCreatePage() {
           <KpiCard label="QC Lines" value={totals.qcRequired} tone="blue" />
         </div>
 
-        {(errors.poNo || errors.shipments || errors.assignment) && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs text-rose-700 space-y-1">
-            {errors.poNo && <div>• {errors.poNo}</div>}
-            {errors.shipments && <div>• {errors.shipments}</div>}
-            {errors.assignment && <div>• {errors.assignment}</div>}
-          </div>
-        )}
+        <div className="mt-4 rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900">
+          {status === "Live" && <span>Step 1: Verify GI, shipment and receiver details, then click <b>Assign & Start</b>.</span>}
+          {status === "Inward Assigned" && <span>Step 2: Open <b>Mobile Receiving</b> and record the actual quantity received.</span>}
+          {status === "Inward In-Progress" && !canCompleteInward && <span>Step 3: Continue receiving. <b>Complete Inward</b> will enable after a receiving transaction is recorded.</span>}
+          {status === "Inward In-Progress" && canCompleteInward && <span>Step 3: Receiving is recorded. Review discrepancies if any, then click <b>Complete Inward</b>.</span>}
+          {status === "Inwarded" && <span>Step 4: Inward is complete. Continue with <b>QC</b> (if required), then <b>Putaway</b>.</span>}
+          {status === "QC Pending" && <span>Step 5: Complete QC. After <b>QC Passed</b>, received LPNs are released from QC Hold for Putaway.</span>}
+          {status === "QC Passed" && <span>Step 6: QC passed. Open <b>Putaway</b> and click <b>Generate Tasks</b>.</span>}
+          {status === "Putaway" && <span>Step 7: Confirm every Putaway task. <b>Convert to GRN</b> enables after all eligible LPNs are put away.</span>}
+          {(errors.poNo || errors.shipments || errors.assignment) && (
+            <div className="mt-2 space-y-1 text-rose-700">
+              {errors.poNo && <div>• {errors.poNo}</div>}
+              {errors.shipments && <div>• {errors.shipments}</div>}
+              {errors.assignment && <div>• {errors.assignment}</div>}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -1086,7 +1337,38 @@ export default function GoodsInwardCreatePage() {
         <div className="p-6">
           {/* BASIC */}
           {activeTab === "basic" && (
-            <div className="space-y-5">
+            <div className="space-y-4">
+              <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-5 dark:border-blue-900 dark:bg-blue-950/20">
+                <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                  <div className="flex-1">
+                    <label className={labelBase}>Inbound Reference</label>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <button type="button" disabled={lockedAfterInward} onClick={removeASNLink} className={cn("rounded-xl px-4 py-2 text-sm font-semibold", !asnMode ? "bg-gray-900 text-white" : "border border-gray-200 bg-white text-gray-700")}>Direct / No ASN</button>
+                      <button type="button" disabled={lockedAfterInward} onClick={() => setAsnMode(true)} className={cn("rounded-xl px-4 py-2 text-sm font-semibold", asnMode ? "text-white" : "border border-gray-200 bg-white text-gray-700")} style={asnMode ? { backgroundColor: FORTUNA_SECONDARY_BLUE } : undefined}>ASN / Pre-Receiving</button>
+                    </div>
+                  </div>
+                  {asnMode && (
+                    <div className="w-full md:w-[480px]">
+                      <label className={labelBase}>Select ASN</label>
+                      <select value={selectedASNId} disabled={lockedAfterInward} onChange={(e) => applyASN(e.target.value)} className={cn(inputBase, "mt-2", errors.asn && "border-rose-400")}>
+                        <option value="">Select eligible ASN</option>
+                        {asnMaster.filter((a) => a.status !== "Draft" && a.status !== "Closed").map((a) => <option key={a.id} value={a.id}>{a.asnNo} • {a.poNo} • {a.vendorName} • {a.status}</option>)}
+                      </select>
+                      {errors.asn && <p className="mt-1 text-xs text-rose-600">{errors.asn}</p>}
+                    </div>
+                  )}
+                </div>
+                {asnMode && selectedASN && (
+                  <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-6">
+                    <div><p className="text-xs text-gray-500">ASN</p><p className="font-semibold text-blue-800">{selectedASN.asnNo}</p></div>
+                    <div><p className="text-xs text-gray-500">PO</p><p className="font-semibold">{selectedASN.poNo}</p></div>
+                    <div><p className="text-xs text-gray-500">Vendor</p><p className="font-semibold">{selectedASN.vendorName}</p></div>
+                    <div><p className="text-xs text-gray-500">Warehouse</p><p className="font-semibold">{selectedASN.warehouse}</p></div>
+                    <div><p className="text-xs text-gray-500">Schedule</p><p className="font-semibold">{selectedASN.deliverySchedule}</p></div>
+                    <div><p className="text-xs text-gray-500">Items</p><p className="font-semibold">{selectedASN.items.length}</p></div>
+                  </div>
+                )}
+              </div>
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                 <div>
                   <label className={labelBase}>GI Number</label>
@@ -1427,6 +1709,12 @@ export default function GoodsInwardCreatePage() {
                         <div className="flex items-center gap-2">
                           <div className="font-semibold text-gray-900 dark:text-white">{s.shipmentNo}</div>
 
+                          {s.asnNo && (
+                            <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
+                              {s.asnNo}
+                            </span>
+                          )}
+
                           {s.linkedPOs.length > 0 && (
                             <span className="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-semibold text-blue-700">
                               {s.linkedPOs.length} PO Linked
@@ -1503,7 +1791,7 @@ export default function GoodsInwardCreatePage() {
                           <select
                             value={s.mode}
                             onChange={(e) => updateShipment(s.id, { mode: e.target.value as InboundMode })}
-                            disabled={lockedAfterInward}
+                            disabled={lockedAfterInward || asnMode}
                             className={cn(inputBase, "mt-2")}
                           >
                             <option value="ASN/Pre-Receiving">ASN/Pre-Receiving</option>
@@ -1760,6 +2048,8 @@ export default function GoodsInwardCreatePage() {
                     <tr>
                       <th className="px-4 py-3 text-left">Line</th>
                       <th className="px-4 py-3 text-left">SKU</th>
+                      <th className="px-4 py-3 text-left">PO Qty</th>
+                      <th className="px-4 py-3 text-left">ASN Qty</th>
                       <th className="px-4 py-3 text-left">Expected</th>
                       <th className="px-4 py-3 text-left">Final</th>
                       <th className="px-4 py-3 text-left">Live</th>
@@ -1789,11 +2079,15 @@ export default function GoodsInwardCreatePage() {
                           {errors[`sku_${it.id}`] && <p className="mt-1 text-xs text-rose-600">{errors[`sku_${it.id}`]}</p>}
                         </td>
 
+                        <td className="px-4 py-3">{it.poQty ?? "-"}</td>
+
+                        <td className="px-4 py-3 font-semibold text-blue-700">{it.asnQty ?? "-"}</td>
+
                         <td className="px-4 py-3">
                           <input
                             type="number"
                             value={it.expectedQty}
-                            disabled={lockedAfterInward}
+                            disabled={lockedAfterInward || asnMode}
                             onChange={(e) => updateItem(it.id, { expectedQty: safeNum(e.target.value) })}
                             className={cn(inputBase, "max-w-[120px]", lockedAfterInward && "opacity-70")}
                           />
@@ -1869,7 +2163,7 @@ export default function GoodsInwardCreatePage() {
 
                     {!items.length && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300">
+                        <td colSpan={11} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300">
                           No items.
                         </td>
                       </tr>
@@ -1886,13 +2180,6 @@ export default function GoodsInwardCreatePage() {
                 >
                   Go to Mobile
                 </button>
-                <button
-                  onClick={syncMobileToFinal}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
-                  style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-                >
-                  Supervisor Sync Live → Final
-                </button>
               </div>
             </div>
           )}
@@ -1907,18 +2194,11 @@ export default function GoodsInwardCreatePage() {
                       Live Receiving (Simulation)
                     </h3>
                     <p className="text-xs text-gray-500 dark:text-gray-300">
-                      Receive = scan + qty → creates LPN + log. (Replace with real scan later)
+                      Receive quantity → creates LPN + receiving log. When physical receiving is complete, use Complete Inward in the header.
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={syncMobileToFinal}
-                      className="rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
-                      style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-                    >
-                      Supervisor Sync
-                    </button>
                     <button
                       onClick={exportLogsCSV}
                       className="rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
@@ -2002,10 +2282,14 @@ export default function GoodsInwardCreatePage() {
                 <div className="mt-4">
                   <button
                     onClick={mobileReceive}
-                    className="rounded-xl px-5 py-2.5 text-sm font-semibold text-white active:scale-95"
+                    disabled={status !== "Inward Assigned" && status !== "Inward In-Progress"}
+                    className={cn(
+                      "rounded-xl px-5 py-2.5 text-sm font-semibold text-white active:scale-95",
+                      status !== "Inward Assigned" && status !== "Inward In-Progress" && "cursor-not-allowed opacity-50"
+                    )}
                     style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
                   >
-                    Receive (Create LPN)
+                    Receive & Create LPN
                   </button>
                 </div>
               </div>
@@ -2016,6 +2300,7 @@ export default function GoodsInwardCreatePage() {
                   <thead className="bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200">
                     <tr>
                       <th className="px-4 py-3 text-left">Time</th>
+                      <th className="px-4 py-3 text-left">ASN</th>
                       <th className="px-4 py-3 text-left">Shipment</th>
                       <th className="px-4 py-3 text-left">PO</th>
                       <th className="px-4 py-3 text-left">Receiver</th>
@@ -2028,6 +2313,7 @@ export default function GoodsInwardCreatePage() {
                     {receivingLogs.map((l) => (
                       <tr key={l.id} className="border-t dark:border-gray-800">
                         <td className="px-4 py-3">{new Date(l.receivedAtISO).toLocaleString()}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-700">{l.asnNo || "-"}</td>
                         <td className="px-4 py-3 font-semibold">{l.shipmentNo}</td>
                         <td className="px-4 py-3">{l.poNo || "-"}</td>
                         <td className="px-4 py-3">{l.receiverName}</td>
@@ -2067,6 +2353,7 @@ export default function GoodsInwardCreatePage() {
                     {lpns.map((l) => (
                       <tr key={l.id} className="border-t dark:border-gray-800">
                         <td className="px-4 py-3 font-semibold">{l.lpnNo}</td>
+                        <td className="px-4 py-3 font-semibold text-blue-700">{l.asnNo || "-"}</td>
                         <td className="px-4 py-3">{l.shipmentNo}</td>
                         <td className="px-4 py-3">{l.poNo || "-"}</td>
                         <td className="px-4 py-3">{l.sku}</td>
@@ -2137,22 +2424,64 @@ export default function GoodsInwardCreatePage() {
           {/* PUTAWAY */}
           {activeTab === "putaway" && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                 <div>
                   <h3 className="text-base font-semibold text-gray-900 dark:text-white">Putaway</h3>
                   <p className="text-xs text-gray-500 dark:text-gray-300">
-                    Generate tasks from LPNs and confirm bin placement. (QC-hold excluded)
+                    LPN-based putaway: QC-passed LPNs move from Receiving / Staging to storage bins.
                   </p>
                 </div>
 
-                <button
-                  onClick={generatePutawayTasks}
-                  className="rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
-                  style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-                >
-                  Generate Tasks
-                </button>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setActiveTab("mobile")}
+                    disabled={lpns.length > 0}
+                    className={cn(
+                      "rounded-xl border px-4 py-2 text-sm font-semibold",
+                      lpns.length > 0 ? "cursor-not-allowed opacity-50" : "border-blue-200 text-blue-700 hover:bg-blue-50"
+                    )}
+                  >
+                    Go to Mobile Receiving
+                  </button>
+                  <button
+                    onClick={generatePutawayTasks}
+                    disabled={status === "QC Pending" || status === "QC Failed" || status === "Inward In-Progress" || status === "Inward Assigned" || status === "Live"}
+                    className={cn(
+                      "rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95",
+                      (status === "QC Pending" || status === "QC Failed" || status === "Inward In-Progress" || status === "Inward Assigned" || status === "Live") && "cursor-not-allowed opacity-50"
+                    )}
+                    style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
+                  >
+                    Generate Tasks
+                  </button>
+                </div>
               </div>
+
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                <KpiCard label="Received LPNs" value={lpns.length} />
+                <KpiCard label="Putaway Tasks" value={putawayTasks.length} tone="blue" />
+                <KpiCard label="Open Tasks" value={putawayTasks.filter((x) => x.status === "Open").length} tone="blue" />
+                <KpiCard label="Confirmed" value={putawayTasks.filter((x) => x.status === "Confirmed").length} tone="blue" />
+              </div>
+
+              {status === "QC Passed" && lpns.length > 0 && putawayTasks.length === 0 && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                  QC passed. <b>{lpns.filter((l) => !l.qcHold).length}</b> eligible LPN(s) are ready. Click <b>Generate Tasks</b> to continue.
+                </div>
+              )}
+
+              {status === "QC Pending" && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  QC is pending. Complete QC first; QC-passed LPNs will automatically be released for Putaway.
+                </div>
+              )}
+
+              {!lpns.length && (
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">
+                  <b>No LPNs are available.</b> Putaway cannot start until Mobile Receiving creates LPNs.
+                  <button onClick={() => setActiveTab("mobile")} className="ml-2 font-semibold underline">Open Mobile Receiving</button>
+                </div>
+              )}
 
               <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-800">
                 <table className="w-full text-sm">
@@ -2199,7 +2528,9 @@ export default function GoodsInwardCreatePage() {
                     {!putawayTasks.length && (
                       <tr>
                         <td colSpan={7} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300">
-                          No tasks yet. Create LPNs in Mobile tab first.
+                          {lpns.length
+                            ? "LPNs are ready. Click Generate Tasks to create Putaway tasks."
+                            : "No LPNs yet. Complete Mobile Receiving first."}
                         </td>
                       </tr>
                     )}
@@ -2346,7 +2677,7 @@ export default function GoodsInwardCreatePage() {
 
                 {!canConvertToGRN && (
                   <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-                    Convert disabled until: <b>Mark Inwarded</b> + <b>QC Passed</b> (if required) + Over action selected.
+                    Convert disabled until: <b>Complete Inward</b> + <b>QC Passed</b> (if required) + <b>Putaway tasks confirmed</b> + Over action selected.
                   </div>
                 )}
               </div>
