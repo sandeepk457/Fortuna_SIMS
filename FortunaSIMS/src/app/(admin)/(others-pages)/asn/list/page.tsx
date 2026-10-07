@@ -290,14 +290,14 @@ export default function ASNListPage() {
               </h3>
 
               <span
-                className="rounded-full px-2.5 py-1 text-xs font-semibold"
-                style={{
-                  backgroundColor: `${FORTUNA_PRIMARY_RED}10`,
-                  color: FORTUNA_PRIMARY_RED,
-                }}
-              >
-                Supplier Shipment Notice
-              </span>
+  className="rounded-full px-2.5 py-1 text-xs font-semibold"
+  style={{
+    backgroundColor: `${FORTUNA_SECONDARY_BLUE}10`,
+    color: FORTUNA_SECONDARY_BLUE,
+  }}
+>
+  Supplier Shipment Notice
+</span>
             </div>
 
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
