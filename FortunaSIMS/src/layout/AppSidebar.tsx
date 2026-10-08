@@ -135,7 +135,7 @@ const navItems: NavItem[] = [
       {
         name: "Sales & Orders",
         subItems: [
-          { name: "Sales Quotation", path: "/sales/quotation" },
+          { name: "Sales Quotation", path: "/SalesQuotation" },
           { name: "Sales Order (SO)", path: "/sales/orders" },
           { name: "Dispatch Planning", path: "/sales/dispatch" },
           { name: "Invoicing", path: "/sales/invoice" },
@@ -159,7 +159,7 @@ const navItems: NavItem[] = [
           { name: "Executive Dashboard", path: "sims/bi/executive-dashboard" },
           { name: "Procurement Dashboard", path: "sims/bi/procurement-dashboard" },
           { name: "Inventory Dashboard", path: "sims/bi/inventory-dashboard" },
-          { name: "Sales Dashboard", path: "sims/bi/sales-dashboard" },
+          { name: "Sales Dashboard", path: "/sales-dashboard" },
           { name: "Logistics Dashboard", path: "sims/bi/logistics-dashboard" },
           { name: "KPI Monitoring", path: "sims/bi/kpi-monitoring" },
           { name: "AI Predictive Insights", path: "sims/bi/predictive-insights" },
