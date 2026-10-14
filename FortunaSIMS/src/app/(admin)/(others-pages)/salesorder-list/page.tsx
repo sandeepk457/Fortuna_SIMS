@@ -14,6 +14,7 @@ type SOStatus =
   | "Rejected"
   | "Reserved"
   | "Dispatched"
+  | "Partially Delivered"
   | "Delivered"
   | "Cancelled";
 
@@ -29,6 +30,15 @@ type ApprovalStep = {
   decision?: ApprovalDecision;
   decidedAt?: string;
   remarks?: string;
+};
+
+type DeliveryConfirmation = {
+  outcome: "Partial" | "Full";
+  deliveryDate: string;
+  receivedBy: string;
+  remarks: string;
+  podFileName?: string;
+  recordedAt: string;
 };
 
 type SalesOrder = {
@@ -50,6 +60,7 @@ type SalesOrder = {
   approvalRequired: boolean;
   approvalRoute: ApprovalStep[];
   currentApprovalLevel: ApprovalLevel;
+  deliveryHistory?: DeliveryConfirmation[];
 };
 
 type ListTab = "all" | "drafts" | "pending" | "approved" | "reserved" | "dispatched";
@@ -200,6 +211,15 @@ export default function SalesOrderListPage() {
   const [approvalRemarks, setApprovalRemarks] = useState("");
   const [viewModalOpen, setViewModalOpen] = useState(false);
   const [viewSoNo, setViewSoNo] = useState("");
+  const [deliveryModalOpen, setDeliveryModalOpen] = useState(false);
+  const [deliverySoNo, setDeliverySoNo] = useState("");
+  const [deliveryDate, setDeliveryDate] = useState(todayISO());
+  const [receivedBy, setReceivedBy] = useState("");
+  const [deliveryRemarks, setDeliveryRemarks] = useState("");
+  const [deliveryOutcome, setDeliveryOutcome] = useState<"Partial" | "Full">("Full");
+  const [podFileName, setPodFileName] = useState("");
+  const [deliveryError, setDeliveryError] = useState("");
+  const [deliveryNotice, setDeliveryNotice] = useState("");
 
   const tabFilteredBase = useMemo(() => {
     if (activeTab === "drafts") return data.filter((x) => x.status === "Draft");
@@ -229,11 +249,12 @@ export default function SalesOrderListPage() {
     const approved = filteredData.filter((x) => x.status === "Approved").length;
     const reserved = filteredData.filter((x) => x.status === "Reserved").length;
     const dispatched = filteredData.filter((x) => x.status === "Dispatched").length;
+    const partiallyDelivered = filteredData.filter((x) => x.status === "Partially Delivered").length;
     const rejected = filteredData.filter((x) => x.status === "Rejected").length;
     const cancelled = filteredData.filter((x) => x.status === "Cancelled").length;
     const totalValue = filteredData.reduce((sum, x) => sum + (Number(x.grandTotal) || 0), 0);
     const avgValue = total ? Math.round(totalValue / total) : 0;
-    return { total, draft, pending, approved, reserved, dispatched, rejected, cancelled, totalValue, avgValue };
+    return { total, draft, pending, approved, reserved, dispatched, partiallyDelivered, rejected, cancelled, totalValue, avgValue };
   }, [filteredData]);
 
   const draftsCount = useMemo(() => data.filter((x) => x.status === "Draft").length, [data]);
@@ -294,6 +315,62 @@ export default function SalesOrderListPage() {
     setData((prev) => prev.map((so) => so.soNo === soNo && so.status === "Approved" ? { ...so, status: "Reserved" } : so));
   };
 
+  const openDeliveryModal = (soNo: string) => {
+    const order = data.find((item) => item.soNo === soNo);
+    if (!order || !["Dispatched", "Partially Delivered"].includes(order.status)) {
+      setDeliveryNotice("Only dispatched Sales Orders can be delivery-confirmed.");
+      return;
+    }
+    setDeliverySoNo(soNo);
+    setDeliveryDate(todayISO());
+    setReceivedBy("");
+    setDeliveryRemarks("");
+    setDeliveryOutcome("Full");
+    setPodFileName("");
+    setDeliveryError("");
+    setDeliveryModalOpen(true);
+  };
+
+  const confirmDelivery = () => {
+    const order = data.find((item) => item.soNo === deliverySoNo);
+    if (!order || !["Dispatched", "Partially Delivered"].includes(order.status)) {
+      setDeliveryError("This Sales Order is not in a dispatchable delivery state. Refresh and try again.");
+      return;
+    }
+    if (!deliveryDate) {
+      setDeliveryError("Delivery date is required.");
+      return;
+    }
+    if (!receivedBy.trim()) {
+      setDeliveryError("Received by name is required.");
+      return;
+    }
+    const confirmation: DeliveryConfirmation = {
+      outcome: deliveryOutcome,
+      deliveryDate,
+      receivedBy: receivedBy.trim(),
+      remarks: deliveryRemarks.trim(),
+      podFileName: podFileName || undefined,
+      recordedAt: new Date().toLocaleString("en-IN"),
+    };
+    setData((previous) => previous.map((so) => {
+      if (so.soNo !== deliverySoNo) return so;
+      const history = [...(so.deliveryHistory || []), confirmation];
+      return {
+        ...so,
+        status: deliveryOutcome === "Full" ? "Delivered" : "Partially Delivered",
+        deliveryHistory: history,
+      };
+    }));
+    setDeliveryModalOpen(false);
+    setDeliveryNotice(
+      deliveryOutcome === "Full"
+        ? `Delivery confirmed for ${deliverySoNo}. Sales Order marked Delivered.`
+        : `Partial delivery recorded for ${deliverySoNo}. The Sales Order remains open as Partially Delivered.`
+    );
+    setCurrentPage(1);
+  };
+
   const onEditDraft = (soNo: string) => {
     router.push(`/sales-orderform?mode=edit&soNo=${encodeURIComponent(soNo)}`);
   };
@@ -323,6 +400,7 @@ export default function SalesOrderListPage() {
     status === "Pending Approval" && "bg-amber-100 text-amber-800",
     status === "Reserved" && "bg-blue-100 text-blue-700",
     status === "Dispatched" && "bg-indigo-100 text-indigo-700",
+    status === "Partially Delivered" && "bg-orange-100 text-orange-800",
     status === "Delivered" && "bg-emerald-100 text-emerald-700",
     status === "Cancelled" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
     status === "Draft" && "bg-gray-100 text-gray-700 dark:bg-white/10 dark:text-gray-200",
@@ -352,7 +430,7 @@ export default function SalesOrderListPage() {
             <p className="text-sm text-gray-500 dark:text-gray-300">Track sales orders, approvals, reservations, dispatches, and customer deliveries.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => router.push("/sales-orderform")} className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}>
+            <button type="button" onClick={() => router.push("/sales/orders/create")} className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}>
               + Create SO
             </button>
             <button type="button" onClick={exportToCSV} className="active:scale-95 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-rose-700">Export to Excel</button>
@@ -394,7 +472,7 @@ export default function SalesOrderListPage() {
                     <th className="px-4 py-3 text-left">Priority<div className="mt-2 text-xs text-gray-500 dark:text-gray-300">(from quote)</div></th>
                     <th className="px-4 py-3 text-left">Status
                       <select className="mt-2 w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value as SOStatus | ""); setCurrentPage(1); }}>
-                        <option value="">All</option><option value="Draft">Draft</option><option value="Pending Approval">Pending Approval</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option><option value="Reserved">Reserved</option><option value="Dispatched">Dispatched</option><option value="Delivered">Delivered</option><option value="Cancelled">Cancelled</option>
+                        <option value="">All</option><option value="Draft">Draft</option><option value="Pending Approval">Pending Approval</option><option value="Approved">Approved</option><option value="Rejected">Rejected</option><option value="Reserved">Reserved</option><option value="Dispatched">Dispatched</option><option value="Partially Delivered">Partially Delivered</option><option value="Delivered">Delivered</option><option value="Cancelled">Cancelled</option>
                       </select>
                     </th>
                     <th className="px-4 py-3 text-left">Created On
@@ -442,7 +520,7 @@ export default function SalesOrderListPage() {
                           {activeTab !== "drafts" && so.status === "Pending Approval" && so.approvalRequired && <button type="button" className="font-semibold hover:underline" style={{ color: FORTUNA_SECONDARY_BLUE }} onClick={() => openApproval(so.soNo)}>Approve / Reject</button>}
                           {activeTab !== "drafts" && so.status === "Approved" && <button type="button" className="font-semibold text-emerald-700 hover:underline" onClick={() => issueSO(so.soNo)}>Reserve / Fulfill</button>}
                           {so.status === "Reserved" && <button type="button" className="font-semibold text-blue-700 hover:underline" onClick={() => setData((prev) => prev.map((x) => x.soNo === so.soNo ? { ...x, status: "Dispatched" } : x))}>Dispatch</button>}
-                          {so.status === "Dispatched" && <button type="button" className="font-semibold text-emerald-700 hover:underline" onClick={() => setData((prev) => prev.map((x) => x.soNo === so.soNo ? { ...x, status: "Delivered" } : x))}>Mark Delivered</button>}
+                          {(["Dispatched", "Partially Delivered"].includes(so.status)) && <button type="button" className="font-semibold text-emerald-700 hover:underline" onClick={() => openDeliveryModal(so.soNo)}>{so.status === "Partially Delivered" ? "Update Delivery" : "Mark Delivered"}</button>}
                           {["Draft", "Pending Approval", "Approved", "Reserved"].includes(so.status) && <button type="button" className="font-semibold text-gray-500 hover:text-rose-700 hover:underline" onClick={() => { if (confirm(`Cancel Sales Order ${so.soNo}?`)) setData((prev) => prev.map((x) => x.soNo === so.soNo ? { ...x, status: "Cancelled" } : x)); }}>Cancel</button>}
                         </div>
                       </td>
@@ -498,6 +576,64 @@ export default function SalesOrderListPage() {
         </div>
       </div>
 
+      {deliveryNotice && (
+        <div className="fixed right-4 top-4 z-[70] flex max-w-lg items-start gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900 shadow-lg dark:border-blue-900 dark:bg-blue-950 dark:text-blue-100">
+          <div className="flex-1">{deliveryNotice}</div>
+          <button type="button" onClick={() => setDeliveryNotice("")} aria-label="Dismiss delivery notice" className="font-bold">×</button>
+        </div>
+      )}
+
+      {/* Delivery confirmation modal */}
+      {deliveryModalOpen && (() => {
+        const deliverySO = data.find((item) => item.soNo === deliverySoNo);
+        if (!deliverySO) return null;
+        return (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) setDeliveryModalOpen(false); }}>
+            <div role="dialog" aria-modal="true" aria-labelledby="delivery-confirm-title" className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-gray-950">
+              <div className="flex items-start justify-between gap-3 border-b border-gray-200 p-5 dark:border-gray-800">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Sales Order Delivery</p>
+                  <h3 id="delivery-confirm-title" className="mt-1 text-xl font-extrabold" style={{ color: FORTUNA_PRIMARY_RED }}>Confirm Delivery</h3>
+                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-300">{deliverySO.soNo} · {deliverySO.customerName}</p>
+                </div>
+                <button type="button" onClick={() => setDeliveryModalOpen(false)} className="rounded-lg border border-gray-200 px-3 py-1.5 text-sm dark:border-gray-700">Close</button>
+              </div>
+              <div className="space-y-4 p-5">
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                  <strong>Demo mode:</strong> This page does not verify linked Goods Outward quantities or save to the backend. Confirm only after checking delivery evidence in the actual outward workflow.
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <label className="space-y-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200">Delivery Outcome <span className="text-red-600">*</span>
+                    <select value={deliveryOutcome} onChange={(event) => setDeliveryOutcome(event.target.value as "Partial" | "Full")} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900">
+                      <option value="Full">Full delivery</option><option value="Partial">Partial delivery</option>
+                    </select>
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200">Delivery Date <span className="text-red-600">*</span>
+                    <input type="date" max={todayISO()} value={deliveryDate} onChange={(event) => setDeliveryDate(event.target.value)} className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900" />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:col-span-2">Received By <span className="text-red-600">*</span>
+                    <input value={receivedBy} onChange={(event) => setReceivedBy(event.target.value)} maxLength={120} placeholder="Customer / receiving person name" className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900" />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:col-span-2">Delivery Remarks
+                    <textarea value={deliveryRemarks} onChange={(event) => setDeliveryRemarks(event.target.value)} rows={3} maxLength={1000} placeholder="Condition of goods, shortages, delivery notes..." className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm dark:border-gray-700 dark:bg-gray-900" />
+                  </label>
+                  <label className="space-y-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200 sm:col-span-2">Proof of Delivery (POD) — optional
+                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(event) => setPodFileName(event.target.files?.[0]?.name || "")} className="block w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-sm font-normal dark:border-gray-700 dark:bg-gray-900" />
+                    {podFileName && <span className="block text-xs font-normal text-gray-500">Selected file: {podFileName} (demo only; file contents are not uploaded)</span>}
+                  </label>
+                </div>
+                {deliveryOutcome === "Partial" && <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 text-xs leading-5 text-orange-900 dark:border-orange-900 dark:bg-orange-950/30 dark:text-orange-200">This records the order as Partially Delivered, not Delivered. Quantity-level partial fulfilment is not available in this SO list because the current SO model has no delivered item quantities; that requires Goods Outward/backend integration.</div>}
+                {deliveryError && <p role="alert" className="rounded-lg bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 dark:bg-red-950/40 dark:text-red-300">{deliveryError}</p>}
+              </div>
+              <div className="flex flex-wrap justify-end gap-2 border-t border-gray-200 p-4 dark:border-gray-800">
+                <button type="button" onClick={() => setDeliveryModalOpen(false)} className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-semibold dark:border-gray-700">Cancel</button>
+                <button type="button" onClick={confirmDelivery} className="rounded-xl px-5 py-2.5 text-sm font-bold text-white" style={{ backgroundColor: FORTUNA_PRIMARY_RED }}>{deliveryOutcome === "Full" ? "Confirm Full Delivery" : "Record Partial Delivery"}</button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* View SO modal */}
       {viewModalOpen && viewedSO && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onMouseDown={(e) => { if (e.target === e.currentTarget) setViewModalOpen(false); }}>
@@ -519,6 +655,7 @@ export default function SalesOrderListPage() {
               <Info label="Grand Total" value={formatMoney(viewedSO.grandTotal, viewedSO.currency)} />
               <Info label="Priority" value={viewedSO.priority} />
               <Info label="Status" value={viewedSO.status} />
+              {viewedSO.deliveryHistory?.length ? <Info label="Delivery Confirmations" value={String(viewedSO.deliveryHistory.length)} /> : null}
             </div>
             <div className="mt-5 rounded-xl border border-gray-200 p-4 dark:border-gray-800">
               <h4 className="text-sm font-semibold text-gray-900 dark:text-white">Approval Route</h4>
@@ -526,6 +663,7 @@ export default function SalesOrderListPage() {
                 {viewedSO.approvalRoute.map((step) => <div key={step.level} className="flex flex-col gap-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between"><span className="font-semibold dark:text-gray-100">Level {step.level} • {step.approverRole}</span><span className={classNames("w-fit rounded-full px-2 py-0.5 text-xs font-semibold", step.decision === "Approved" && "bg-green-100 text-green-700", step.decision === "Rejected" && "bg-red-100 text-red-600", !step.decision && "bg-amber-100 text-amber-800")}>{step.decision ?? "Pending"}</span>{step.decidedAt && <span className="text-xs text-gray-500">{step.decidedAt}{step.remarks ? ` • ${step.remarks}` : ""}</span>}</div>)}
               </div>
             </div>
+            {viewedSO.deliveryHistory?.length ? <div className="mx-5 mb-5 rounded-xl border border-emerald-200 p-4 dark:border-emerald-900"><h4 className="text-sm font-semibold">Delivery History</h4><div className="mt-3 space-y-3">{viewedSO.deliveryHistory.map((entry, index) => <div key={`${entry.recordedAt}-${index}`} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-gray-900"><div className="flex flex-wrap items-center justify-between gap-2"><span className="font-bold">{entry.outcome === "Full" ? "Full Delivery" : "Partial Delivery"}</span><span className="text-xs text-gray-500">Delivery date: {entry.deliveryDate}</span></div><p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Received by: {entry.receivedBy}</p>{entry.remarks && <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">Remarks: {entry.remarks}</p>}{entry.podFileName && <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">POD selected: {entry.podFileName}</p>}<p className="mt-1 text-[11px] text-gray-500">Recorded: {entry.recordedAt}</p></div>)}</div></div> : null}
           </div>
         </div>
       )}

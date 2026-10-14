@@ -68,7 +68,7 @@ const navItems: NavItem[] = [
         subItems: [
           { name: "ASN List", path: "/asn/list" },
           { name: "Goods Inward / Receive", path: "/GoodsInwardList" },
-          { name: "Goods Outward / Issue", path: "sims/inventory/issue" },
+          { name: "Goods Outward / Issue", path: "/goods-outward" },
           {
             name: "Returns",
             subItems: [
