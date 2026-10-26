@@ -25,6 +25,8 @@ import {
 const RED = "#C8102E";
 const BLUE = "#005F99";
 
+type PicklistStatus = "Created" | "Picking In Progress" | "Picking Complete" | "Cancelled";
+
 type OutwardStatus =
   | "Draft"
   | "Ready for Picking"
@@ -193,6 +195,7 @@ const DEMO_ORDERS: SalesOrderOption[] = [
 ];
 
 const STORAGE_KEY = "FORTUNA_GOODS_OUTWARD_DEMO_V1";
+const PICKLIST_STORAGE_KEY = "FORTUNA_PICKLISTS_DEMO_V1";
 
 const STATUS_STYLES: Record<OutwardStatus, string> = {
   Draft: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
@@ -424,6 +427,8 @@ export default function GoodsOutwardCreatePage() {
   const [showIssueConfirm, setShowIssueConfirm] = useState(false);
   const [showDispatchConfirm, setShowDispatchConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [picklistNo, setPicklistNo] = useState("");
+  const [picklistCreatedAt, setPicklistCreatedAt] = useState("");
   const [orderSearch, setOrderSearch] = useState("");
   const [showOrderPicker, setShowOrderPicker] = useState(false);
 
@@ -540,6 +545,8 @@ export default function GoodsOutwardCreatePage() {
         items: OutwardItem[];
         status: OutwardStatus;
         activities: Activity[];
+        picklistNo?: string;
+        picklistCreatedAt?: string;
       }>;
 
       const existing = records.find((record) => record.id === requestedOutwardId);
@@ -549,11 +556,76 @@ export default function GoodsOutwardCreatePage() {
       setItems(existing.items);
       setStatus(existing.status);
       setActivities(existing.activities || []);
+      setPicklistNo(existing.picklistNo || "");
+      setPicklistCreatedAt(existing.picklistCreatedAt || "");
       setNotice(`Loaded saved demo outward ${existing.form.outwardNo}.`);
     } catch {
       setNotice("Unable to load the saved demo outward record.");
     }
   }, [requestedOutwardId]);
+
+  useEffect(() => {
+    if (!picklistNo) return;
+
+    try {
+      const existingPicklists = JSON.parse(
+        localStorage.getItem(PICKLIST_STORAGE_KEY) || "[]"
+      ) as Array<Record<string, unknown>>;
+
+      const picklistRecord = {
+        id: picklistNo,
+        picklistNo,
+        outwardNo: form.outwardNo,
+        salesOrderNo: form.salesOrderNo,
+        customer: form.customer,
+        customerCode: form.customerCode,
+        warehouse: form.warehouse,
+        picker: form.picker,
+        packer: form.packer,
+        createdAt: picklistCreatedAt,
+        status:
+          status === "Ready for Issue" || ["Issued", "Dispatched", "Delivered"].includes(status)
+            ? "Picking Complete"
+            : status === "Cancelled"
+            ? "Cancelled"
+            : status === "Draft"
+            ? "Created"
+            : "Picking In Progress",
+        lines: items
+          .filter((item) => item.outwardQty > 0)
+          .map((item) => ({
+            id: item.id,
+            sku: item.sku,
+            description: item.description,
+            uom: item.uom,
+            bin: item.bin,
+            requiredQty: item.outwardQty,
+            pickedQty: item.pickedQty,
+            packedQty: item.packedQty,
+            balanceToPick: Math.max(0, item.outwardQty - item.pickedQty),
+            status:
+              item.outwardQty > 0 &&
+              item.pickedQty === item.outwardQty &&
+              item.packedQty === item.outwardQty
+                ? "Complete"
+                : item.pickedQty > 0
+                ? "In Progress"
+                : "Pending",
+          })),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const withoutCurrent = existingPicklists.filter(
+        (record) => record.picklistNo !== picklistNo
+      );
+      localStorage.setItem(
+        PICKLIST_STORAGE_KEY,
+        JSON.stringify([picklistRecord, ...withoutCurrent])
+      );
+    } catch (error) {
+      console.error("Unable to update demo Picklist storage:", error);
+    }
+  }, [picklistNo, picklistCreatedAt, form, items, status]);
 
   const validateBasic = () => {
     const next: Record<string, string> = {};
@@ -628,6 +700,8 @@ export default function GoodsOutwardCreatePage() {
         id,
         form,
         items,
+        picklistNo,
+        picklistCreatedAt,
         status: nextStatus,
         activities: [
           {
@@ -665,10 +739,21 @@ export default function GoodsOutwardCreatePage() {
   const startPicking = () => {
     if (!validateBasic() || !validateItemPlan()) return;
 
+    const generatedPicklistNo =
+      picklistNo || `PL-${new Date().getFullYear()}-${String(Date.now()).slice(-6)}`;
+    const createdAt = picklistCreatedAt || new Date().toISOString();
+
+    setPicklistNo(generatedPicklistNo);
+    setPicklistCreatedAt(createdAt);
     setStatus("Picking In Progress");
-    addActivity("Picking Started");
+    addActivity(
+      picklistNo ? "Picking Resumed" : "Picklist Generated",
+      `Picklist ${generatedPicklistNo} created for ${form.salesOrderNo}.`
+    );
     setActiveTab("picking");
-    setNotice("Picking started. Record picked and packed quantities.");
+    setNotice(
+      `Picklist ${generatedPicklistNo} is ready. Pick items from the assigned bins and record picked quantities.`
+    );
   };
 
   const markReadyForIssue = () => {
@@ -690,8 +775,9 @@ export default function GoodsOutwardCreatePage() {
     }
 
     setStatus("Ready for Issue");
+    addActivity("Picklist Completed", picklistNo ? `Picklist ${picklistNo} completed.` : "Picking and packing completed.");
     addActivity("Ready for Goods Issue");
-    setNotice("Picking and packing verified. Ready for Goods Issue.");
+    setNotice(`Picking and packing verified${picklistNo ? ` for Picklist ${picklistNo}` : ""}. Ready for Goods Issue.`);
   };
 
   const confirmGoodsIssue = () => {
@@ -827,6 +913,8 @@ export default function GoodsOutwardCreatePage() {
     setItems([]);
     setStatus("Draft");
     setActivities([]);
+    setPicklistNo("");
+    setPicklistCreatedAt("");
     setErrors({});
     setActiveTab("basic");
     setNotice("Form reset.");
@@ -1317,6 +1405,70 @@ const tabAllowed = (tab: TabId) => {
                 title="Picking & Packing"
                 description="Record the actual picked quantity and packed quantity for each planned line. Quantities cannot exceed the outward quantity."
               >
+                {picklistNo ? (
+                  <div className="mb-5 rounded-xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900 dark:bg-blue-950/30">
+                    <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold uppercase tracking-wide text-blue-800 dark:text-blue-200">
+                          Generated Picklist
+                        </p>
+                        <p className="mt-1 break-all text-lg font-extrabold text-blue-950 dark:text-white">
+                          {picklistNo}
+                        </p>
+                        <p className="mt-1 text-xs text-blue-800 dark:text-blue-300">
+                          Sales Order: {form.salesOrderNo || "—"} · Outward: {form.outwardNo}
+                        </p>
+                        <p className="mt-1 text-xs text-blue-800 dark:text-blue-300">
+                          Warehouse: {form.warehouse || "—"} · Picker: {form.picker || "Not assigned"}
+                        </p>
+                        {picklistCreatedAt && (
+                          <p className="mt-1 text-xs text-blue-800 dark:text-blue-300">
+                            Created: {new Date(picklistCreatedAt).toLocaleString("en-IN")}
+                          </p>
+                        )}
+                      </div>
+                      <span className={cn(
+                        "inline-flex w-fit shrink-0 rounded-full px-3 py-1.5 text-xs font-bold",
+                        status === "Ready for Issue" || ["Issued", "Dispatched", "Delivered"].includes(status)
+                          ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300"
+                          : status === "Cancelled"
+                          ? "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                          : "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                      )}>
+                        {status === "Ready for Issue" || ["Issued", "Dispatched", "Delivered"].includes(status)
+                          ? "Picking Complete"
+                          : status === "Cancelled"
+                          ? "Cancelled"
+                          : "Picking In Progress"}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
+                        <p className="text-[11px] font-semibold text-gray-500">Pick Lines</p>
+                        <p className="mt-1 text-lg font-extrabold">{items.filter((item) => item.outwardQty > 0).length}</p>
+                      </div>
+                      <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
+                        <p className="text-[11px] font-semibold text-gray-500">Required Qty</p>
+                        <p className="mt-1 text-lg font-extrabold">{items.reduce((sum, item) => sum + item.outwardQty, 0)}</p>
+                      </div>
+                      <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
+                        <p className="text-[11px] font-semibold text-gray-500">Picked Qty</p>
+                        <p className="mt-1 text-lg font-extrabold">{items.reduce((sum, item) => sum + item.pickedQty, 0)}</p>
+                      </div>
+                      <div className="rounded-lg bg-white/80 p-3 dark:bg-gray-900/70">
+                        <p className="text-[11px] font-semibold text-gray-500">Balance to Pick</p>
+                        <p className="mt-1 text-lg font-extrabold">{items.reduce((sum, item) => sum + Math.max(0, item.outwardQty - item.pickedQty), 0)}</p>
+                      </div>
+                    </div>
+                    <p className="mt-3 text-xs leading-5 text-blue-900 dark:text-blue-200">
+                      Picklist is stored in browser demo storage under <code>{PICKLIST_STORAGE_KEY}</code>. It does not deduct stock; inventory changes must occur through a successful backend Goods Issue transaction.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+                    No Picklist generated yet. Use <strong>Start Picking</strong> from the Item Plan tab after selecting a Sales Order and validating the outward quantities.
+                  </div>
+                )}
                 <div className="mb-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <Field label="Assigned Picker" value={form.picker} onChange={(value) => updateForm("picker", value)} placeholder="Enter picker name" disabled={locked} />
                   <Field label="Assigned Packer" value={form.packer} onChange={(value) => updateForm("packer", value)} placeholder="Enter packer name" disabled={locked} />
@@ -1329,10 +1481,10 @@ const tabAllowed = (tab: TabId) => {
                 </div>
 
                 <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
-                  <table className="w-full min-w-[900px] text-left">
+                  <table className="w-full min-w-[1120px] text-left">
                     <thead>
                       <tr style={{ backgroundColor: RED }}>
-                        {["SKU", "Description", "Bin", "Outward Qty", "Picked Qty", "Packed Qty", "Progress"].map((heading) => (
+                        {["Picklist No.", "SKU", "Description", "Bin", "Required Pick Qty", "Picked Qty", "Packed Qty", "Balance", "Progress"].map((heading) => (
                           <th key={heading} className="whitespace-nowrap px-4 py-3 text-xs font-bold text-white">{heading}</th>
                         ))}
                       </tr>
@@ -1342,6 +1494,7 @@ const tabAllowed = (tab: TabId) => {
                         const complete = item.outwardQty > 0 && item.pickedQty === item.outwardQty && item.packedQty === item.outwardQty;
                         return (
                           <tr key={item.id}>
+                            <td className="px-4 py-4 text-xs font-extrabold" style={{ color: BLUE }}>{item.outwardQty > 0 ? picklistNo || "Not generated" : "—"}</td>
                             <td className="px-4 py-4 text-sm font-bold">{item.sku}</td>
                             <td className="px-4 py-4 text-sm">{item.description}</td>
                             <td className="px-4 py-4 text-sm">{item.bin || "—"}</td>
@@ -1368,9 +1521,10 @@ const tabAllowed = (tab: TabId) => {
                                 className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
                               />
                             </td>
+                            <td className="px-4 py-4 text-sm font-bold">{Math.max(0, item.outwardQty - item.pickedQty)}</td>
                             <td className="px-4 py-4">
-                              <span className={cn("rounded-full px-3 py-1 text-xs font-bold", complete ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}>
-                                {complete ? "Complete" : "Pending"}
+                              <span className={cn("rounded-full px-3 py-1 text-xs font-bold", complete ? "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300" : item.pickedQty > 0 ? "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" : "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300")}>
+                                {complete ? "Complete" : item.pickedQty > 0 ? "In Progress" : "Pending"}
                               </span>
                             </td>
                           </tr>
@@ -1378,7 +1532,7 @@ const tabAllowed = (tab: TabId) => {
                       })}
                       {!items.length && (
                         <tr>
-                          <td colSpan={7} className="p-10 text-center text-sm text-gray-500">Select a Sales Order first.</td>
+                          <td colSpan={9} className="p-10 text-center text-sm text-gray-500">Select a Sales Order first.</td>
                         </tr>
                       )}
                     </tbody>
@@ -1487,6 +1641,7 @@ const tabAllowed = (tab: TabId) => {
                     <p className="text-xs font-semibold text-gray-500">Outward Number</p>
                     <p className="mt-1 text-lg font-extrabold" style={{ color: RED }}>{form.outwardNo}</p>
                     <p className="mt-1 text-xs text-gray-500">Sales Order: {form.salesOrderNo || "Not selected"}</p>
+                    {picklistNo && <p className="mt-1 text-xs font-bold" style={{ color: BLUE }}>Picklist: {picklistNo}</p>}
                   </div>
                   <StatusBadge status={status} />
                 </div>
@@ -1647,10 +1802,6 @@ const tabAllowed = (tab: TabId) => {
         </div>
       )}
 
-      {/* Demo disclaimer */}
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs leading-5 text-amber-900 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
-        <strong>Demo mode:</strong> Sales Orders, item quantities, and stock values in this page are sample data. Records are saved in browser local storage. The real application still needs Sales Order, warehouse stock, reservation, stock ledger, Goods Issue, dispatch, and delivery APIs. Do not treat a demo status change as an actual inventory transaction.
-      </div>
     </div>
   );
 }
