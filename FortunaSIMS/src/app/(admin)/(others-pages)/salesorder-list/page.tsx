@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 import { useRouter } from "next/navigation";
 
@@ -61,6 +61,8 @@ type SalesOrder = {
   approvalRoute: ApprovalStep[];
   currentApprovalLevel: ApprovalLevel;
   deliveryHistory?: DeliveryConfirmation[];
+  temporary?: boolean;
+  savedAt?: string;
 };
 
 type ListTab = "all" | "drafts" | "pending" | "approved" | "reserved" | "dispatched";
@@ -195,6 +197,37 @@ export default function SalesOrderListPage() {
       ],
     },
   ]);
+
+  // Load browser-only temporary drafts created by the Sales Order Form.
+  // New temporary drafts are prepended so the latest draft appears in row 1.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("fortuna_sales_orders_drafts");
+      if (!raw) return;
+
+      const parsed: unknown = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return;
+
+      const temporaryDrafts = (parsed as SalesOrder[])
+        .filter((order) => order && typeof order.soNo === "string")
+        .map((order) => ({
+          ...order,
+          status: "Draft" as SOStatus,
+          temporary: true,
+        }));
+
+      if (!temporaryDrafts.length) return;
+
+      const draftIds = new Set(temporaryDrafts.map((order) => order.soNo));
+      setData((previous) => [
+        ...temporaryDrafts,
+        ...previous.filter((order) => !draftIds.has(order.soNo)),
+      ]);
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("Unable to load temporary Sales Order drafts:", error);
+    }
+  }, []);
 
   const [activeTab, setActiveTab] = useState<ListTab>("all");
   const [searchSoNo, setSearchSoNo] = useState("");
@@ -430,7 +463,7 @@ export default function SalesOrderListPage() {
             <p className="text-sm text-gray-500 dark:text-gray-300">Track sales orders, approvals, reservations, dispatches, and customer deliveries.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => router.push("/sales/orders/create")} className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}>
+            <button type="button" onClick={() => router.push("/sales-orderform")} className="active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200" style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}>
               + Create SO
             </button>
             <button type="button" onClick={exportToCSV} className="active:scale-95 rounded-xl bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-rose-700">Export to Excel</button>
@@ -491,6 +524,11 @@ export default function SalesOrderListPage() {
                     <tr key={so.soNo} className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
                       <td className="px-4 py-3 font-semibold">
                         {so.soNo}
+                        {so.temporary && (
+                          <span className="ml-2 inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">
+                            TEMP
+                          </span>
+                        )}
                         <div className="mt-1 text-xs font-normal text-gray-500 dark:text-gray-300">SO Date: {so.soDate}</div>
                       </td>
                       <td className="px-4 py-3">

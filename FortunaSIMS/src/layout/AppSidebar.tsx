@@ -64,6 +64,16 @@ const navItems: NavItem[] = [
       },
 
       {
+        name: "Sales & Orders",
+        subItems: [
+          { name: "Sales Quotation", path: "/SalesQuotation" },
+          { name: "Sales Order (SO)", path: "/salesorder-list" },
+          { name: "Dispatch Planning", path: "/sales/dispatch" },
+          { name: "Invoicing", path: "/sales/invoice" },
+        ],
+      },
+
+      {
         name: "Inventory & (WMS)",
         subItems: [
           { name: "ASN List", path: "/asn/list" },
@@ -132,15 +142,6 @@ const navItems: NavItem[] = [
         ],
       },
 
-      {
-        name: "Sales & Orders",
-        subItems: [
-          { name: "Sales Quotation", path: "/SalesQuotation" },
-          { name: "Sales Order (SO)", path: "/salesorder-list" },
-          { name: "Dispatch Planning", path: "/sales/dispatch" },
-          { name: "Invoicing", path: "/sales/invoice" },
-        ],
-      },
 
       {
         name: "Fortuna SIMS AI",

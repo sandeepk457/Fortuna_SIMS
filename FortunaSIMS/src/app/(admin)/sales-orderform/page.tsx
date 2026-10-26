@@ -11,6 +11,8 @@ import {
 const RED = "#C8102E";
 const BLUE = "#005F99";
 const API = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
+const TEMP_DRAFTS_KEY = "fortuna_sales_orders_drafts";
+const SALES_ORDER_LIST_ROUTE = "/salesorder-list";
 
 type TabKey = "basic" | "customer" | "items" | "delivery" | "taxes" | "terms";
 type RecordData = Record<string, any>;
@@ -75,6 +77,21 @@ function money(value: number, currency: string) {
 function today() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function Field({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="min-w-0">
+      <label className={labelClass}>{title}</label>
+      {children}
+    </div>
+  );
 }
 
 const newLine = (): OrderLine => ({
@@ -436,33 +453,66 @@ export default function SalesOrderPage() {
         client_calculated_total: Number(totals.grandTotal.toFixed(2)),
       };
 
-      await request("/api/orders", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      // TEMPORARY FRONTEND-ONLY SAVE:
+      // The backend POST /api/orders currently returns 404. Preserve the draft
+      // in this browser and show it at the top of the existing SO List.
+      const existingDraftsRaw = localStorage.getItem(TEMP_DRAFTS_KEY);
+      const existingDrafts = existingDraftsRaw ? JSON.parse(existingDraftsRaw) : [];
+      const savedAt = new Date().toISOString();
+      const temporarySoNo = `SO-TEMP-${Date.now().toString().slice(-6)}`;
+      const customer = selectedCustomer;
+      const warehouse = selectedWarehouse;
+      const temporaryRecord = {
+        soNo: temporarySoNo,
+        soDate: form.order_date,
+        createdOn: savedAt.slice(0, 10),
+        salesRep: "Current User",
+        channel: form.channel === "RETAIL" ? "Retail" : form.channel,
+        customerName: customer ? String(customerName(customer) || "Selected Customer") : "Customer",
+        customerCode: String(customer?.customer_code ?? customer?.code ?? form.customer_id),
+        quoteNo: form.quotation_reference || "—",
+        currency: form.currency,
+        totalItems: lines.length,
+        grandTotal: Number(totals.grandTotal.toFixed(2)),
+        priority: "Medium",
+        status: "Draft",
+        deliveryWarehouse: warehouse
+          ? String(warehouse.warehouse_code ?? warehouse.code ?? warehouse.warehouse_name ?? warehouse.name ?? form.warehouse_id)
+          : String(form.warehouse_id || "—"),
+        requestedDeliveryDate: form.delivery_date || "—",
+        approvalRequired: false,
+        currentApprovalLevel: 1,
+        approvalRoute: [
+          { level: 1, approverRole: "Sales Manager" },
+          { level: 2, approverRole: "Finance Manager" },
+          { level: 3, approverRole: "Sales Head" },
+        ],
+        temporary: true,
+        customerReference: form.customer_reference,
+        deliveryInstructions: form.delivery_instructions,
+        warrantyTerms: form.warranty_terms,
+        cancellationTerms: form.cancellation_terms,
+        specialInstructions: form.special_instructions,
+        internalNotes: form.internal_notes,
+        lines: lines.map((line) => ({ ...line })),
+        payload,
+        savedAt,
+      };
 
-      setSuccess("Sales Order draft saved successfully.");
-      setActiveTab("basic");
+      const safeExistingDrafts = Array.isArray(existingDrafts) ? existingDrafts : [];
+      localStorage.setItem(
+        TEMP_DRAFTS_KEY,
+        JSON.stringify([temporaryRecord, ...safeExistingDrafts.filter((item: any) => item?.soNo !== temporarySoNo)])
+      );
+
+      // Use a full browser navigation so the existing SO List route loads cleanly.
+      // The draft is already saved to localStorage before navigating.
+      window.location.assign(SALES_ORDER_LIST_ROUTE);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unable to save Sales Order.");
     } finally {
       setSaving(false);
     }
-  }
-
-  function Field({
-    title,
-    children,
-  }: {
-    title: string;
-    children: React.ReactNode;
-  }) {
-    return (
-      <div>
-        <label className={labelClass}>{title}</label>
-        {children}
-      </div>
-    );
   }
 
   return (
