@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
+import { useRouter } from "next/navigation";
 
 /** Fortuna Theme Colors */
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -30,7 +31,13 @@ type POStatus =
 
 type ApprovalDecision = "Approved" | "Rejected";
 
-type Warehouse = { id: string; name: string; address: string; state?: string };
+type Warehouse = {
+  id: string;
+  code: string;
+  name: string;
+  address: string;
+  state: string;
+};
 type Vendor = {
   vendor_id: string;
   vendor_name: string;
@@ -38,32 +45,32 @@ type Vendor = {
   gstin: string;
   contact_person: string;
   vendor_email: string;
-  state?: string; // for IGST decision demo
+  state: string;
   default_payment_terms: PaymentTerms;
   default_credit_days: number;
 };
 
-type RFQLine = {
-  rfq_item_id: string;
+type PRLine = {
   pr_item_id: string;
   item_id: string;
   item_description: string;
   uom: string;
-  ordered_qty: number; // final qty default from RFQ qty
-  unit_price: number; // final agreed price from RFQ
-  delivery_date: string; // expected delivery date (editable)
+  ordered_qty: number;
+  unit_price: number;
+  delivery_date: string;
 };
 
-type ApprovedRFQ = {
-  rfq_id: string;
-  rfq_number: string;
+type ApprovedPR = {
   pr_id: string;
   pr_number: string;
-  currency: Currency;
-  selected_vendor_id: string;
-  payment_terms: PaymentTerms;
-  credit_period_days: number;
-  lines: RFQLine[];
+  department?: string;
+  requested_by?: string;
+  priority?: string;
+  status: string;
+  estimated_pr_value?: number | string;
+  currency?: Currency | string;
+  preferred_vendor?: string;
+  items?: PRLine[];
 };
 
 /** PO Form types */
@@ -72,14 +79,14 @@ type POFormState = {
   po_id: string; // system
   po_number: string; // system
   po_date: string; // system auto
-  rfq_id: string; // from approved RFQ (required)
-  pr_id: string; // from RFQ (read-only)
+  pr_id: string; // UUID of approved PR (required)
+  pr_number: string; // display number from PR (read-only)
   po_status: POStatus; // system-driven
   created_by: string; // logged-in user
   approval_required: boolean; // system/config
-  currency: Currency; // from RFQ (required)
+  currency: Currency; // from PR (required)
 
-  /** Vendor Details (read-only from RFQ/Vendor master) */
+  /** Vendor Details (auto-filled from PR preferred vendor / vendor master) */
   vendor_id: string;
   vendor_name: string;
   vendor_address: string;
@@ -90,7 +97,7 @@ type POFormState = {
   credit_period_days: number;
 
   /** Items & Pricing */
-  items: RFQLine[];
+  items: PRLine[];
 
   /** Delivery & Logistics */
   delivery_location: string; // warehouse id (required)
@@ -126,95 +133,60 @@ type POFormState = {
   approval_remarks: string;
 };
 
-/** Masters (demo) */
-const WAREHOUSES: Warehouse[] = [
-  { id: "WH-001", name: "Vizag Central WH", address: "Vizag, Andhra Pradesh, India", state: "AP" },
-  { id: "WH-002", name: "Hyderabad WH", address: "Hyderabad, Telangana, India", state: "TS" },
-  { id: "WH-003", name: "Chennai WH", address: "Chennai, Tamil Nadu, India", state: "TN" },
-];
+/** Master API response mapping helpers */
+function normalizeVendorTerms(value: unknown): PaymentTerms {
+  const text = String(value || "").trim().toLowerCase();
+  if (text.includes("advance")) return "Advance";
+  if (text.includes("15")) return "Net 15";
+  return "Net 30";
+}
 
-const VENDORS: Vendor[] = [
-  {
-    vendor_id: "V-001",
-    vendor_name: "Sri Lakshmi Suppliers",
-    vendor_address: "Dwaraka Nagar, Vizag, Andhra Pradesh, India",
-    gstin: "37ABCDE1234F1Z1",
-    contact_person: "Ramesh",
-    vendor_email: "sales@srilakshmi.com",
-    state: "AP",
-    default_payment_terms: "Net 30",
-    default_credit_days: 30,
-  },
-  {
-    vendor_id: "V-002",
-    vendor_name: "Aparna Packaging",
-    vendor_address: "Kukatpally, Hyderabad, Telangana, India",
-    gstin: "36PQRSX5678K1Z9",
-    contact_person: "Aparna",
-    vendor_email: "quotes@aparnapack.com",
-    state: "TS",
-    default_payment_terms: "Net 15",
-    default_credit_days: 15,
-  },
-];
+function normalizeVendor(raw: any): Vendor {
+  const addressParts = [
+    raw.registered_address,
+    raw.address_line1,
+    raw.address_line2,
+    raw.city,
+    raw.state,
+    raw.postal_code || raw.pincode,
+  ].filter(Boolean);
 
-/** Approved RFQs (demo) */
-const APPROVED_RFQS: ApprovedRFQ[] = [
-  {
-    rfq_id: "RFQ-UUID-001",
-    rfq_number: "RFQ-2026-00021",
-    pr_id: "PR-UUID-103",
-    pr_number: "PR-000103",
-    currency: "INR",
-    selected_vendor_id: "V-001",
-    payment_terms: "Net 30",
-    credit_period_days: 30,
-    lines: [
-      {
-        rfq_item_id: "RFQITEM-1001",
-        pr_item_id: "PRITEM-1001",
-        item_id: "SKU-BOX-5PLY",
-        item_description: "Corrugated Box (5-ply)",
-        uom: "Nos",
-        ordered_qty: 200,
-        unit_price: 160,
-        delivery_date: todayISOPlus(7),
-      },
-      {
-        rfq_item_id: "RFQITEM-1002",
-        pr_item_id: "PRITEM-1002",
-        item_id: "SKU-BUBBLE-L",
-        item_description: "Bubble Wrap Roll (Large)",
-        uom: "Box",
-        ordered_qty: 20,
-        unit_price: 1200,
-        delivery_date: todayISOPlus(10),
-      },
-    ],
-  },
-  {
-    rfq_id: "RFQ-UUID-002",
-    rfq_number: "RFQ-2026-00022",
-    pr_id: "PR-UUID-105",
-    pr_number: "PR-000105",
-    currency: "INR",
-    selected_vendor_id: "V-002",
-    payment_terms: "Net 15",
-    credit_period_days: 15,
-    lines: [
-      {
-        rfq_item_id: "RFQITEM-2001",
-        pr_item_id: "PRITEM-2001",
-        item_id: "SKU-STRAP",
-        item_description: "PP Strapping Roll",
-        uom: "Nos",
-        ordered_qty: 50,
-        unit_price: 380,
-        delivery_date: todayISOPlus(5),
-      },
-    ],
-  },
-];
+  const address = String(
+    raw.registered_address || raw.vendor_address || raw.address || addressParts.join(", ")
+  );
+
+  return {
+    vendor_id: String(raw.id || raw.vendor_id || ""),
+    vendor_name: String(raw.vendor_name || raw.name || ""),
+    vendor_address: address,
+    gstin: String(raw.gstin || raw.GSTIN || ""),
+    contact_person: String(raw.contact_person_name || raw.contact_person || ""),
+    vendor_email: String(raw.contact_email || raw.vendor_email || raw.email || ""),
+    state: String(raw.state || ""),
+    default_payment_terms: normalizeVendorTerms(raw.payment_terms || raw.default_payment_terms),
+    default_credit_days: Number(raw.credit_period_days || raw.credit_days || raw.default_credit_days || 30),
+  };
+}
+
+function normalizeWarehouse(raw: any): Warehouse {
+  const addressParts = [
+    raw.address_line1,
+    raw.address_line2,
+    raw.city,
+    raw.state,
+    raw.pincode || raw.postal_code,
+  ].filter(Boolean);
+
+  return {
+    id: String(raw.warehouse_id || raw.id || raw.warehouse_code || ""),
+    code: String(raw.warehouse_code || raw.code || ""),
+    name: String(raw.warehouse_name || raw.name || ""),
+    address: String(raw.address || addressParts.join(", ")),
+    state: String(raw.state || ""),
+  };
+}
+
+/** Approved PRs are loaded from the existing PR backend API. */
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "basic", label: "PO Basic Info" },
@@ -294,8 +266,8 @@ const initialState: POFormState = {
   po_id: "Auto-generated",
   po_number: "Auto (PO-YYYY-SEQ)",
   po_date: todayISO(),
-  rfq_id: "",
-  pr_id: "Auto (from RFQ)",
+  pr_id: "",
+  pr_number: "Select an Approved PR",
   po_status: "Draft",
   created_by: "Logged-in user",
   approval_required: true,
@@ -343,6 +315,7 @@ const initialState: POFormState = {
 };
 
 export default function PurchaseOrderCreatePage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<POFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -350,78 +323,244 @@ export default function PurchaseOrderCreatePage() {
   /** Lock editing after leaving Draft (as per workflow rule: approved PO is locked; also pending approval usually locked) */
   const isLocked = form.po_status !== "Draft";
 
-  /** Convenience lookup */
-  const selectedRFQ = useMemo(() => {
-    if (!form.rfq_id) return undefined;
-    return APPROVED_RFQS.find((r) => r.rfq_id === form.rfq_id);
-  }, [form.rfq_id]);
+  const [approvedPRs, setApprovedPRs] = useState<ApprovedPR[]>([]);
+  const [prLoading, setPrLoading] = useState(false);
+  const [prLoadError, setPrLoadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [vendorLoading, setVendorLoading] = useState(false);
+  const [warehouseLoading, setWarehouseLoading] = useState(false);
+  const [masterLoadError, setMasterLoadError] = useState("");
 
-  /** When RFQ selected -> auto-populate */
-  const onSelectRFQ = (rfqId: string) => {
-    const rfq = APPROVED_RFQS.find((r) => r.rfq_id === rfqId);
-    if (!rfq) {
+  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
+
+  /** Load Vendor and Warehouse Master records from the backend. */
+  useEffect(() => {
+    let active = true;
+
+    const loadMasters = async () => {
+      setVendorLoading(true);
+      setWarehouseLoading(true);
+      setMasterLoadError("");
+
+      try {
+        const [vendorResponse, warehouseResponse] = await Promise.all([
+          fetch(`${API_BASE}/api/vendors`, { cache: "no-store" }),
+          fetch(`${API_BASE}/api/warehouses`, { cache: "no-store" }),
+        ]);
+
+        const [vendorResult, warehouseResult] = await Promise.all([
+          vendorResponse.json(),
+          warehouseResponse.json(),
+        ]);
+
+        if (!vendorResponse.ok || vendorResult?.success === false) {
+          throw new Error(vendorResult?.message || "Unable to load Vendor Master.");
+        }
+        if (!warehouseResponse.ok || warehouseResult?.success === false) {
+          throw new Error(warehouseResult?.message || "Unable to load Warehouse Master.");
+        }
+
+        const vendorRows = Array.isArray(vendorResult?.data)
+          ? vendorResult.data
+          : Array.isArray(vendorResult) ? vendorResult : [];
+        const warehouseRows = Array.isArray(warehouseResult?.data)
+          ? warehouseResult.data
+          : Array.isArray(warehouseResult) ? warehouseResult : [];
+
+        if (active) {
+          setVendors(vendorRows.map(normalizeVendor).filter((v: Vendor) => v.vendor_id && v.vendor_name));
+          setWarehouses(warehouseRows.map(normalizeWarehouse).filter((w: Warehouse) => w.id && w.name));
+        }
+      } catch (error) {
+        if (active) {
+          setMasterLoadError(error instanceof Error ? error.message : "Unable to load Master data.");
+        }
+      } finally {
+        if (active) {
+          setVendorLoading(false);
+          setWarehouseLoading(false);
+        }
+      }
+    };
+
+    void loadMasters();
+    return () => { active = false; };
+  }, [API_BASE]);
+
+  /** Load PR list from existing backend and keep only approved PRs. */
+  useEffect(() => {
+    let active = true;
+    const loadApprovedPRs = async () => {
+      setPrLoading(true);
+      setPrLoadError("");
+      try {
+        const response = await fetch(`${API_BASE}/api/pr/list`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok || result?.success === false) {
+          throw new Error(result?.message || "Unable to load PR list.");
+        }
+        const rows: ApprovedPR[] = Array.isArray(result?.data) ? result.data : [];
+        if (active) setApprovedPRs(rows.filter((pr) => String(pr.status || "").trim().toLowerCase() === "approved"));
+      } catch (error) {
+        if (active) setPrLoadError(error instanceof Error ? error.message : "Failed to load approved PRs.");
+      } finally {
+        if (active) setPrLoading(false);
+      }
+    };
+    loadApprovedPRs();
+    return () => { active = false; };
+  }, [API_BASE]);
+
+  const selectedPR = useMemo(() => {
+    return approvedPRs.find((pr) => pr.pr_id === form.pr_id);
+  }, [approvedPRs, form.pr_id]);
+
+  /** PR item mapping: backend pr_items -> PO items. */
+  const mapPRItems = (items: any[]): PRLine[] => items.map((item, index) => ({
+    pr_item_id: String(item.pr_item_id || item.id || `${item.pr_id || "PRITEM"}-${index + 1}`),
+    item_id: String(item.item_id || ""),
+    item_description: String(item.item_description || item.description || ""),
+    uom: String(item.uom || ""),
+    ordered_qty: Number(item.requested_qty ?? item.qty ?? 0),
+    unit_price: Number(item.estimated_unit_price ?? item.unit_price ?? 0),
+    delivery_date: item.required_by_date ? String(item.required_by_date).slice(0, 10) : todayISOPlus(7),
+  }));
+
+  /** When an Approved PR is selected, fetch the full PR detail and auto-fill vendor/items. */
+  const onSelectApprovedPR = async (prId: string) => {
+    if (!prId) {
+      setForm((p) => ({ ...p, pr_id: "", pr_number: "", vendor_id: "", vendor_name: "", vendor_address: "", gstin: "", contact_person: "", vendor_email: "", items: [] }));
+      return;
+    }
+
+    const listPR = approvedPRs.find((pr) => pr.pr_id === prId);
+    if (!listPR) {
+      alert("Please select a valid Approved PR.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE}/api/pr/${encodeURIComponent(prId)}`, { cache: "no-store" });
+      const result = await response.json();
+      if (!response.ok || result?.success === false || !result?.data?.header) {
+        throw new Error(result?.message || "Unable to load selected PR details.");
+      }
+
+      const header = result.data.header;
+      const prItems = Array.isArray(result.data.items) ? result.data.items : [];
+      const preferredVendors: string[] = [...new Set<string>(
+        prItems
+          .map((item: any) => String(item.preferred_vendor || "").trim())
+          .filter((vendor: string): vendor is string => Boolean(vendor))
+      )];
+      const preferredVendor: string = preferredVendors[0] ?? "";
+      let vendorMaster: Vendor | undefined;
+
+      if (preferredVendor) {
+        const matchedVendor = vendors.find(
+          (v) => v.vendor_id === preferredVendor ||
+            v.vendor_name.toLowerCase() === preferredVendor.toLowerCase()
+        );
+
+        if (matchedVendor) {
+          const vendorDetailResponse = await fetch(
+            `${API_BASE}/api/vendors/${encodeURIComponent(matchedVendor.vendor_id)}`,
+            { cache: "no-store" }
+          );
+          const vendorDetailResult = await vendorDetailResponse.json();
+
+          if (!vendorDetailResponse.ok || vendorDetailResult?.success === false) {
+            throw new Error(vendorDetailResult?.message || "Unable to load selected Vendor details.");
+          }
+
+          const rawVendor = vendorDetailResult?.data?.vendor || vendorDetailResult?.data || vendorDetailResult;
+          vendorMaster = normalizeVendor(rawVendor);
+          // Cache the complete vendor record (including state) for later GST calculation.
+          setVendors((current) => current.map((v) =>
+            v.vendor_id === vendorMaster?.vendor_id ? { ...v, ...vendorMaster! } : v
+          ));
+        }
+      }
+
+      const wh = warehouses.find((w) => w.id === form.delivery_location);
+      const vendorState = vendorMaster?.state?.trim().toLowerCase();
+      const warehouseState = wh?.state?.trim().toLowerCase();
+      const isIGST = Boolean(vendorState && warehouseState && vendorState !== warehouseState);
+      const currencyCandidate = String(header.currency || "INR").toUpperCase();
+      const currency: Currency = currencyCandidate === "USD" || currencyCandidate === "EUR" ? currencyCandidate : "INR";
+
       setForm((p) => ({
         ...p,
-        rfq_id: "",
-        pr_id: "Auto (from RFQ)",
-        currency: "INR",
-        vendor_id: "",
-        vendor_name: "",
-        vendor_address: "",
-        gstin: "",
-        contact_person: "",
-        vendor_email: "",
-        payment_terms: "Net 30",
-        credit_period_days: 30,
-        items: [],
+        pr_id: String(header.pr_id || prId),
+        pr_number: String(header.pr_number || listPR.pr_number || prId),
+        currency,
+        vendor_id: vendorMaster?.vendor_id ?? preferredVendor,
+        vendor_name: vendorMaster?.vendor_name ?? preferredVendor,
+        vendor_address: vendorMaster?.vendor_address || "",
+        gstin: vendorMaster?.gstin || "",
+        contact_person: vendorMaster?.contact_person || "",
+        vendor_email: vendorMaster?.vendor_email || "",
+        payment_terms: vendorMaster?.default_payment_terms || "Net 30",
+        credit_period_days: vendorMaster?.default_credit_days || 30,
+        items: mapPRItems(prItems),
+        is_igst: isIGST,
+      }));
+
+      if (preferredVendors.length > 1) {
+        alert(`Selected PR has multiple preferred vendors (${preferredVendors.join(", ")}). PO vendor auto-filled from the first preferred vendor: ${preferredVendor}. Please verify before saving.`);
+      }
+      setActiveTab("vendor");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Unable to load PR details.");
+    }
+  };
+
+  /** Delivery location -> warehouse address and GST determination */
+  const onSelectWarehouse = async (warehouseId: string) => {
+    if (isLocked) return;
+
+    if (!warehouseId) {
+      setForm((p) => ({
+        ...p,
+        delivery_location: "",
+        delivery_address: "",
+        is_igst: false,
       }));
       return;
     }
 
-    const v = VENDORS.find((x) => x.vendor_id === rfq.selected_vendor_id);
-    const vendorState = v?.state;
-    const wh = WAREHOUSES.find((w) => w.id === form.delivery_location);
-    const whState = wh?.state;
+    let warehouse = warehouses.find((w) => w.id === warehouseId);
+    if (!warehouse) return;
 
-    // IGST demo: if states differ => IGST
-    const isIGST = Boolean(vendorState && whState && vendorState !== whState);
+    // Fetch the complete Warehouse Master record where the full endpoint is available.
+    if (warehouse.code) {
+      try {
+        const response = await fetch(
+          `${API_BASE}/api/warehouses/full/${encodeURIComponent(warehouse.code)}`,
+          { cache: "no-store" }
+        );
+        const result = await response.json();
 
-    setForm((p) => ({
-      ...p,
-      rfq_id: rfq.rfq_id,
-      pr_id: rfq.pr_number, // keep as PR number display
-      currency: rfq.currency,
-      vendor_id: v?.vendor_id ?? rfq.selected_vendor_id,
-      vendor_name: v?.vendor_name ?? "Vendor (from RFQ)",
-      vendor_address: v?.vendor_address ?? "",
-      gstin: v?.gstin ?? "",
-      contact_person: v?.contact_person ?? "",
-      vendor_email: v?.vendor_email ?? "",
-      payment_terms: rfq.payment_terms,
-      credit_period_days: rfq.credit_period_days,
-      items: rfq.lines.map((ln) => ({
-        ...ln,
-        delivery_date: ln.delivery_date || todayISOPlus(7),
-      })),
-      is_igst: isIGST,
-    }));
+        if (response.ok && result?.success !== false) {
+          const rawWarehouse = result?.data?.warehouse || result?.data || result;
+          warehouse = normalizeWarehouse(rawWarehouse);
+        }
+      } catch (error) {
+        console.error("Unable to load full warehouse details:", error);
+      }
+    }
 
-    // UX: next tab
-    setActiveTab("vendor");
-  };
-
-  /** Delivery location -> address */
-  const onSelectWarehouse = (warehouseId: string) => {
-    if (isLocked) return;
-    const wh = WAREHOUSES.find((w) => w.id === warehouseId);
-    const vendor = VENDORS.find((x) => x.vendor_id === form.vendor_id);
-
-    const isIGST = Boolean(vendor?.state && wh?.state && vendor.state !== wh.state);
+    const vendor = vendors.find((v) => v.vendor_id === form.vendor_id);
+    const vendorState = vendor?.state?.trim().toLowerCase();
+    const warehouseState = warehouse.state?.trim().toLowerCase();
+    const isIGST = Boolean(vendorState && warehouseState && vendorState !== warehouseState);
 
     setForm((p) => ({
       ...p,
       delivery_location: warehouseId,
-      delivery_address: wh?.address ?? "",
+      delivery_address: warehouse.address || "",
       is_igst: isIGST,
     }));
   };
@@ -480,13 +619,14 @@ export default function PurchaseOrderCreatePage() {
   const errors = useMemo(() => {
     const e: Record<string, string> = {};
 
-    if (!form.rfq_id) e.rfq_id = "Approved RFQ is required";
+    if (!form.pr_id) e.pr_id = "Approved PR is required";
+    if (form.pr_id && !form.vendor_name.trim()) e.vendor_name = "PR preferred vendor is required to create a PO";
     if (!form.currency) e.currency = "Currency is required";
 
     if (!form.delivery_location) e.delivery_location = "Delivery warehouse is required";
 
     // Items must exist
-    if (form.items.length === 0) e.items = "PO items must be populated from RFQ";
+    if (form.items.length === 0) e.items = "PO items must be populated from Approved PR";
 
     // Delivery date rule
     form.items.forEach((ln, idx) => {
@@ -537,7 +677,7 @@ export default function PurchaseOrderCreatePage() {
 
   const firstErrorTab = () => {
     const order: TabKey[] = ["basic", "vendor", "items", "delivery", "taxes", "terms"];
-    const basicKeys = ["rfq_id", "currency"];
+    const basicKeys = ["pr_id", "currency"];
     const deliveryKeys = ["delivery_location"];
     const taxKeys = ["gst_percentage", "freight_charges", "other_charges"];
     const termKeys = ["liquidated_damages"];
@@ -553,7 +693,7 @@ export default function PurchaseOrderCreatePage() {
   };
 
   /** Items update (delivery date editable) */
-  const updateItem = (idx: number, patch: Partial<RFQLine>) => {
+  const updateItem = (idx: number, patch: Partial<PRLine>) => {
     if (isLocked) return;
     setForm((p) => {
       const next = [...p.items];
@@ -569,14 +709,77 @@ export default function PurchaseOrderCreatePage() {
     setActiveTab("basic");
   };
 
-  const onSaveDraft = () => {
-    console.log("Save PO Draft:", form);
-    alert("Saved Draft (demo). Next: connect API.");
+  const onSaveDraft = async () => {
+    if (isLocked || saving) return;
+    touchAll();
+    if (hasErrors) {
+      setActiveTab(firstErrorTab());
+      alert("Please fix validation errors before saving the PO draft.");
+      return;
+    }
+    if (!form.pr_id || !selectedPR || String(selectedPR.status).toLowerCase() !== "approved") {
+      alert("Only an Approved PR can be used to create a PO.");
+      return;
+    }
+
+    const payload = {
+      pr_id: form.pr_id,
+      po_date: form.po_date,
+      vendor_id: form.vendor_id,
+      vendor_name: form.vendor_name,
+      buyer: form.created_by,
+      department: selectedPR.department || null,
+      currency: form.currency,
+      total_items: form.items.length,
+      total_value: form.total_po_value,
+      priority: selectedPR.priority || null,
+      status: "Draft",
+      delivery_warehouse: form.delivery_location,
+      approval_required: form.approval_required,
+      current_approval_level: 0,
+      created_by: form.created_by,
+      items: form.items.map((item) => ({
+        item_id: item.item_id || null,
+        description: item.item_description,
+        uom: item.uom,
+        qty: item.ordered_qty,
+        unit_price: item.unit_price,
+        delivery_date: item.delivery_date || null,
+      })),
+    };
+
+    setSaving(true);
+    try {
+      const response = await fetch(`${API_BASE}/api/purchase-orders`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json();
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || "Failed to save PO draft.");
+      }
+      alert(
+  `PO Draft saved successfully${
+    result?.data?.po_number
+      ? `: ${result.data.po_number}`
+      : result?.po_number
+      ? `: ${result.po_number}`
+      : ""
+  }.`
+);
+
+router.push("/PurchaseOrderList");
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Failed to save PO draft.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const touchAll = () => {
     const next: Record<string, boolean> = { ...touched };
-    ["rfq_id", "currency", "delivery_location", "gst_percentage", "freight_charges", "other_charges", "liquidated_damages"].forEach(
+    ["pr_id", "currency", "delivery_location", "gst_percentage", "freight_charges", "other_charges", "liquidated_damages"].forEach(
       (k) => (next[k] = true)
     );
     form.items.forEach((_, idx) => {
@@ -648,7 +851,7 @@ export default function PurchaseOrderCreatePage() {
         <div>
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">PO Creation</h3>
           <p className={helperBase}>
-            Step 1: Select Approved RFQ → Step 2: Delivery → Step 3: Taxes → Step 4: Send for Approval → Issue to Vendor.
+            Step 1: Select Approved PR → Step 2: Delivery → Step 3: Taxes → Step 4: Send for Approval → Issue to Vendor.
           </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -676,7 +879,7 @@ export default function PurchaseOrderCreatePage() {
             Save Draft
           </button>
 
-          <button
+          {/* <button
             type="button"
             className={classNames(primaryBtn, "active:scale-95")}
             style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
@@ -684,7 +887,7 @@ export default function PurchaseOrderCreatePage() {
             disabled={isLocked}
           >
             Send for Approval
-          </button>
+          </button> */}
         </div>
       </div>
 
@@ -770,31 +973,32 @@ export default function PurchaseOrderCreatePage() {
 
                 <div>
                   <label className={labelBase}>
-                    Source RFQ (Approved) <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
+                    Source PR (Approved) <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                   </label>
                   <select
-                    value={form.rfq_id}
+                    value={form.pr_id}
                     disabled={isLocked}
                     onChange={(e) => {
-                      setField("rfq_id", e.target.value);
-                      markTouched("rfq_id");
-                      onSelectRFQ(e.target.value);
+                      setField("pr_id", e.target.value);
+                      markTouched("pr_id");
+                      void onSelectApprovedPR(e.target.value);
                     }}
                     className={classNames(
                       inputBase,
                       isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
-                      showError("rfq_id") && "border-brand-500"
+                      showError("pr_id") && "border-brand-500"
                     )}
                   >
-                    <option value="">Select Approved RFQ</option>
-                    {APPROVED_RFQS.map((r) => (
-                      <option key={r.rfq_id} value={r.rfq_id}>
-                        {r.rfq_number} • {r.pr_number}
+                    <option value="">{prLoading ? "Loading Approved PRs…" : "Select Approved PR"}</option>
+                    {approvedPRs.map((r) => (
+                      <option key={r.pr_id} value={r.pr_id}>
+                        {r.pr_number} • {r.department || ""}
                       </option>
                     ))}
                   </select>
-                  {showError("rfq_id") && <p className="mt-1 text-xs text-brand-500">{errors.rfq_id}</p>}
-                  <p className={classNames(helperBase, "mt-1")}>Validation: Approved RFQ only.</p>
+                  {showError("pr_id") && <p className="mt-1 text-xs text-brand-500">{errors.pr_id}</p>}
+                  <p className={classNames(helperBase, "mt-1")}>Validation: Approved PR only.</p>
+                  {prLoadError && <p className="mt-1 text-xs text-red-600">{prLoadError}</p>}
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 min-w-0">
@@ -804,7 +1008,7 @@ export default function PurchaseOrderCreatePage() {
                     </label>
                     <input
                       readOnly
-                      value={selectedRFQ ? selectedRFQ.pr_number : form.pr_id}
+                      value={form.pr_number || selectedPR?.pr_number || ""}
                       className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     />
                   </div>
@@ -824,15 +1028,14 @@ export default function PurchaseOrderCreatePage() {
                       <option value="EUR">EUR</option>
                     </select>
                     {showError("currency") && <p className="mt-1 text-xs text-brand-500">{errors.currency}</p>}
-                    <p className={classNames(helperBase, "mt-1")}>Currency comes from RFQ.</p>
+                    <p className={classNames(helperBase, "mt-1")}>Currency comes from PR.</p>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-5 min-w-0">
                 <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-xs text-gray-700 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-                  <span className="font-semibold">Rule:</span> Vendor & item prices are locked from Approved RFQ (Phase-1).
-                  You can unlock in Phase-2 if needed.
+                  <span className="font-semibold">Rule:</span> Vendor is auto-filled from PR preferred vendor. PR estimated unit price is auto-filled and editable in the PO.
                 </div>
 
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-950">
@@ -941,10 +1144,6 @@ export default function PurchaseOrderCreatePage() {
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 min-w-0">
                 <div className="space-y-4">
                   <div>
-                    <label className={labelBase}>Vendor ID</label>
-                    <input readOnly value={form.vendor_id} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
-                  </div>
-                  <div>
                     <label className={labelBase}>Vendor Name</label>
                     <input readOnly value={form.vendor_name} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
                   </div>
@@ -975,7 +1174,7 @@ export default function PurchaseOrderCreatePage() {
                         Payment Terms <span style={{ color: FORTUNA_PRIMARY_RED }}>*</span>
                       </label>
                       <input readOnly value={form.payment_terms} className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")} />
-                      <p className={classNames(helperBase, "mt-1")}>From RFQ.</p>
+                      <p className={classNames(helperBase, "mt-1")}>Default vendor payment terms.</p>
                     </div>
                     <div>
                       <label className={labelBase}>
@@ -986,7 +1185,7 @@ export default function PurchaseOrderCreatePage() {
                         value={String(form.credit_period_days || "")}
                         className={classNames(inputBase, "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       />
-                      <p className={classNames(helperBase, "mt-1")}>From RFQ.</p>
+                      <p className={classNames(helperBase, "mt-1")}>Default vendor payment terms.</p>
                     </div>
                   </div>
 
@@ -1016,7 +1215,7 @@ export default function PurchaseOrderCreatePage() {
             <div className="space-y-4 min-w-0">
               <div>
                 <h4 className="text-base font-semibold text-gray-900 dark:text-white">Item & Pricing Details</h4>
-                <p className={helperBase}>Auto-populated from Approved RFQ. Qty & Unit Price are locked (Phase-1). Delivery Date editable.</p>
+                <p className={helperBase}>Auto-populated from Approved PR. Quantity comes from PR. Estimated unit price is editable in PO. Delivery Date editable.</p>
                 {errors.items && <p className="mt-1 text-xs text-brand-500">{errors.items}</p>}
               </div>
 
@@ -1039,11 +1238,11 @@ export default function PurchaseOrderCreatePage() {
                       const lineTotal = (ln.ordered_qty || 0) * (ln.unit_price || 0);
 
                       return (
-                        <tr key={ln.rfq_item_id} className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
+                        <tr key={ln.pr_item_id} className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5">
                           <td className="px-4 py-3">
                             <div className="font-semibold text-gray-900 dark:text-white">{ln.item_description}</div>
                             <div className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                              {ln.item_id} • RFQ Item: {ln.rfq_item_id} • PR Item: {ln.pr_item_id}
+                              {ln.item_id} • PR Item: {ln.pr_item_id}
                             </div>
                           </td>
                           <td className="px-4 py-3">{ln.uom}</td>
@@ -1053,15 +1252,19 @@ export default function PurchaseOrderCreatePage() {
                               value={String(ln.ordered_qty)}
                               className={classNames(inputBase, "min-w-[110px] cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                             />
-                            <p className={classNames(helperBase, "mt-1")}>From RFQ (Phase-1 locked)</p>
+                            <p className={classNames(helperBase, "mt-1")}>Requested quantity from PR</p>
                           </td>
                           <td className="px-4 py-3">
                             <input
-                              readOnly
+                              type="number"
+                              min="0"
+                              step="any"
                               value={String(ln.unit_price)}
-                              className={classNames(inputBase, "min-w-[120px] cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                              disabled={isLocked}
+                              onChange={(e) => updateItem(idx, { unit_price: Math.max(0, Number(e.target.value) || 0) })}
+                              className={classNames(inputBase, "min-w-[120px]", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                             />
-                            <p className={classNames(helperBase, "mt-1")}>From RFQ winner quote</p>
+                            <p className={classNames(helperBase, "mt-1")}>PR estimated unit price (editable)</p>
                           </td>
                           <td className="px-4 py-3 font-semibold text-gray-900 dark:text-white">
                             {money(lineTotal, form.currency)}
@@ -1089,7 +1292,7 @@ export default function PurchaseOrderCreatePage() {
                     {form.items.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300">
-                          Select an Approved RFQ to populate items.
+                          Select an Approved PR to populate items.
                         </td>
                       </tr>
                     )}
@@ -1129,13 +1332,18 @@ export default function PurchaseOrderCreatePage() {
                       showError("delivery_location") && "border-brand-500"
                     )}
                   >
-                    <option value="">Select</option>
-                    {WAREHOUSES.map((w) => (
+                    <option value="">
+                      {warehouseLoading ? "Loading Warehouses..." : "Select Warehouse"}
+                    </option>
+                    {warehouses.map((w) => (
                       <option key={w.id} value={w.id}>
-                        {w.name} ({w.id})
+                        {w.name} ({w.code || w.id})
                       </option>
                     ))}
                   </select>
+                  {masterLoadError && (
+                    <p className="mt-1 text-xs text-red-600">{masterLoadError}</p>
+                  )}
                   {showError("delivery_location") && (
                     <p className="mt-1 text-xs text-brand-500">{errors.delivery_location}</p>
                   )}
@@ -1454,8 +1662,8 @@ export default function PurchaseOrderCreatePage() {
                 <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-950">
                   <h4 className="text-base font-semibold text-gray-900 dark:text-white">Final Checks</h4>
                   <div className="mt-4 space-y-2 text-sm">
-                    <Row label="Approved RFQ" value={form.rfq_id ? "Selected" : "Not selected"} />
-                    <Row label="Warehouse" value={form.delivery_location ? form.delivery_location : "Not selected"} />
+                    <Row label="Approved PR" value={form.pr_id ? "Selected" : "Not selected"} />
+                    <Row label="Warehouse" value={warehouses.find((w) => w.id === form.delivery_location)?.name || (form.delivery_location ? form.delivery_location : "Not selected")} />
                     <Row label="Items" value={String(form.items.length)} />
                     <Row label="Grand Total" value={money(form.total_po_value, form.currency)} bold />
                   </div>
@@ -1483,10 +1691,10 @@ export default function PurchaseOrderCreatePage() {
           onClick={onSaveDraft}
           disabled={isLocked}
         >
-          Save Draft
+          {saving ? "Saving…" : "Save Draft"}
         </button>
 
-        <button
+        {/* <button
           type="button"
           className={classNames(primaryBtn, "active:scale-95")}
           style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
@@ -1494,7 +1702,7 @@ export default function PurchaseOrderCreatePage() {
           disabled={isLocked}
         >
           Send for Approval
-        </button>
+        </button> */}
       </div>
     </div>
   );

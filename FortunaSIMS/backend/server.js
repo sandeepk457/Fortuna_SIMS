@@ -1,10 +1,13 @@
+
 require("dotenv").config();
 
 const express = require("express");
 const cors = require("cors");
-const  pool  = require("./config/db");
+const path = require("path");
 
+const pool = require("./config/db");
 
+// Existing Routes
 const authRoutes = require("./routes/authRoutes");
 const vendorRoutes = require("./routes/vendorRoutes");
 const itemRoutes = require("./routes/itemRoutes");
@@ -15,18 +18,38 @@ const customerRoutes = require("./routes/customerRoutes");
 const prRoutes = require("./routes/prRoutes");
 const ecommerceRoutes = require("./routes/ecommerceRoutes");
 const rfqRoutes = require("./routes/rfqRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
 
 const app = express();
 
-// Middleware
+// =====================================================
+// MIDDLEWARE
+// =====================================================
+
 app.use(cors());
+
 app.use(express.json({ limit: "10mb" }));
-app.use(express.urlencoded({ limit: "10mb", extended: true }));
 
-// Static uploads
-app.use("/uploads", express.static("uploads"));
+app.use(
+  express.urlencoded({
+    limit: "10mb",
+    extended: true,
+  })
+);
 
-// API Routes
+// =====================================================
+// STATIC UPLOADS
+// =====================================================
+
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "uploads"))
+);
+
+// =====================================================
+// API ROUTES
+// =====================================================
+
 app.use("/api/auth", authRoutes);
 app.use("/api/vendors", vendorRoutes);
 app.use("/api/items", itemRoutes);
@@ -38,7 +61,13 @@ app.use("/api/pr", prRoutes);
 app.use("/api/ecommerce", ecommerceRoutes);
 app.use("/api/rfq", rfqRoutes);
 
-// Health check - useful for Render
+// Purchase Order API
+app.use("/api/purchase-orders", purchaseOrderRoutes);
+
+// =====================================================
+// HEALTH CHECK
+// =====================================================
+
 app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
@@ -46,31 +75,73 @@ app.get("/", (req, res) => {
   });
 });
 
-// Render provides PORT automatically.
-// Local development falls back to port 5000.
-const PORT = process.env.PORT || 5000;
+app.get("/api/debug/test", (req, res) => {
+  res.json({
+    success: true,
+    message: "Debug route working",
+  });
+});
 
+// =====================================================
+// DATABASE CONNECTION TEST
+// =====================================================
 
 app.get("/api/testdb", async (req, res) => {
   try {
     const result = await pool.query("SELECT NOW()");
 
-    res.json({
+    res.status(200).json({
       status: "Database Connected",
       time: result.rows[0],
     });
   } catch (err) {
-    console.error("DB Error:", err);
+    console.error("Database Error:", err);
 
     res.status(500).json({
       status: "Database Connection Failed",
       error: err?.message || String(err),
-      stack: process.env.NODE_ENV !== "production" ? err?.stack : undefined,
+      stack:
+        process.env.NODE_ENV !== "production"
+          ? err?.stack
+          : undefined,
     });
   }
 });
 
+// =====================================================
+// 404 HANDLER
+// =====================================================
+
+app.use((req, res) => {
+  res.status(404).json({
+    success: false,
+    message: `Cannot ${req.method} ${req.originalUrl}`,
+    serverFile: __filename,
+  });
+});
+
+// =====================================================
+// GLOBAL ERROR HANDLER
+// =====================================================
+
+app.use((err, req, res, next) => {
+  console.error("Backend Error:", err);
+
+  res.status(err.status || 500).json({
+    success: false,
+    message:
+      process.env.NODE_ENV === "production"
+        ? "Internal Server Error"
+        : err.message || "Internal Server Error",
+  });
+});
+
+// =====================================================
+// START SERVER
+// =====================================================
+
+const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
-  console.log(`SIMS backend running on port ${PORT}`);
+  console.log(`Fortuna SIMS Backend running on port ${PORT}`);
 });

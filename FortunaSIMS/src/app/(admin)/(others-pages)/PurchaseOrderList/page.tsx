@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 // ✅ Add-on (for navigation to edit PO form)
 import { useRouter } from "next/navigation";
@@ -25,7 +25,7 @@ type Priority = "Low" | "Medium" | "High" | "Urgent";
 type Department = "Stores" | "Operations" | "Maintenance" | "Finance" | "IT" | "Admin" | "Procurement";
 type Currency = "INR" | "USD" | "EUR";
 
-type ApprovalLevel = 1 | 2 | 3;
+type ApprovalLevel = 0 | 1 | 2 | 3;
 type ApprovalDecision = "Approved" | "Rejected";
 
 type ApprovalStep = {
@@ -37,6 +37,7 @@ type ApprovalStep = {
 };
 
 type PurchaseOrder = {
+  poId: string; // PostgreSQL purchase_orders.po_id UUID
   poNo: string;
   poDate: string; // yyyy-mm-dd (system)
   createdOn: string; // yyyy-mm-dd
@@ -69,24 +70,32 @@ type ListTab = "all" | "drafts" | "pending" | "approved" | "issued";
 function classNames(...v: Array<string | false | undefined | null>) {
   return v.filter(Boolean).join(" ");
 }
-function todayISO() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
-}
-function withinRange(dateISO: string, from?: string, to?: string) {
-  const t = new Date(dateISO).getTime();
-  if (from) {
-    const f = new Date(from).getTime();
-    if (t < f) return false;
-  }
-  if (to) {
-    const e = new Date(to).getTime();
-    if (t > e) return false;
-  }
+function withinRange(
+  dateISO: string,
+  from?: string,
+  to?: string
+) {
+  if (!from && !to) return true;
+  if (!dateISO) return false;
+
+  const date = dateISO.slice(0, 10);
+
+  if (from && date < from) return false;
+  if (to && date > to) return false;
+
   return true;
+}
+
+/** Read JSON or plain-text API responses safely. */
+async function readApiResponse(response: Response): Promise<any> {
+  const text = await response.text();
+  if (!text.trim()) return {};
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { message: text };
+  }
 }
 function formatMoney(value: number, currency: Currency) {
   try {
@@ -100,130 +109,119 @@ function formatMoney(value: number, currency: Currency) {
   }
 }
 
+const mapApiPurchaseOrder = (row: any): PurchaseOrder => {
+  const validStatuses: POStatus[] = [
+    "Draft", "Pending Approval", "Approved", "Rejected", "Issued to Vendor",
+    "Partially Received", "Fully Received", "Closed", "Cancelled",
+  ];
+  const validPriorities: Priority[] = ["Low", "Medium", "High", "Urgent"];
+  const validDepartments: Department[] = [
+    "Stores", "Operations", "Maintenance", "Finance", "IT", "Admin", "Procurement",
+  ];
+  const validCurrencies: Currency[] = ["INR", "USD", "EUR"];
+
+  const status = validStatuses.includes(row.status) ? row.status : "Draft";
+  const priority = validPriorities.includes(row.priority) ? row.priority : "Medium";
+  const department = validDepartments.includes(row.department) ? row.department : "Procurement";
+  const currency = validCurrencies.includes(row.currency) ? row.currency : "INR";
+  const dateOnly = (value: unknown): string => {
+  if (!value) return "";
+
+  const text = String(value).trim();
+
+  // PostgreSQL DATE: preserve exact date
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
+    return text;
+  }
+
+  // PostgreSQL timestamp: convert to India timezone
+  const date = new Date(text);
+
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Kolkata",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const getPart = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return `${getPart("year")}-${getPart("month")}-${getPart("day")}`;
+};
+
+  return {
+    poId: String(row.po_id ?? ""),
+    poNo: String(row.po_number ?? row.poNo ?? ""),
+    poDate: dateOnly(row.po_date),
+    createdOn: dateOnly(
+  row.created_at ??
+  row.created_on ??
+  row.createdOn ??
+  row.po_date
+),
+    buyer: String(row.buyer ?? ""),
+    department,
+    rfqNo: String(row.rfq_number ?? row.rfq_no ?? row.rfq_id ?? ""),
+    prNo: String(row.pr_number ?? row.pr_no ?? row.pr_id ?? ""),
+    vendorName: String(row.vendor_name ?? ""),
+    vendorCode: String(row.vendor_code ?? ""),
+    currency,
+    totalItems: Number(row.total_items ?? 0),
+    grandTotal: Number(row.total_value ?? row.grand_total ?? 0),
+    priority,
+    status,
+    deliveryWarehouse: String(row.delivery_warehouse ?? ""),
+    approvalRequired: Boolean(row.approval_required),
+    approvalRoute: [{ level: 1, approverRole: "Procurement Manager" }],
+    currentApprovalLevel: Math.min(Math.max(Number(row.current_approval_level ?? 0), 0), 3) as ApprovalLevel,
+  };
+};
+
 export default function PurchaseOrderListPage() {
   const router = useRouter();
-  const [data, setData] = useState<PurchaseOrder[]>([
-    {
-      poNo: "PO-2026-000201",
-      poDate: "2026-02-03",
-      createdOn: "2026-02-03",
-      buyer: "Sandeep",
-      department: "Procurement",
-      rfqNo: "RFQ-2026-000101",
-      prNo: "PR-000103",
-      vendorName: "Aparna Packaging",
-      vendorCode: "V-002",
-      currency: "INR",
-      totalItems: 2,
-      grandTotal: 68080,
-      priority: "High",
-      status: "Pending Approval",
-      deliveryWarehouse: "WH-002",
-      approvalRequired: true,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Finance" },
-        { level: 2, approverRole: "Procurement Head" },
-        { level: 3, approverRole: "Admin" },
-      ],
-    },
-    {
-      poNo: "PO-2026-000202",
-      poDate: "2026-02-02",
-      createdOn: "2026-02-02",
-      buyer: "Aparna",
-      department: "Maintenance",
-      rfqNo: "RFQ-2026-000099",
-      prNo: "PR-000101",
-      vendorName: "Sri Lakshmi Suppliers",
-      vendorCode: "V-001",
-      currency: "INR",
-      totalItems: 6,
-      grandTotal: 145000,
-      priority: "Urgent",
-      status: "Approved",
-      deliveryWarehouse: "WH-001",
-      approvalRequired: true,
-      currentApprovalLevel: 2,
-      approvalRoute: [
-        { level: 1, approverRole: "Finance", decision: "Approved", decidedAt: "2026-02-02", remarks: "OK" },
-        { level: 2, approverRole: "Procurement Head" },
-        { level: 3, approverRole: "Admin" },
-      ],
-    },
-    {
-      poNo: "PO-2026-000203",
-      poDate: "2026-02-01",
-      createdOn: "2026-02-01",
-      buyer: "Divya",
-      department: "Admin",
-      rfqNo: "RFQ-2026-000090",
-      prNo: "PR-000104",
-      vendorName: "Prime 3PL",
-      vendorCode: "V-010",
-      currency: "INR",
-      totalItems: 1,
-      grandTotal: 18000,
-      priority: "Low",
-      status: "Draft",
-      deliveryWarehouse: "WH-003",
-      approvalRequired: false,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Finance" },
-        { level: 2, approverRole: "Procurement Head" },
-        { level: 3, approverRole: "Admin" },
-      ],
-    },
-    {
-      poNo: "PO-2026-000204",
-      poDate: "2026-01-30",
-      createdOn: "2026-01-30",
-      buyer: "Kiran",
-      department: "Operations",
-      rfqNo: "RFQ-2026-000088",
-      prNo: "PR-000105",
-      vendorName: "FastLine Transport",
-      vendorCode: "V-007",
-      currency: "INR",
-      totalItems: 1,
-      grandTotal: 95000,
-      priority: "High",
-      status: "Issued to Vendor",
-      deliveryWarehouse: "WH-002",
-      approvalRequired: true,
-      currentApprovalLevel: 3,
-      approvalRoute: [
-        { level: 1, approverRole: "Finance", decision: "Approved", decidedAt: "2026-01-31" },
-        { level: 2, approverRole: "Procurement Head", decision: "Approved", decidedAt: "2026-02-01" },
-        { level: 3, approverRole: "Admin", decision: "Approved", decidedAt: "2026-02-01" },
-      ],
-    },
-    {
-      poNo: "PO-2026-000205",
-      poDate: "2026-01-28",
-      createdOn: "2026-01-28",
-      buyer: "Ravi",
-      department: "Stores",
-      rfqNo: "RFQ-2026-000080",
-      prNo: "PR-000099",
-      vendorName: "Sri Lakshmi Suppliers",
-      vendorCode: "V-001",
-      currency: "INR",
-      totalItems: 3,
-      grandTotal: 42000,
-      priority: "Medium",
-      status: "Rejected",
-      deliveryWarehouse: "WH-001",
-      approvalRequired: true,
-      currentApprovalLevel: 1,
-      approvalRoute: [
-        { level: 1, approverRole: "Finance", decision: "Rejected", decidedAt: "2026-01-29", remarks: "Budget not available" },
-        { level: 2, approverRole: "Procurement Head" },
-        { level: 3, approverRole: "Admin" },
-      ],
-    },
-  ]);
+  const [data, setData] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
+
+
+
+  const fetchPurchaseOrders = useCallback(async () => {
+    setLoading(true);
+    setLoadError("");
+
+    try {
+      const response = await fetch(`${API_BASE}/api/purchase-orders`, {
+        method: "GET",
+        headers: { "Content-Type": "application/json" },
+        cache: "no-store",
+      });
+
+      const result = await readApiResponse(response);
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || `Request failed (${response.status})`);
+      }
+
+      const rows = Array.isArray(result) ? result : Array.isArray(result?.data) ? result.data : [];
+      setData(rows.map(mapApiPurchaseOrder));
+    } catch (error) {
+      console.error("Fetch PO List Error:", error);
+      setLoadError(error instanceof Error ? error.message : "Unable to load purchase orders.");
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE]);
+
+  useEffect(() => {
+    void fetchPurchaseOrders();
+  }, [fetchPurchaseOrders]);
 
   /** Tabs */
   const [activeTab, setActiveTab] = useState<ListTab>("all");
@@ -236,6 +234,7 @@ export default function PurchaseOrderListPage() {
   const [statusFilter, setStatusFilter] = useState<POStatus | "">("");
   const [createdFrom, setCreatedFrom] = useState("");
   const [createdTo, setCreatedTo] = useState("");
+  const [searchCreatedOn, setSearchCreatedOn] = useState("");
 
   /** Pagination */
   const [currentPage, setCurrentPage] = useState(1);
@@ -245,6 +244,9 @@ export default function PurchaseOrderListPage() {
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [selectedPoNo, setSelectedPoNo] = useState("");
   const [approvalRemarks, setApprovalRemarks] = useState("");
+  const [approvalActionLoading, setApprovalActionLoading] = useState(false);
+  const [approvalError, setApprovalError] = useState("");
+  const [submittingPoId, setSubmittingPoId] = useState<string | null>(null);
 
   /** Tab base filtering */
   const tabFilteredBase = useMemo(() => {
@@ -256,30 +258,50 @@ export default function PurchaseOrderListPage() {
   }, [data, activeTab]);
 
   /** Apply filters */
-  const filteredData = useMemo(() => {
-    return tabFilteredBase.filter((po) => {
-      const ok =
-        po.poNo.toLowerCase().includes(searchPoNo.toLowerCase()) &&
-        po.vendorName.toLowerCase().includes(searchVendor.toLowerCase()) &&
-        po.buyer.toLowerCase().includes(searchBuyer.toLowerCase()) &&
-        (deptFilter ? po.department === deptFilter : true) &&
-        (statusFilter ? po.status === statusFilter : true) &&
-        withinRange(po.createdOn, createdFrom || undefined, createdTo || undefined);
+const filteredData = useMemo(() => {
+  return tabFilteredBase.filter((po) => {
 
-      return ok;
-    });
-  }, [
-    tabFilteredBase,
-    searchPoNo,
-    searchVendor,
-    searchBuyer,
-    deptFilter,
-    statusFilter,
-    createdFrom,
-    createdTo,
-  ]);
+    // Created On text search
+    const createdOnSearch = searchCreatedOn.trim().toLowerCase();
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+    const matchesCreatedOn =
+      !createdOnSearch ||
+      po.createdOn.toLowerCase().includes(createdOnSearch);
+
+    // Existing filters
+    const ok =
+      po.poNo.toLowerCase().includes(searchPoNo.toLowerCase()) &&
+      po.vendorName.toLowerCase().includes(searchVendor.toLowerCase()) &&
+      po.buyer.toLowerCase().includes(searchBuyer.toLowerCase()) &&
+      (deptFilter ? po.department === deptFilter : true) &&
+      (statusFilter ? po.status === statusFilter : true) &&
+      withinRange(
+        po.createdOn,
+        createdFrom || undefined,
+        createdTo || undefined
+      ) &&
+      matchesCreatedOn;
+
+    return ok;
+  });
+}, [
+  tabFilteredBase,
+  searchPoNo,
+  searchVendor,
+  searchBuyer,
+  deptFilter,
+  statusFilter,
+  createdFrom,
+  createdTo,
+  searchCreatedOn, // NEW
+]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / itemsPerPage));
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
   const paginatedData = filteredData.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   /** Stats (based on filteredData) */
@@ -366,66 +388,122 @@ export default function PurchaseOrderListPage() {
   const openApproval = (poNo: string) => {
     setSelectedPoNo(poNo);
     setApprovalRemarks("");
+    setApprovalError("");
     setApprovalModalOpen(true);
   };
 
-  const applyDecision = (decision: ApprovalDecision) => {
-    if (!selectedPoNo) return;
+  const applyDecision = async (decision: ApprovalDecision) => {
+    if (!selectedPoNo || !selectedPO) return;
 
-    setData((prev) =>
-      prev.map((po) => {
-        if (po.poNo !== selectedPoNo) return po;
-        if (po.status !== "Pending Approval") return po;
+    if (!selectedPO.poId) {
+      setApprovalError("PO database ID is missing. Refresh the list and try again.");
+      return;
+    }
 
-        const now = todayISO();
-        const lvl = po.currentApprovalLevel;
+    setApprovalActionLoading(true);
+    setApprovalError("");
 
-        const nextRoute = po.approvalRoute.map((s) => {
-          if (s.level !== lvl) return s;
-          return {
-            ...s,
+    try {
+      const response = await fetch(
+        `${API_BASE}/api/purchase-orders/${encodeURIComponent(selectedPO.poId)}/approval`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
             decision,
-            decidedAt: now,
-            remarks: approvalRemarks?.trim() ? approvalRemarks.trim() : undefined,
-          };
-        });
-
-        if (decision === "Rejected") {
-          return { ...po, status: "Rejected", approvalRoute: nextRoute };
+            remarks: approvalRemarks.trim() || null,
+            // Temporary identity until application authentication is connected.
+            approver_id: "Procurement Manager",
+          }),
         }
+      );
 
-        const nextLevel = (lvl + 1) as ApprovalLevel;
-        const hasNext = po.approvalRoute.some((s) => s.level === nextLevel);
+      const result = await readApiResponse(response);
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || `Approval failed (${response.status})`);
+      }
 
-        if (hasNext) {
-          return {
-            ...po,
-            status: "Pending Approval",
-            approvalRoute: nextRoute,
-            currentApprovalLevel: nextLevel,
-          };
-        }
-
-        return { ...po, status: "Approved", approvalRoute: nextRoute };
-      })
-    );
-
-    setApprovalModalOpen(false);
+      await fetchPurchaseOrders();
+      setApprovalModalOpen(false);
+      setSelectedPoNo("");
+      setApprovalRemarks("");
+      setActiveTab(decision === "Approved" ? "approved" : "all");
+      setCurrentPage(1);
+    } catch (error) {
+      console.error("PO Approval Error:", error);
+      setApprovalError(
+        error instanceof Error ? error.message : "Unable to save PO approval."
+      );
+    } finally {
+      setApprovalActionLoading(false);
+    }
   };
 
-  /** Issue action (demo) */
-  const issueToVendor = (poNo: string) => {
-    const ok = confirm(`Issue PO ${poNo} to Vendor?`);
-    if (!ok) return;
+    
+/** Issue Approved PO to Vendor - Database API */
+const issueToVendor = async (poNo: string) => {
+  const po = data.find((item) => item.poNo === poNo);
 
-    setData((prev) =>
-      prev.map((po) => {
-        if (po.poNo !== poNo) return po;
-        if (po.status !== "Approved") return po;
-        return { ...po, status: "Issued to Vendor" };
-      })
+  if (!po) {
+    alert("Purchase Order not found. Please refresh the list.");
+    return;
+  }
+
+  if (!po.poId) {
+    alert("PO database ID is missing. Please refresh the list.");
+    return;
+  }
+
+  if (po.status !== "Approved") {
+    alert("Only Approved Purchase Orders can be issued to Vendor.");
+    return;
+  }
+
+  const confirmed = confirm(
+    `Issue PO ${poNo} to Vendor ${po.vendorName}?`
+  );
+
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(
+      `${API_BASE}/api/purchase-orders/${encodeURIComponent(po.poId)}/issue`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({}),
+      }
     );
-  };
+
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok || result?.success === false) {
+      throw new Error(
+        result?.message || `Issue PO failed (${response.status})`
+      );
+    }
+
+    alert(result.message || `PO ${poNo} issued to Vendor successfully.`);
+
+    // Refresh from PostgreSQL
+    await fetchPurchaseOrders();
+
+    // Show issued PO
+    setActiveTab("all");
+    setCurrentPage(1);
+  } catch (error) {
+    console.error("Issue PO to Vendor Error:", error);
+
+    alert(
+      error instanceof Error
+        ? error.message
+        : "Unable to issue Purchase Order to Vendor."
+    );
+  }
+};
+
 
   /** ✅ Draft actions (ONLY in Drafts tab) */
   const onEditDraft = (poNo: string) => {
@@ -433,29 +511,72 @@ export default function PurchaseOrderListPage() {
     alert(`Edit Draft PO: ${poNo} (demo)`);
   };
 
-  const onSendDraftForApproval = (poNo: string) => {
+  const onSendDraftForApproval = async (poNo: string) => {
+    const po = data.find((item) => item.poNo === poNo);
+    if (!po) {
+      alert("Purchase order was not found in the current list. Please refresh and try again.");
+      return;
+    }
+
+    if (po.status !== "Draft") {
+      alert(`Only Draft purchase orders can be submitted. Current status: ${po.status}`);
+      return;
+    }
+
+    if (!po.poId) {
+      alert("PO database ID is missing. Refresh the list and try again.");
+      return;
+    }
+
+    if (submittingPoId) return;
+
     const ok = confirm(`Send draft PO ${poNo} for approval?`);
     if (!ok) return;
 
-    setData((prev) =>
-      prev.map((po) => {
-        if (po.poNo !== poNo) return po;
-        if (po.status !== "Draft") return po;
+    setSubmittingPoId(po.poId);
 
-        // Draft -> Pending Approval
-        return {
-          ...po,
-          status: "Pending Approval",
-          approvalRequired: true, // in demo we assume approvals required once submitted
-          currentApprovalLevel: 1,
-          approvalRoute: po.approvalRoute.map((s) => ({ ...s, decision: undefined, decidedAt: undefined, remarks: undefined })),
-        };
-      })
-    );
+    try {
+      const url = `${API_BASE}/api/purchase-orders/${encodeURIComponent(po.poId)}/submit-for-approval`;
+      const response = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
 
-    // UX: switch to Pending tab after send
-    setActiveTab("pending");
-    setCurrentPage(1);
+      const result = await readApiResponse(response);
+
+      if (!response.ok || result?.success === false) {
+        console.error("PO Submit API Error:", {
+          status: response.status,
+          statusText: response.statusText,
+          url: response.url,
+          response: result,
+        });
+
+        throw new Error(
+          result?.message ||
+            result?.error ||
+            `Submit PO failed: HTTP ${response.status} ${response.statusText}`
+        );
+      }
+
+      // The backend is the source of truth for PO status. Refresh from DB.
+      await fetchPurchaseOrders();
+      setActiveTab("pending");
+      setStatusFilter("");
+      setCurrentPage(1);
+
+      alert(result?.message || `PO ${poNo} submitted for approval successfully.`);
+    } catch (error) {
+      console.error("Submit PO for Approval Error:", error);
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Unable to submit PO for approval."
+      );
+    } finally {
+      setSubmittingPoId(null);
+    }
   };
 
   /** ✅ REQUIRED: Delete draft (ONLY in Drafts tab) */
@@ -516,10 +637,18 @@ export default function PurchaseOrderListPage() {
 
 
             <button
+              onClick={() => void fetchPurchaseOrders()}
+              disabled={loading}
+              className="active:scale-95 rounded-xl border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 shadow-md transition-all duration-200 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-gray-800 dark:bg-gray-950 dark:text-gray-200 dark:hover:bg-white/5"
+            >
+              {loading ? "Refreshing..." : "Refresh List"}
+            </button>
+
+            <button
               onClick={exportToCSV}
               className="bg-rose-600 hover:bg-rose-700 active:scale-95 rounded-xl px-5 py-2.5 text-sm font-semibold text-white shadow-md transition-all duration-200"
             >
-              Export to Excel
+              Export CSV
             </button>
 
             <button
@@ -697,29 +826,37 @@ export default function PurchaseOrderListPage() {
                       </select>
                     </th>
 
-                    <th className="px-4 py-3 text-left">
-                      Created On
-                      <div className="mt-2 grid grid-cols-2 gap-2">
-                        <input
-                          type="date"
-                          className="w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                          value={createdFrom}
-                          onChange={(e) => {
-                            setCreatedFrom(e.target.value);
-                            setCurrentPage(1);
-                          }}
-                        />
-                        <input
-                          type="date"
-                          className="w-full rounded border bg-white px-2 py-1 text-xs dark:border-gray-700 dark:bg-gray-900"
-                          value={createdTo}
-                          onChange={(e) => {
-                            setCreatedTo(e.target.value);
-                            setCurrentPage(1);
-                          }}
-                        />
-                      </div>
-                    </th>
+                    <th className="px-4 py-3 text-left min-w-[240px]">
+  <div className="font-semibold text-white">
+    Created On
+  </div>
+
+  
+  {/* Date Range */}
+  <div className="mt-2 grid grid-cols-2 gap-2">
+    <input
+      type="date"
+      title="Created From"
+      className="min-w-0 w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-xs text-gray-800"
+      value={createdFrom}
+      onChange={(e) => {
+        setCreatedFrom(e.target.value);
+        setCurrentPage(1);
+      }}
+    />
+
+    <input
+      type="date"
+      title="Created To"
+      className="min-w-0 w-full rounded-md border border-gray-300 bg-white px-2 py-2 text-xs text-gray-800"
+      value={createdTo}
+      onChange={(e) => {
+        setCreatedTo(e.target.value);
+        setCurrentPage(1);
+      }}
+    />
+  </div>
+</th>
 
                     <th className="px-4 py-3 text-left">Items</th>
                     <th className="px-4 py-3 text-left">Grand Total</th>
@@ -728,7 +865,31 @@ export default function PurchaseOrderListPage() {
                 </thead>
 
                 <tbody className="dark:text-gray-200">
-                  {paginatedData.map((po) => (
+                  {loading && (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                        Loading purchase orders from database...
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && loadError && (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-8 text-center text-red-600">
+                        Failed to load purchase orders: {loadError}
+                        <button className="ml-3 font-semibold underline" onClick={() => void fetchPurchaseOrders()}>
+                          Retry
+                        </button>
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && !loadError && paginatedData.length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="px-4 py-10 text-center text-gray-500">
+                        No purchase orders found.
+                      </td>
+                    </tr>
+                  )}
+                  {!loading && !loadError && paginatedData.map((po) => (
                     <tr
                       key={po.poNo}
                       className="border-b hover:bg-gray-50 dark:border-gray-800 dark:hover:bg-white/5"
@@ -757,7 +918,7 @@ export default function PurchaseOrderListPage() {
                         {po.status === "Pending Approval" && po.approvalRequired && (
                           <div className="mt-1 text-[11px] text-gray-500 dark:text-gray-300">
                             Level {po.currentApprovalLevel} •{" "}
-                            {po.approvalRoute.find((s) => s.level === po.currentApprovalLevel)?.approverRole}
+                            {po.approvalRoute.find((s) => s.level === po.currentApprovalLevel)?.approverRole || "Procurement Manager"}
                           </div>
                         )}
 
@@ -792,10 +953,12 @@ export default function PurchaseOrderListPage() {
                             </button>
 
                             <button
-                              className="font-semibold hover:underline text-emerald-700"
-                              onClick={() => onSendDraftForApproval(po.poNo)}
+                              type="button"
+                              className="font-semibold hover:underline text-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                              disabled={submittingPoId === po.poId || submittingPoId !== null}
+                              onClick={() => void onSendDraftForApproval(po.poNo)}
                             >
-                              Send for Approval
+                              {submittingPoId === po.poId ? "Submitting..." : "Send for Approval"}
                             </button>
 
                             {/* ✅ Delete ONLY in Drafts tab */}
@@ -832,13 +995,6 @@ export default function PurchaseOrderListPage() {
                     </tr>
                   ))}
 
-                  {paginatedData.length === 0 && (
-                    <tr>
-                      <td className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-300" colSpan={10}>
-                        No POs found for current filters.
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>
@@ -938,7 +1094,7 @@ export default function PurchaseOrderListPage() {
                   PO: <span className="font-semibold">{selectedPO.poNo}</span> • Level{" "}
                   <span className="font-semibold">{selectedPO.currentApprovalLevel}</span> •{" "}
                   <span className="font-semibold">
-                    {selectedPO.approvalRoute.find((s) => s.level === selectedPO.currentApprovalLevel)?.approverRole}
+                    {selectedPO.approvalRoute.find((s) => s.level === selectedPO.currentApprovalLevel)?.approverRole || "Procurement Manager"}
                   </span>
                 </p>
               </div>
@@ -1035,21 +1191,29 @@ export default function PurchaseOrderListPage() {
                   <button
                     className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
                     style={{ backgroundColor: FORTUNA_PRIMARY_RED }}
-                    onClick={() => applyDecision("Rejected")}
+                    disabled={approvalActionLoading}
+                    onClick={() => void applyDecision("Rejected")}
                   >
-                    Reject
+                    {approvalActionLoading ? "Saving..." : "Reject"}
                   </button>
                   <button
                     className="flex-1 rounded-xl px-4 py-2 text-sm font-semibold text-white active:scale-95"
                     style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
-                    onClick={() => applyDecision("Approved")}
+                    disabled={approvalActionLoading}
+                    onClick={() => void applyDecision("Approved")}
                   >
-                    Approve
+                    {approvalActionLoading ? "Saving..." : "Approve"}
                   </button>
                 </div>
 
+                {approvalError && (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                    {approvalError}
+                  </div>
+                )}
+
                 <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
-                  <span className="font-semibold">Note:</span> This is demo approval (state update). Next: connect API + role access.
+                  <span className="font-semibold">Approval:</span> Single-level Procurement Manager approval. Status and remarks are saved to PostgreSQL.
                 </div>
               </div>
             </div>
