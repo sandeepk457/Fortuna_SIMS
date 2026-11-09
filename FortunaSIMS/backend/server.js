@@ -7,26 +7,52 @@ const path = require("path");
 
 const pool = require("./config/db");
 
-// Existing Routes
-const authRoutes = require("./routes/authRoutes");
-const vendorRoutes = require("./routes/vendorRoutes");
-const itemRoutes = require("./routes/itemRoutes");
-const uomRoutes = require("./routes/uom.routes.js");
-const demandRoutes = require("./routes/demand.routes.js");
-const warehouseRoutes = require("./routes/warehouse.routes.js");
-const customerRoutes = require("./routes/customerRoutes");
-const prRoutes = require("./routes/prRoutes");
-const ecommerceRoutes = require("./routes/ecommerceRoutes");
-const rfqRoutes = require("./routes/rfqRoutes");
-const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
-
 const app = express();
+
+// =====================================================
+// CORS CONFIGURATION
+// LOCAL + PRODUCTION
+// =====================================================
+
+const defaultOrigins = [
+  "http://localhost:3000",
+  "http://localhost:3001",
+  "https://fortuna-sims-frontend.onrender.com",
+];
+
+const allowedOrigins = (
+  process.env.CORS_ORIGINS || defaultOrigins.join(",")
+)
+  .split(",")
+  .map((origin) => origin.trim().replace(/\/$/, ""))
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow Postman and server-to-server requests
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      const normalizedOrigin = origin.replace(/\/$/, "");
+
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        return callback(null, true);
+      }
+
+      console.warn("CORS blocked origin:", origin);
+
+      return callback(new Error("Not allowed by CORS"));
+    },
+
+    credentials: true,
+  })
+);
 
 // =====================================================
 // MIDDLEWARE
 // =====================================================
-
-app.use(cors());
 
 app.use(express.json({ limit: "10mb" }));
 
@@ -47,6 +73,22 @@ app.use(
 );
 
 // =====================================================
+// EXISTING ROUTES
+// =====================================================
+
+const authRoutes = require("./routes/authRoutes");
+const vendorRoutes = require("./routes/vendorRoutes");
+const itemRoutes = require("./routes/itemRoutes");
+const uomRoutes = require("./routes/uom.routes.js");
+const demandRoutes = require("./routes/demand.routes.js");
+const warehouseRoutes = require("./routes/warehouse.routes.js");
+const customerRoutes = require("./routes/customerRoutes");
+const prRoutes = require("./routes/prRoutes");
+const ecommerceRoutes = require("./routes/ecommerceRoutes");
+const rfqRoutes = require("./routes/rfqRoutes");
+const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+
+// =====================================================
 // API ROUTES
 // =====================================================
 
@@ -61,7 +103,10 @@ app.use("/api/pr", prRoutes);
 app.use("/api/ecommerce", ecommerceRoutes);
 app.use("/api/rfq", rfqRoutes);
 
-// Purchase Order API
+// =====================================================
+// PURCHASE ORDER API
+// =====================================================
+
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 
 // =====================================================
@@ -72,11 +117,16 @@ app.get("/", (req, res) => {
   res.status(200).json({
     status: "success",
     message: "Fortuna SIMS Backend API is running",
+    environment: process.env.NODE_ENV || "development",
   });
 });
 
+// =====================================================
+// DEBUG ROUTE
+// =====================================================
+
 app.get("/api/debug/test", (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: "Debug route working",
   });
@@ -99,11 +149,10 @@ app.get("/api/testdb", async (req, res) => {
 
     res.status(500).json({
       status: "Database Connection Failed",
-      error: err?.message || String(err),
-      stack:
-        process.env.NODE_ENV !== "production"
-          ? err?.stack
-          : undefined,
+      error:
+        process.env.NODE_ENV === "production"
+          ? "Database connection failed"
+          : err.message || String(err),
     });
   }
 });
@@ -116,7 +165,6 @@ app.use((req, res) => {
   res.status(404).json({
     success: false,
     message: `Cannot ${req.method} ${req.originalUrl}`,
-    serverFile: __filename,
   });
 });
 
@@ -126,6 +174,13 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error("Backend Error:", err);
+
+  if (err.message === "Not allowed by CORS") {
+    return res.status(403).json({
+      success: false,
+      message: "Request origin is not allowed",
+    });
+  }
 
   res.status(err.status || 500).json({
     success: false,
