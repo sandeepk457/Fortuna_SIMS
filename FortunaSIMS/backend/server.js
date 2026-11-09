@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -18,6 +17,7 @@ const defaultOrigins = [
   "http://localhost:3000",
   "http://localhost:3001",
   "https://fortuna-sims-frontend.onrender.com",
+  "https://sims.fortunaglobalsupplychain.com",
 ];
 
 const allowedOrigins = (
@@ -26,6 +26,8 @@ const allowedOrigins = (
   .split(",")
   .map((origin) => origin.trim().replace(/\/$/, ""))
   .filter(Boolean);
+
+console.log("Allowed CORS Origins:", allowedOrigins);
 
 app.use(
   cors({
@@ -102,11 +104,6 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/pr", prRoutes);
 app.use("/api/ecommerce", ecommerceRoutes);
 app.use("/api/rfq", rfqRoutes);
-
-// =====================================================
-// PURCHASE ORDER API
-// =====================================================
-
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 
 // =====================================================
@@ -173,7 +170,7 @@ app.use((req, res) => {
 // =====================================================
 
 app.use((err, req, res, next) => {
-  console.error("Backend Error:", err);
+  console.error("Backend Error:", err.message);
 
   if (err.message === "Not allowed by CORS") {
     return res.status(403).json({

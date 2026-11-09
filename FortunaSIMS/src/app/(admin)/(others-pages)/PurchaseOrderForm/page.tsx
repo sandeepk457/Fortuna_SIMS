@@ -332,9 +332,6 @@ export default function PurchaseOrderCreatePage() {
   const [vendorLoading, setVendorLoading] = useState(false);
   const [warehouseLoading, setWarehouseLoading] = useState(false);
   const [masterLoadError, setMasterLoadError] = useState("");
-
-  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
-
   /** Load Vendor and Warehouse Master records from the backend. */
   useEffect(() => {
     let active = true;
@@ -346,8 +343,8 @@ export default function PurchaseOrderCreatePage() {
 
       try {
         const [vendorResponse, warehouseResponse] = await Promise.all([
-          fetch(`${API_BASE}/api/vendors`, { cache: "no-store" }),
-          fetch(`${API_BASE}/api/warehouses`, { cache: "no-store" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`, { cache: "no-store" }),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`, { cache: "no-store" }),
         ]);
 
         const [vendorResult, warehouseResult] = await Promise.all([
@@ -387,7 +384,7 @@ export default function PurchaseOrderCreatePage() {
 
     void loadMasters();
     return () => { active = false; };
-  }, [API_BASE]);
+  }, []);
 
   /** Load PR list from existing backend and keep only approved PRs. */
   useEffect(() => {
@@ -396,7 +393,7 @@ export default function PurchaseOrderCreatePage() {
       setPrLoading(true);
       setPrLoadError("");
       try {
-        const response = await fetch(`${API_BASE}/api/pr/list`, { cache: "no-store" });
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pr/list`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok || result?.success === false) {
           throw new Error(result?.message || "Unable to load PR list.");
@@ -411,7 +408,7 @@ export default function PurchaseOrderCreatePage() {
     };
     loadApprovedPRs();
     return () => { active = false; };
-  }, [API_BASE]);
+  }, []);
 
   const selectedPR = useMemo(() => {
     return approvedPRs.find((pr) => pr.pr_id === form.pr_id);
@@ -442,7 +439,7 @@ export default function PurchaseOrderCreatePage() {
     }
 
     try {
-      const response = await fetch(`${API_BASE}/api/pr/${encodeURIComponent(prId)}`, { cache: "no-store" });
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pr/${encodeURIComponent(prId)}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || result?.success === false || !result?.data?.header) {
         throw new Error(result?.message || "Unable to load selected PR details.");
@@ -466,7 +463,7 @@ export default function PurchaseOrderCreatePage() {
 
         if (matchedVendor) {
           const vendorDetailResponse = await fetch(
-            `${API_BASE}/api/vendors/${encodeURIComponent(matchedVendor.vendor_id)}`,
+            `${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${encodeURIComponent(matchedVendor.vendor_id)}`,
             { cache: "no-store" }
           );
           const vendorDetailResult = await vendorDetailResponse.json();
@@ -538,7 +535,7 @@ export default function PurchaseOrderCreatePage() {
     if (warehouse.code) {
       try {
         const response = await fetch(
-          `${API_BASE}/api/warehouses/full/${encodeURIComponent(warehouse.code)}`,
+          `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full/${encodeURIComponent(warehouse.code)}`,
           { cache: "no-store" }
         );
         const result = await response.json();
@@ -750,7 +747,7 @@ export default function PurchaseOrderCreatePage() {
 
     setSaving(true);
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

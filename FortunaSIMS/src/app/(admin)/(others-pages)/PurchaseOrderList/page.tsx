@@ -187,17 +187,12 @@ export default function PurchaseOrderListPage() {
   const [data, setData] = useState<PurchaseOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-
-  const API_BASE = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000").replace(/\/$/, "");
-
-
-
   const fetchPurchaseOrders = useCallback(async () => {
     setLoading(true);
     setLoadError("");
 
     try {
-      const response = await fetch(`${API_BASE}/api/purchase-orders`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -217,7 +212,7 @@ export default function PurchaseOrderListPage() {
     } finally {
       setLoading(false);
     }
-  }, [API_BASE]);
+  }, []);
 
   useEffect(() => {
     void fetchPurchaseOrders();
@@ -405,7 +400,7 @@ const filteredData = useMemo(() => {
 
     try {
       const response = await fetch(
-        `${API_BASE}/api/purchase-orders/${encodeURIComponent(selectedPO.poId)}/approval`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(selectedPO.poId)}/approval`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -467,7 +462,7 @@ const issueToVendor = async (poNo: string) => {
 
   try {
     const response = await fetch(
-      `${API_BASE}/api/purchase-orders/${encodeURIComponent(po.poId)}/issue`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(po.poId)}/issue`,
       {
         method: "POST",
         headers: {
@@ -536,7 +531,7 @@ const issueToVendor = async (poNo: string) => {
     setSubmittingPoId(po.poId);
 
     try {
-      const url = `${API_BASE}/api/purchase-orders/${encodeURIComponent(po.poId)}/submit-for-approval`;
+      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(po.poId)}/submit-for-approval`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
