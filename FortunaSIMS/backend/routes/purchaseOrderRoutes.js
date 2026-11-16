@@ -1,3 +1,4 @@
+
 const express = require("express");
 const router = express.Router();
 
@@ -8,40 +9,31 @@ const purchaseOrderController = require("../controllers/purchaseOrderController"
 // ==========================================
 
 // GET: Purchase Order List
-router.get(
-  "/",
-  purchaseOrderController.getPurchaseOrders
-);
+router.get("/", purchaseOrderController.getPurchaseOrders);
 
 // GET: Purchase Order Details
-router.get(
-  "/:id",
-  purchaseOrderController.getPurchaseOrderById
-);
+router.get("/:id", purchaseOrderController.getPurchaseOrderById);
 
 // POST: Create Purchase Order
-router.post(
-  "/",
-  purchaseOrderController.createPurchaseOrder
-);
+router.post("/", purchaseOrderController.createPurchaseOrder);
 
 // PUT: Update Purchase Order
-router.put(
-  "/:id",
-  purchaseOrderController.updatePurchaseOrder
-);
+router.put("/:id", purchaseOrderController.updatePurchaseOrder);
+
+// DELETE: Delete Draft Purchase Order
+router.delete("/:id", purchaseOrderController.deleteDraftPurchaseOrder);
 
 // ==========================================
 // PURCHASE ORDER APPROVAL ROUTES
 // ==========================================
 
-// POST: Submit Draft PO for Approval
+// Submit Draft PO for Approval
 router.post(
   "/:id/submit-for-approval",
   purchaseOrderController.submitPurchaseOrderForApproval
 );
 
-// POST: Procurement Manager Approve / Reject PO
+// Approve / Reject PO
 router.post(
   "/:id/approval",
   purchaseOrderController.approveOrRejectPurchaseOrder
@@ -51,7 +43,6 @@ router.post(
 // PURCHASE ORDER ISSUE ROUTE
 // ==========================================
 
-// POST: Issue Approved PO to Vendor
 router.post(
   "/:id/issue",
   purchaseOrderController.issuePurchaseOrderToVendor

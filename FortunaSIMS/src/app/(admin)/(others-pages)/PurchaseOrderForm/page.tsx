@@ -8,6 +8,12 @@ import { useRouter } from "next/navigation";
 const FORTUNA_PRIMARY_RED = "#C8102E";
 const FORTUNA_SECONDARY_BLUE = "#005F99";
 
+const getApiBaseUrl = () => {
+  const value = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!value) throw new Error("NEXT_PUBLIC_API_URL is not configured for this environment.");
+  return value.replace(/\/$/, "");
+};
+
 /** Tabs */
 type TabKey = "basic" | "vendor" | "items" | "delivery" | "taxes" | "terms";
 
@@ -316,6 +322,15 @@ const initialState: POFormState = {
 
 export default function PurchaseOrderCreatePage() {
   const router = useRouter();
+  const [editMode, setEditMode] = useState(false);
+  const [editPoId, setEditPoId] = useState<string | null>(null);
+  const [editLoaded, setEditLoaded] = useState(false);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setEditMode(params.get("mode") === "edit");
+    setEditPoId(params.get("id"));
+  }, []);
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<POFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -343,8 +358,8 @@ export default function PurchaseOrderCreatePage() {
 
       try {
         const [vendorResponse, warehouseResponse] = await Promise.all([
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/vendors`, { cache: "no-store" }),
-          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`, { cache: "no-store" }),
+          fetch(`${getApiBaseUrl()}/api/vendors`, { cache: "no-store" }),
+          fetch(`${getApiBaseUrl()}/api/warehouses`, { cache: "no-store" }),
         ]);
 
         const [vendorResult, warehouseResult] = await Promise.all([
@@ -393,7 +408,7 @@ export default function PurchaseOrderCreatePage() {
       setPrLoading(true);
       setPrLoadError("");
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pr/list`, { cache: "no-store" });
+        const response = await fetch(`${getApiBaseUrl()}/api/pr/list`, { cache: "no-store" });
         const result = await response.json();
         if (!response.ok || result?.success === false) {
           throw new Error(result?.message || "Unable to load PR list.");
@@ -409,6 +424,94 @@ export default function PurchaseOrderCreatePage() {
     loadApprovedPRs();
     return () => { active = false; };
   }, []);
+
+  // Load an existing Draft PO when the page is opened from the PO List Edit action.
+  useEffect(() => {
+    if (!editMode || !editPoId || editLoaded || prLoading || vendorLoading || warehouseLoading) return;
+    let active = true;
+    const loadDraftPO = async () => {
+      try {
+        const response = await fetch(`${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(editPoId)}`, { cache: "no-store" });
+        const result = await response.json();
+        if (!response.ok || result?.success === false) throw new Error(result?.message || "Unable to load Purchase Order.");
+        const po = result?.data?.purchaseOrder || result?.data?.po || result?.data || result?.purchaseOrder || result;
+        if (!po?.po_id) throw new Error("Purchase Order details were not returned by the API.");
+        if (String(po.status || "").trim() !== "Draft") throw new Error("Only Draft purchase orders can be edited.");
+        let editVendor = vendors.find((v) => v.vendor_id === String(po.vendor_id || ""));
+        if (po.vendor_id) {
+          try {
+            const vendorResponse = await fetch(`${getApiBaseUrl()}/api/vendors/${encodeURIComponent(String(po.vendor_id))}`, { cache: "no-store" });
+            const vendorResult = await vendorResponse.json();
+            if (vendorResponse.ok && vendorResult?.success !== false) {
+              const rawVendor = vendorResult?.data?.vendor || vendorResult?.data || vendorResult;
+              const normalized = normalizeVendor(rawVendor);
+              if (normalized.vendor_id) editVendor = normalized;
+            }
+          } catch (vendorError) {
+            console.warn("Unable to load PO vendor master details:", vendorError);
+          }
+        }
+        const apiItems = Array.isArray(po.items) ? po.items : Array.isArray(po.purchase_order_items) ? po.purchase_order_items : [];
+        const items: PRLine[] = apiItems.map((item: any, index: number) => ({
+          pr_item_id: String(item.pr_item_id || item.po_item_id || item.id || `${po.po_id}-${index + 1}`),
+          item_id: String(item.item_id || ""),
+          item_description: String(item.description || item.item_description || ""),
+          uom: String(item.uom || ""),
+          ordered_qty: Number(item.qty ?? item.ordered_qty ?? 0),
+          unit_price: Number(item.unit_price ?? 0),
+          delivery_date: item.delivery_date ? String(item.delivery_date).slice(0, 10) : "",
+        }));
+        if (!active) return;
+        setForm((previous) => ({
+          ...previous,
+          po_id: String(po.po_id),
+          po_number: String(po.po_number || previous.po_number),
+          po_date: po.po_date ? String(po.po_date).slice(0, 10) : previous.po_date,
+          pr_id: String(po.pr_id || ""),
+          pr_number: String(po.pr_number || po.pr_no || previous.pr_number),
+          po_status: "Draft",
+          created_by: String(po.created_by || po.buyer || previous.created_by),
+          approval_required: po.approval_required !== false,
+          currency: (po.currency || "INR") as Currency,
+          vendor_id: String(po.vendor_id || ""),
+          vendor_name: String(po.vendor_name || ""),
+          vendor_address: editVendor?.vendor_address || "",
+          gstin: editVendor?.gstin || "",
+          contact_person: editVendor?.contact_person || "",
+          vendor_email: editVendor?.vendor_email || "",
+          payment_terms: editVendor?.default_payment_terms || "Net 30",
+          credit_period_days: editVendor?.default_credit_days || 30,
+          delivery_location: String(po.delivery?.warehouse_id || po.delivery_warehouse || po.delivery_location || ""),
+          delivery_address: String(po.delivery?.delivery_address ?? po.delivery_address ?? ""),
+          incoterms: (po.delivery?.incoterms ?? po.incoterms ?? "") as Incoterms | "",
+          freight_responsibility: (po.delivery?.freight_responsibility ?? po.freight_responsibility ?? "") as FreightResponsibility | "",
+          delivery_schedule: (po.delivery?.delivery_schedule ?? po.delivery_schedule ?? "") as DeliverySchedule | "",
+          packing_instructions: String(po.delivery?.packing_instructions ?? po.packing_instructions ?? ""),
+          tax_applicable: Boolean(String(po.taxes?.gst_percentage ?? po.gst_percentage ?? "").trim()),
+          gst_percentage: String(po.taxes?.gst_percentage ?? po.gst_percentage ?? ""),
+          is_igst: Number(po.taxes?.igst_amount ?? po.igst_amount ?? 0) > 0,
+          cgst_amount: Number(po.taxes?.cgst_amount ?? po.cgst_amount ?? 0),
+          sgst_amount: Number(po.taxes?.sgst_amount ?? po.sgst_amount ?? 0),
+          igst_amount: Number(po.taxes?.igst_amount ?? po.igst_amount ?? 0),
+          freight_charges: String(po.taxes?.freight_charges ?? po.freight_charges ?? ""),
+          other_charges: String(po.taxes?.other_charges ?? po.other_charges ?? ""),
+          warranty_terms: String(po.terms?.warranty_terms ?? po.warranty_terms ?? ""),
+          penalty_clause: Boolean(po.terms?.penalty_clause ?? po.penalty_clause ?? false),
+          liquidated_damages: String(po.terms?.liquidated_damages ?? po.liquidated_damages ?? ""),
+          cancellation_terms: String(po.terms?.cancellation_terms ?? po.cancellation_terms ?? ""),
+          governing_law: String(po.terms?.governing_law ?? po.governing_law ?? "India"),
+          dispute_resolution: String(po.terms?.dispute_resolution ?? po.dispute_resolution ?? "Arbitration / Court"),
+          items,
+          total_po_value: Number(po.total_value ?? po.total_po_value ?? items.reduce((sum, item) => sum + item.ordered_qty * item.unit_price, 0)),
+        }));
+        setEditLoaded(true);
+      } catch (error) {
+        if (active) alert(error instanceof Error ? error.message : "Unable to load Draft PO.");
+      }
+    };
+    void loadDraftPO();
+    return () => { active = false; };
+  }, [editMode, editPoId, editLoaded, prLoading, vendorLoading, warehouseLoading, vendors]);
 
   const selectedPR = useMemo(() => {
     return approvedPRs.find((pr) => pr.pr_id === form.pr_id);
@@ -439,7 +542,7 @@ export default function PurchaseOrderCreatePage() {
     }
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/pr/${encodeURIComponent(prId)}`, { cache: "no-store" });
+      const response = await fetch(`${getApiBaseUrl()}/api/pr/${encodeURIComponent(prId)}`, { cache: "no-store" });
       const result = await response.json();
       if (!response.ok || result?.success === false || !result?.data?.header) {
         throw new Error(result?.message || "Unable to load selected PR details.");
@@ -463,7 +566,7 @@ export default function PurchaseOrderCreatePage() {
 
         if (matchedVendor) {
           const vendorDetailResponse = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/vendors/${encodeURIComponent(matchedVendor.vendor_id)}`,
+            `${getApiBaseUrl()}/api/vendors/${encodeURIComponent(matchedVendor.vendor_id)}`,
             { cache: "no-store" }
           );
           const vendorDetailResult = await vendorDetailResponse.json();
@@ -535,7 +638,7 @@ export default function PurchaseOrderCreatePage() {
     if (warehouse.code) {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses/full/${encodeURIComponent(warehouse.code)}`,
+          `${getApiBaseUrl()}/api/warehouses/full/${encodeURIComponent(warehouse.code)}`,
           { cache: "no-store" }
         );
         const result = await response.json();
@@ -701,6 +804,7 @@ export default function PurchaseOrderCreatePage() {
 
   /** Actions */
   const onReset = () => {
+    if (editMode) { alert("Reset is disabled while editing an existing PO. Use the PO List to reopen the record."); return; }
     setForm(initialState);
     setTouched({});
     setActiveTab("basic");
@@ -714,7 +818,7 @@ export default function PurchaseOrderCreatePage() {
       alert("Please fix validation errors before saving the PO draft.");
       return;
     }
-    if (!form.pr_id || !selectedPR || String(selectedPR.status).toLowerCase() !== "approved") {
+    if (!form.pr_id || (!editMode && (!selectedPR || String(selectedPR.status).toLowerCase() !== "approved"))) {
       alert("Only an Approved PR can be used to create a PO.");
       return;
     }
@@ -725,11 +829,11 @@ export default function PurchaseOrderCreatePage() {
       vendor_id: form.vendor_id,
       vendor_name: form.vendor_name,
       buyer: form.created_by,
-      department: selectedPR.department || null,
+      department: selectedPR?.department || null,
       currency: form.currency,
       total_items: form.items.length,
       total_value: form.total_po_value,
-      priority: selectedPR.priority || null,
+      priority: selectedPR?.priority || null,
       status: "Draft",
       delivery_warehouse: form.delivery_location,
       approval_required: form.approval_required,
@@ -743,30 +847,60 @@ export default function PurchaseOrderCreatePage() {
         unit_price: item.unit_price,
         delivery_date: item.delivery_date || null,
       })),
+      delivery: {
+        warehouse_id: form.delivery_location || null,
+        delivery_address: form.delivery_address || null,
+        incoterms: form.incoterms || null,
+        freight_responsibility: form.freight_responsibility || null,
+        delivery_schedule: form.delivery_schedule || null,
+        packing_instructions: form.packing_instructions || null,
+      },
+      taxes: {
+        gst_percentage: form.tax_applicable ? form.gst_percentage : "",
+        cgst_amount: totals.cgst,
+        sgst_amount: totals.sgst,
+        igst_amount: totals.igst,
+        freight_charges: form.freight_charges.trim() ? Number(form.freight_charges) : 0,
+        other_charges: form.other_charges.trim() ? Number(form.other_charges) : 0,
+      },
+      terms: {
+        warranty_terms: form.warranty_terms || null,
+        penalty_clause: Boolean(form.penalty_clause),
+        liquidated_damages: form.penalty_clause && form.liquidated_damages.trim() ? Number(form.liquidated_damages) : null,
+        cancellation_terms: form.cancellation_terms || null,
+        governing_law: form.governing_law || null,
+        dispute_resolution: form.dispute_resolution || null,
+      },
     };
 
     setSaving(true);
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const response = await fetch(
+        editMode
+          ? `${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(editPoId || form.po_id)}`
+          : `${getApiBaseUrl()}/api/purchase-orders`,
+        {
+          method: editMode ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const result = await response.json();
       if (!response.ok || result?.success === false) {
         throw new Error(result?.message || "Failed to save PO draft.");
       }
+      if (editMode) {
+        const saved = result?.data;
+        if (!saved?.po_id || !Array.isArray(saved?.items) || !saved?.delivery || !saved?.taxes || !saved?.terms) {
+          throw new Error("The server did not return the complete saved PO details. Please refresh the PO List and verify before proceeding.");
+        }
+      }
       alert(
-  `PO Draft saved successfully${
-    result?.data?.po_number
-      ? `: ${result.data.po_number}`
-      : result?.po_number
-      ? `: ${result.po_number}`
-      : ""
-  }.`
-);
-
-router.push("/PurchaseOrderList");
+        `${editMode ? "PO Draft updated successfully" : "PO Draft saved successfully"}${
+          result?.data?.po_number ? `: ${result.data.po_number}` : result?.po_number ? `: ${result.po_number}` : ""
+        }.`
+      );
+      router.push("/PurchaseOrderList");
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to save PO draft.");
     } finally {
@@ -846,7 +980,7 @@ router.push("/PurchaseOrderList");
       {/* Header */}
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">PO Creation</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editMode ? "Edit Purchase Order" : "PO Creation"}</h3>
           <p className={helperBase}>
             Step 1: Select Approved PR → Step 2: Delivery → Step 3: Taxes → Step 4: Send for Approval → Issue to Vendor.
           </p>
@@ -862,7 +996,7 @@ router.push("/PurchaseOrderList");
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
+          <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || editMode}>
             Reset
           </button>
 
@@ -871,9 +1005,9 @@ router.push("/PurchaseOrderList");
             className={classNames(primaryBtn, "active:scale-95")}
             style={{ backgroundColor: FORTUNA_SECONDARY_BLUE, opacity: isLocked ? 0.6 : 1 }}
             onClick={onSaveDraft}
-            disabled={isLocked}
+            disabled={isLocked || saving || (editMode && !editLoaded)}
           >
-            Save Draft
+            {saving ? "Saving…" : editMode ? "Update Draft" : "Save Draft"}
           </button>
 
           {/* <button
@@ -1074,7 +1208,7 @@ router.push("/PurchaseOrderList");
                     />
                   </div>
 
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  {/* <div className="mt-4 flex flex-wrap gap-2">
                     <button
                       type="button"
                       className={classNames(primaryBtn, "active:scale-95")}
@@ -1113,7 +1247,7 @@ router.push("/PurchaseOrderList");
                     >
                       Issue to Vendor (Demo)
                     </button>
-                  </div>
+                  </div> */}
 
                   {form.approval_date && (
                     <p className={classNames(helperBase, "mt-2")}>
@@ -1677,7 +1811,7 @@ router.push("/PurchaseOrderList");
 
       {/* Footer actions */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked}>
+        <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || editMode}>
           Reset
         </button>
 
@@ -1686,9 +1820,9 @@ router.push("/PurchaseOrderList");
           className={classNames(primaryBtn, "active:scale-95")}
           style={{ backgroundColor: FORTUNA_SECONDARY_BLUE, opacity: isLocked ? 0.6 : 1 }}
           onClick={onSaveDraft}
-          disabled={isLocked}
+          disabled={isLocked || saving || (editMode && !editLoaded)}
         >
-          {saving ? "Saving…" : "Save Draft"}
+          {saving ? "Saving…" : editMode ? "Update Draft" : "Save Draft"}
         </button>
 
         {/* <button

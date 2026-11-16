@@ -66,6 +66,13 @@ type PurchaseOrder = {
 /** Tabs */
 type ListTab = "all" | "drafts" | "pending" | "approved" | "issued";
 
+/** API base URL: same frontend build works with Local and Vercel env values. */
+const getApiBaseUrl = () => {
+  const value = process.env.NEXT_PUBLIC_API_URL?.trim();
+  if (!value) throw new Error("NEXT_PUBLIC_API_URL is not configured.");
+  return value.replace(/\/$/, "");
+};
+
 /** UI helpers */
 function classNames(...v: Array<string | false | undefined | null>) {
   return v.filter(Boolean).join(" ");
@@ -192,7 +199,7 @@ export default function PurchaseOrderListPage() {
     setLoadError("");
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders`, {
+      const response = await fetch(`${getApiBaseUrl()}/api/purchase-orders`, {
         method: "GET",
         headers: { "Content-Type": "application/json" },
         cache: "no-store",
@@ -238,6 +245,12 @@ export default function PurchaseOrderListPage() {
   /** Approval Modal */
   const [approvalModalOpen, setApprovalModalOpen] = useState(false);
   const [selectedPoNo, setSelectedPoNo] = useState("");
+
+  /** Read-only PO View Modal */
+  const [viewModalOpen, setViewModalOpen] = useState(false);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [viewError, setViewError] = useState("");
+  const [viewPO, setViewPO] = useState<any>(null);
   const [approvalRemarks, setApprovalRemarks] = useState("");
   const [approvalActionLoading, setApprovalActionLoading] = useState(false);
   const [approvalError, setApprovalError] = useState("");
@@ -379,6 +392,44 @@ const filteredData = useMemo(() => {
     setCurrentPage(1);
   };
 
+  /** Read-only PO details - fetch complete record from backend */
+  const openPOView = async (po: PurchaseOrder) => {
+    if (!po?.poId) {
+      setViewError("PO database ID is missing. Refresh the list and try again.");
+      setViewPO(null);
+      setViewModalOpen(true);
+      return;
+    }
+
+    setViewModalOpen(true);
+    setViewLoading(true);
+    setViewError("");
+    setViewPO(null);
+
+    try {
+      const response = await fetch(
+        `${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(po.poId)}`,
+        {
+          method: "GET",
+          headers: { "Content-Type": "application/json" },
+          cache: "no-store",
+        }
+      );
+
+      const result = await readApiResponse(response);
+      if (!response.ok || result?.success === false) {
+        throw new Error(result?.message || `Unable to load PO details (${response.status})`);
+      }
+
+      setViewPO(result?.data ?? result);
+    } catch (error) {
+      console.error("View PO Details Error:", error);
+      setViewError(error instanceof Error ? error.message : "Unable to load PO details.");
+    } finally {
+      setViewLoading(false);
+    }
+  };
+
   /** Approval modal actions */
   const openApproval = (poNo: string) => {
     setSelectedPoNo(poNo);
@@ -400,7 +451,7 @@ const filteredData = useMemo(() => {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(selectedPO.poId)}/approval`,
+        `${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(selectedPO.poId)}/approval`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -462,7 +513,7 @@ const issueToVendor = async (poNo: string) => {
 
   try {
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(po.poId)}/issue`,
+      `${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(po.poId)}/issue`,
       {
         method: "POST",
         headers: {
@@ -501,9 +552,16 @@ const issueToVendor = async (poNo: string) => {
 
 
   /** ✅ Draft actions (ONLY in Drafts tab) */
-  const onEditDraft = (poNo: string) => {
-    // Replace with router.push("/procurement/po/new?mode=edit&poNo=...")
-    alert(`Edit Draft PO: ${poNo} (demo)`);
+  const onEditDraft = (po: PurchaseOrder) => {
+    if (!po?.poId) {
+      alert("PO database ID is missing. Please refresh the list and try again.");
+      return;
+    }
+    if (po.status !== "Draft") {
+      alert("Only Draft Purchase Orders can be edited.");
+      return;
+    }
+    router.push(`/PurchaseOrderForm?mode=edit&id=${encodeURIComponent(po.poId)}`);
   };
 
   const onSendDraftForApproval = async (poNo: string) => {
@@ -531,7 +589,7 @@ const issueToVendor = async (poNo: string) => {
     setSubmittingPoId(po.poId);
 
     try {
-      const url = `${process.env.NEXT_PUBLIC_API_URL}/api/purchase-orders/${encodeURIComponent(po.poId)}/submit-for-approval`;
+      const url = `${getApiBaseUrl()}/api/purchase-orders/${encodeURIComponent(po.poId)}/submit-for-approval`;
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -930,8 +988,9 @@ const issueToVendor = async (poNo: string) => {
 
                       <td className="px-4 py-3 space-x-3">
                         <button
+                          type="button"
                           className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => alert(`View: open PO detail for ${po.poNo} (demo)`)}
+                          onClick={() => void openPOView(po)}
                         >
                           View
                         </button>
@@ -942,7 +1001,7 @@ const issueToVendor = async (poNo: string) => {
                             <button
                               className="font-semibold hover:underline"
                               style={{ color: FORTUNA_SECONDARY_BLUE }}
-                              onClick={() => onEditDraft(po.poNo)}
+                              onClick={() => onEditDraft(po)}
                             >
                               Edit
                             </button>
@@ -1077,6 +1136,172 @@ const issueToVendor = async (poNo: string) => {
           </div>
         </div>
       </div>
+
+      {/* Read-only Purchase Order Details Modal */}
+      {viewModalOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-3 sm:p-5">
+          <div className="flex max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-950">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-200 px-5 py-4 dark:border-gray-800">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900 dark:text-white">Purchase Order Details</h3>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  {viewPO?.po_number || viewPO?.poNo || "Loading PO"} • Read-only view
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setViewModalOpen(false); setViewPO(null); setViewError(""); }}
+                className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-white/10"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-5">
+              {viewLoading && (
+                <div className="py-16 text-center text-sm text-gray-500">Loading complete Purchase Order details...</div>
+              )}
+              {!viewLoading && viewError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/30 dark:text-red-300">
+                  {viewError}
+                </div>
+              )}
+              {!viewLoading && !viewError && viewPO && (
+                <div className="space-y-6">
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">1. PO Header & Vendor Details</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <ReadOnlyField label="PO Number" value={viewPO.po_number} />
+                      <ReadOnlyField label="PO Date" value={viewPO.po_date} />
+                      <ReadOnlyField label="Status" value={viewPO.status} />
+                      <ReadOnlyField label="Priority" value={viewPO.priority} />
+                      <ReadOnlyField label="Vendor Name" value={viewPO.vendor_name} />
+                      <ReadOnlyField label="Vendor ID" value={viewPO.vendor_id} />
+                      <ReadOnlyField label="Buyer" value={viewPO.buyer} />
+                      <ReadOnlyField label="Department" value={viewPO.department} />
+                      <ReadOnlyField label="RFQ Reference" value={viewPO.rfq_id} />
+                      <ReadOnlyField label="PR Reference" value={viewPO.pr_id} />
+                      <ReadOnlyField label="Currency" value={viewPO.currency} />
+                      <ReadOnlyField label="Delivery Warehouse" value={viewPO.delivery_warehouse} />
+                      <ReadOnlyField label="Total Items" value={viewPO.total_items} />
+                      <ReadOnlyField label="Total Value" value={viewPO.total_value} />
+                      <ReadOnlyField label="Approval Required" value={viewPO.approval_required} />
+                      <ReadOnlyField label="Current Approval Level" value={viewPO.current_approval_level} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">2. PO Items</h4>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+                      <table className="w-full min-w-[720px] text-sm">
+                        <thead className="bg-gray-100 text-left dark:bg-gray-800">
+                          <tr>
+                            {["Item ID", "Description", "UOM", "Quantity", "Unit Price", "Line Value", "Delivery Date"].map((h) => (
+                              <th key={h} className="px-3 py-2 font-semibold">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(Array.isArray(viewPO.items) ? viewPO.items : []).map((item: any, index: number) => (
+                            <tr key={item.po_item_id || index} className="border-t border-gray-200 dark:border-gray-800">
+                              <td className="px-3 py-2">{item.item_id || "—"}</td>
+                              <td className="px-3 py-2">{item.description || "—"}</td>
+                              <td className="px-3 py-2">{item.uom || "—"}</td>
+                              <td className="px-3 py-2">{item.qty ?? "—"}</td>
+                              <td className="px-3 py-2">{item.unit_price ?? "—"}</td>
+                              <td className="px-3 py-2">{Number(item.qty || 0) * Number(item.unit_price || 0)}</td>
+                              <td className="px-3 py-2">{item.delivery_date || "—"}</td>
+                            </tr>
+                          ))}
+                          {(!Array.isArray(viewPO.items) || viewPO.items.length === 0) && (
+                            <tr><td colSpan={7} className="px-3 py-5 text-center text-gray-500">No PO items found.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">3. Delivery Details</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <ReadOnlyField label="Warehouse ID" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.warehouse_id} />
+                      <ReadOnlyField label="Delivery Address" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.delivery_address} />
+                      <ReadOnlyField label="Incoterms" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.incoterms} />
+                      <ReadOnlyField label="Freight Responsibility" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.freight_responsibility} />
+                      <ReadOnlyField label="Delivery Schedule" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.delivery_schedule} />
+                      <ReadOnlyField label="Packing Instructions" value={(Array.isArray(viewPO.delivery) ? viewPO.delivery[0] : viewPO.delivery)?.packing_instructions} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">4. Taxes & Charges</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                      <ReadOnlyField label="GST %" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.gst_percentage} />
+                      <ReadOnlyField label="CGST Amount" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.cgst_amount} />
+                      <ReadOnlyField label="SGST Amount" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.sgst_amount} />
+                      <ReadOnlyField label="IGST Amount" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.igst_amount} />
+                      <ReadOnlyField label="Freight Charges" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.freight_charges} />
+                      <ReadOnlyField label="Other Charges" value={(Array.isArray(viewPO.taxes) ? viewPO.taxes[0] : viewPO.taxes)?.other_charges} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">5. Terms & Conditions</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <ReadOnlyField label="Warranty Terms" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.warranty_terms} />
+                      <ReadOnlyField label="Penalty Clause" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.penalty_clause} />
+                      <ReadOnlyField label="Liquidated Damages" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.liquidated_damages} />
+                      <ReadOnlyField label="Cancellation Terms" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.cancellation_terms} />
+                      <ReadOnlyField label="Governing Law" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.governing_law} />
+                      <ReadOnlyField label="Dispute Resolution" value={(Array.isArray(viewPO.terms) ? viewPO.terms[0] : viewPO.terms)?.dispute_resolution} />
+                    </div>
+                  </section>
+
+                  <section>
+                    <h4 className="mb-3 text-base font-bold text-gray-900 dark:text-white">6. Approval History</h4>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-800">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100 text-left dark:bg-gray-800">
+                          <tr>
+                            {["Level", "Approver", "Decision", "Remarks", "Approval Date"].map((h) => (
+                              <th key={h} className="px-3 py-2 font-semibold">{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(Array.isArray(viewPO.approvals) ? viewPO.approvals : []).map((approval: any, index: number) => (
+                            <tr key={approval.approval_id || index} className="border-t border-gray-200 dark:border-gray-800">
+                              <td className="px-3 py-2">{approval.level ?? "—"}</td>
+                              <td className="px-3 py-2">{approval.approver_id || "—"}</td>
+                              <td className="px-3 py-2">{approval.decision || "—"}</td>
+                              <td className="px-3 py-2">{approval.remarks || "—"}</td>
+                              <td className="px-3 py-2">{approval.approval_date || "—"}</td>
+                            </tr>
+                          ))}
+                          {(!Array.isArray(viewPO.approvals) || viewPO.approvals.length === 0) && (
+                            <tr><td colSpan={5} className="px-3 py-5 text-center text-gray-500">No approval history available.</td></tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end border-t border-gray-200 px-5 py-3 dark:border-gray-800">
+              <button
+                type="button"
+                onClick={() => { setViewModalOpen(false); setViewPO(null); setViewError(""); }}
+                className="rounded-xl px-5 py-2 text-sm font-semibold text-white"
+                style={{ backgroundColor: FORTUNA_SECONDARY_BLUE }}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Approval Modal (PR list la same pattern) */}
       {approvalModalOpen && selectedPO && (
@@ -1288,6 +1513,24 @@ function StatRow({
       >
         {showValue}
       </span>
+    </div>
+  );
+}
+
+function ReadOnlyField({ label, value }: { label: string; value: unknown }) {
+  const displayValue =
+    value === null || value === undefined || value === ""
+      ? "—"
+      : typeof value === "boolean"
+        ? value ? "Yes" : "No"
+        : String(value);
+
+  return (
+    <div className="min-w-0 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 dark:border-gray-800 dark:bg-white/5">
+      <div className="text-xs font-medium text-gray-500 dark:text-gray-400">{label}</div>
+      <div className="mt-1 whitespace-pre-wrap break-words text-sm font-semibold text-gray-900 dark:text-gray-100">
+        {displayValue}
+      </div>
     </div>
   );
 }
