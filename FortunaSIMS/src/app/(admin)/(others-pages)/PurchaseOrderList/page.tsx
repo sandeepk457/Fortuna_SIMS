@@ -988,12 +988,21 @@ const issueToVendor = async (poNo: string) => {
 
                       <td className="px-4 py-3 space-x-3">
                         <button
-                          type="button"
-                          className="font-semibold text-blue-600 hover:underline"
-                          onClick={() => void openPOView(po)}
-                        >
-                          View
-                        </button>
+  type="button"
+  className="font-semibold text-blue-600 hover:underline"
+  onClick={() => {
+    if (!po?.poId) {
+      alert("PO database ID is missing. Please refresh the list and try again.");
+      return;
+    }
+
+    router.push(
+      `/PurchaseOrderForm?mode=view&id=${encodeURIComponent(po.poId)}`
+    );
+  }}
+>
+  View
+</button>
 
                         {/* ✅ Draft actions ONLY in Drafts tab */}
                         {activeTab === "drafts" && po.status === "Draft" && (

@@ -323,20 +323,24 @@ const initialState: POFormState = {
 export default function PurchaseOrderCreatePage() {
   const router = useRouter();
   const [editMode, setEditMode] = useState(false);
+  const [viewMode, setViewMode] = useState(false);
   const [editPoId, setEditPoId] = useState<string | null>(null);
   const [editLoaded, setEditLoaded] = useState(false);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    setEditMode(params.get("mode") === "edit");
+    const mode = params.get("mode");
+    setEditMode(mode === "edit");
+    setViewMode(mode === "view");
     setEditPoId(params.get("id"));
   }, []);
   const [activeTab, setActiveTab] = useState<TabKey>("basic");
   const [form, setForm] = useState<POFormState>(initialState);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  /** Lock editing after leaving Draft (as per workflow rule: approved PO is locked; also pending approval usually locked) */
+  /** View is always read-only. Existing workflow lock remains unchanged for Edit/Create. */
   const isLocked = form.po_status !== "Draft";
+  const isReadOnly = viewMode || isLocked;
 
   const [approvedPRs, setApprovedPRs] = useState<ApprovedPR[]>([]);
   const [prLoading, setPrLoading] = useState(false);
@@ -425,9 +429,9 @@ export default function PurchaseOrderCreatePage() {
     return () => { active = false; };
   }, []);
 
-  // Load an existing Draft PO when the page is opened from the PO List Edit action.
+  // Load the saved PO for both Edit and View. Edit remains Draft-only; View supports every status.
   useEffect(() => {
-    if (!editMode || !editPoId || editLoaded || prLoading || vendorLoading || warehouseLoading) return;
+    if ((!editMode && !viewMode) || !editPoId || editLoaded || prLoading || vendorLoading || warehouseLoading) return;
     let active = true;
     const loadDraftPO = async () => {
       try {
@@ -436,7 +440,10 @@ export default function PurchaseOrderCreatePage() {
         if (!response.ok || result?.success === false) throw new Error(result?.message || "Unable to load Purchase Order.");
         const po = result?.data?.purchaseOrder || result?.data?.po || result?.data || result?.purchaseOrder || result;
         if (!po?.po_id) throw new Error("Purchase Order details were not returned by the API.");
-        if (String(po.status || "").trim() !== "Draft") throw new Error("Only Draft purchase orders can be edited.");
+        const loadedStatus = String(po.status || po.po_status || "Draft").trim();
+        if (editMode && loadedStatus !== "Draft") throw new Error("Only Draft purchase orders can be edited.");
+        const validStatuses: POStatus[] = ["Draft", "Pending Approval", "Approved", "Rejected", "Issued to Vendor", "Partially Received", "Fully Received", "Closed", "Cancelled"];
+        const normalizedStatus: POStatus = validStatuses.includes(loadedStatus as POStatus) ? loadedStatus as POStatus : "Draft";
         let editVendor = vendors.find((v) => v.vendor_id === String(po.vendor_id || ""));
         if (po.vendor_id) {
           try {
@@ -469,7 +476,7 @@ export default function PurchaseOrderCreatePage() {
           po_date: po.po_date ? String(po.po_date).slice(0, 10) : previous.po_date,
           pr_id: String(po.pr_id || ""),
           pr_number: String(po.pr_number || po.pr_no || previous.pr_number),
-          po_status: "Draft",
+          po_status: normalizedStatus,
           created_by: String(po.created_by || po.buyer || previous.created_by),
           approval_required: po.approval_required !== false,
           currency: (po.currency || "INR") as Currency,
@@ -506,12 +513,12 @@ export default function PurchaseOrderCreatePage() {
         }));
         setEditLoaded(true);
       } catch (error) {
-        if (active) alert(error instanceof Error ? error.message : "Unable to load Draft PO.");
+        if (active) alert(error instanceof Error ? error.message : "Unable to load Purchase Order.");
       }
     };
     void loadDraftPO();
     return () => { active = false; };
-  }, [editMode, editPoId, editLoaded, prLoading, vendorLoading, warehouseLoading, vendors]);
+  }, [editMode, viewMode, editPoId, editLoaded, prLoading, vendorLoading, warehouseLoading, vendors]);
 
   const selectedPR = useMemo(() => {
     return approvedPRs.find((pr) => pr.pr_id === form.pr_id);
@@ -530,6 +537,7 @@ export default function PurchaseOrderCreatePage() {
 
   /** When an Approved PR is selected, fetch the full PR detail and auto-fill vendor/items. */
   const onSelectApprovedPR = async (prId: string) => {
+    if (isReadOnly) return;
     if (!prId) {
       setForm((p) => ({ ...p, pr_id: "", pr_number: "", vendor_id: "", vendor_name: "", vendor_address: "", gstin: "", contact_person: "", vendor_email: "", items: [] }));
       return;
@@ -619,7 +627,7 @@ export default function PurchaseOrderCreatePage() {
 
   /** Delivery location -> warehouse address and GST determination */
   const onSelectWarehouse = async (warehouseId: string) => {
-    if (isLocked) return;
+    if (isReadOnly) return;
 
     if (!warehouseId) {
       setForm((p) => ({
@@ -769,6 +777,7 @@ export default function PurchaseOrderCreatePage() {
   const hasErrors = Object.keys(errors).length > 0;
 
   const setField = <K extends keyof POFormState>(key: K, value: POFormState[K]) => {
+    if (isReadOnly) return;
     setForm((p) => ({ ...p, [key]: value }));
   };
 
@@ -794,7 +803,7 @@ export default function PurchaseOrderCreatePage() {
 
   /** Items update (delivery date editable) */
   const updateItem = (idx: number, patch: Partial<PRLine>) => {
-    if (isLocked) return;
+    if (isReadOnly) return;
     setForm((p) => {
       const next = [...p.items];
       next[idx] = { ...next[idx], ...patch };
@@ -804,6 +813,7 @@ export default function PurchaseOrderCreatePage() {
 
   /** Actions */
   const onReset = () => {
+    if (viewMode) return;
     if (editMode) { alert("Reset is disabled while editing an existing PO. Use the PO List to reopen the record."); return; }
     setForm(initialState);
     setTouched({});
@@ -811,7 +821,7 @@ export default function PurchaseOrderCreatePage() {
   };
 
   const onSaveDraft = async () => {
-    if (isLocked || saving) return;
+    if (viewMode || isLocked || saving) return;
     touchAll();
     if (hasErrors) {
       setActiveTab(firstErrorTab());
@@ -920,7 +930,7 @@ export default function PurchaseOrderCreatePage() {
   };
 
   const onSendForApproval = () => {
-    if (isLocked) return;
+    if (isReadOnly) return;
     touchAll();
     if (hasErrors) {
       setActiveTab(firstErrorTab());
@@ -937,6 +947,7 @@ export default function PurchaseOrderCreatePage() {
   };
 
   const onApplyApprovalDecision = (decision: ApprovalDecision) => {
+    if (viewMode) return;
     // Demo: Procurement Head/Finance action happens here
     if (form.po_status !== "Pending Approval") return;
 
@@ -957,6 +968,7 @@ export default function PurchaseOrderCreatePage() {
   };
 
   const onIssueToVendor = () => {
+    if (viewMode) return;
     if (form.po_status !== "Approved") return;
     setForm((p) => ({ ...p, po_status: "Issued to Vendor" }));
     alert("Issued to Vendor (demo). Next: GRN/Receipts flow.");
@@ -980,21 +992,26 @@ export default function PurchaseOrderCreatePage() {
       {/* Header */}
       <div className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-theme-sm dark:border-gray-800 dark:bg-gray-900 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{editMode ? "Edit Purchase Order" : "PO Creation"}</h3>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{viewMode ? "View Purchase Order" : editMode ? "Edit Purchase Order" : "PO Creation"}</h3>
           <p className={helperBase}>
             Step 1: Select Approved PR → Step 2: Delivery → Step 3: Taxes → Step 4: Send for Approval → Issue to Vendor.
           </p>
 
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <span className={statusPill(form.po_status)}>{form.po_status}</span>
-            {isLocked && (
+            {viewMode ? (
+              <span className="text-xs font-semibold" style={{ color: FORTUNA_SECONDARY_BLUE }}>
+                Read-only view — saved Purchase Order details.
+              </span>
+            ) : isLocked ? (
               <span className="text-xs font-semibold" style={{ color: FORTUNA_PRIMARY_RED }}>
                 Locked: PO cannot be edited after sending for approval.
               </span>
-            )}
+            ) : null}
           </div>
         </div>
 
+        {!viewMode && (
         <div className="flex flex-wrap gap-2">
           <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || editMode}>
             Reset
@@ -1015,11 +1032,12 @@ export default function PurchaseOrderCreatePage() {
             className={classNames(primaryBtn, "active:scale-95")}
             style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
             onClick={onSendForApproval}
-            disabled={isLocked}
+            disabled={isReadOnly}
           >
             Send for Approval
           </button> */}
         </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -1108,7 +1126,7 @@ export default function PurchaseOrderCreatePage() {
                   </label>
                   <select
                     value={form.pr_id}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => {
                       setField("pr_id", e.target.value);
                       markTouched("pr_id");
@@ -1116,7 +1134,7 @@ export default function PurchaseOrderCreatePage() {
                     }}
                     className={classNames(
                       inputBase,
-                      isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                      isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                       showError("pr_id") && "border-brand-500"
                     )}
                   >
@@ -1391,9 +1409,9 @@ export default function PurchaseOrderCreatePage() {
                               min="0"
                               step="any"
                               value={String(ln.unit_price)}
-                              disabled={isLocked}
+                              disabled={isReadOnly}
                               onChange={(e) => updateItem(idx, { unit_price: Math.max(0, Number(e.target.value) || 0) })}
-                              className={classNames(inputBase, "min-w-[120px]", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                              className={classNames(inputBase, "min-w-[120px]", isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                             />
                             <p className={classNames(helperBase, "mt-1")}>PR estimated unit price (editable)</p>
                           </td>
@@ -1404,13 +1422,13 @@ export default function PurchaseOrderCreatePage() {
                             <input
                               type="date"
                               value={ln.delivery_date}
-                              disabled={isLocked}
+                              disabled={isReadOnly}
                               onChange={(e) => updateItem(idx, { delivery_date: e.target.value })}
                               onBlur={() => markTouched(k)}
                               className={classNames(
                                 inputBase,
                                 "min-w-[170px]",
-                                isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                                isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                                 showError(k) && "border-brand-500"
                               )}
                             />
@@ -1452,14 +1470,14 @@ export default function PurchaseOrderCreatePage() {
                   </label>
                   <select
                     value={form.delivery_location}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => {
                       onSelectWarehouse(e.target.value);
                       markTouched("delivery_location");
                     }}
                     className={classNames(
                       inputBase,
-                      isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                      isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                       showError("delivery_location") && "border-brand-500"
                     )}
                   >
@@ -1496,9 +1514,9 @@ export default function PurchaseOrderCreatePage() {
                     <label className={labelBase}>Incoterms</label>
                     <select
                       value={form.incoterms}
-                      disabled={isLocked}
+                      disabled={isReadOnly}
                       onChange={(e) => setField("incoterms", e.target.value as any)}
-                      className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      className={classNames(inputBase, isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     >
                       <option value="">Select (Optional)</option>
                       <option value="EXW">EXW</option>
@@ -1511,9 +1529,9 @@ export default function PurchaseOrderCreatePage() {
                     <label className={labelBase}>Freight Responsibility</label>
                     <select
                       value={form.freight_responsibility}
-                      disabled={isLocked}
+                      disabled={isReadOnly}
                       onChange={(e) => setField("freight_responsibility", e.target.value as any)}
-                      className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                      className={classNames(inputBase, isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     >
                       <option value="">Select (Optional)</option>
                       <option value="Vendor">Vendor</option>
@@ -1526,9 +1544,9 @@ export default function PurchaseOrderCreatePage() {
                   <label className={labelBase}>Delivery Schedule</label>
                   <select
                     value={form.delivery_schedule}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => setField("delivery_schedule", e.target.value as any)}
-                    className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    className={classNames(inputBase, isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                   >
                     <option value="">Select (Optional)</option>
                     <option value="Single">Single</option>
@@ -1542,9 +1560,9 @@ export default function PurchaseOrderCreatePage() {
                   </label>
                   <textarea
                     value={form.packing_instructions}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => setField("packing_instructions", e.target.value)}
-                    className={classNames(inputBase, "min-h-[100px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    className={classNames(inputBase, "min-h-[100px] resize-y", isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     placeholder="Special packing/handling instructions"
                   />
                 </div>
@@ -1572,9 +1590,9 @@ export default function PurchaseOrderCreatePage() {
                       <label className={labelBase}>Tax Applicable</label>
                       <select
                         value={form.tax_applicable ? "Yes" : "No"}
-                        disabled={isLocked}
+                        disabled={isReadOnly}
                         onChange={(e) => setField("tax_applicable", e.target.value === "Yes")}
-                        className={classNames(inputBase, isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                        className={classNames(inputBase, isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                       >
                         <option value="Yes">Yes</option>
                         <option value="No">No</option>
@@ -1606,13 +1624,13 @@ export default function PurchaseOrderCreatePage() {
                       </label>
                       <input
                         value={form.gst_percentage}
-                        disabled={isLocked || !form.tax_applicable}
+                        disabled={isReadOnly || !form.tax_applicable}
                         onChange={(e) => setField("gst_percentage", e.target.value.replace(/[^\d.]/g, ""))}
                         onBlur={() => markTouched("gst_percentage")}
                         placeholder="Example: 18"
                         className={classNames(
                           inputBase,
-                          (isLocked || !form.tax_applicable) && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                          (isReadOnly || !form.tax_applicable) && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                           showError("gst_percentage") && "border-brand-500"
                         )}
                       />
@@ -1636,13 +1654,13 @@ export default function PurchaseOrderCreatePage() {
                       <label className={labelBase}>Freight Charges</label>
                       <input
                         value={form.freight_charges}
-                        disabled={isLocked}
+                        disabled={isReadOnly}
                         onChange={(e) => setField("freight_charges", e.target.value.replace(/[^\d.]/g, ""))}
                         onBlur={() => markTouched("freight_charges")}
                         placeholder="Optional"
                         className={classNames(
                           inputBase,
-                          isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                          isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                           showError("freight_charges") && "border-brand-500"
                         )}
                       />
@@ -1653,13 +1671,13 @@ export default function PurchaseOrderCreatePage() {
                       <label className={labelBase}>Other Charges</label>
                       <input
                         value={form.other_charges}
-                        disabled={isLocked}
+                        disabled={isReadOnly}
                         onChange={(e) => setField("other_charges", e.target.value.replace(/[^\d.]/g, ""))}
                         onBlur={() => markTouched("other_charges")}
                         placeholder="Optional (Packing/Insurance)"
                         className={classNames(
                           inputBase,
-                          isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                          isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                           showError("other_charges") && "border-brand-500"
                         )}
                       />
@@ -1705,9 +1723,9 @@ export default function PurchaseOrderCreatePage() {
                   <label className={labelBase}>Warranty Terms</label>
                   <textarea
                     value={form.warranty_terms}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => setField("warranty_terms", e.target.value)}
-                    className={classNames(inputBase, "min-h-[100px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    className={classNames(inputBase, "min-h-[100px] resize-y", isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     placeholder="Warranty details (Optional)"
                   />
                 </div>
@@ -1723,7 +1741,7 @@ export default function PurchaseOrderCreatePage() {
                       <input
                         type="checkbox"
                         checked={form.penalty_clause}
-                        disabled={isLocked}
+                        disabled={isReadOnly}
                         onChange={(e) => setField("penalty_clause", e.target.checked)}
                       />
                       Enable
@@ -1736,13 +1754,13 @@ export default function PurchaseOrderCreatePage() {
                     </label>
                     <input
                       value={form.liquidated_damages}
-                      disabled={isLocked || !form.penalty_clause}
+                      disabled={isReadOnly || !form.penalty_clause}
                       onChange={(e) => setField("liquidated_damages", e.target.value.replace(/[^\d.]/g, ""))}
                       onBlur={() => markTouched("liquidated_damages")}
                       placeholder={form.penalty_clause ? "Example: 1.5" : "Disabled"}
                       className={classNames(
                         inputBase,
-                        (isLocked || !form.penalty_clause) && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
+                        (isReadOnly || !form.penalty_clause) && "cursor-not-allowed bg-gray-50 dark:bg-white/5",
                         showError("liquidated_damages") && "border-brand-500"
                       )}
                     />
@@ -1754,9 +1772,9 @@ export default function PurchaseOrderCreatePage() {
                   <label className={labelBase}>Cancellation Terms</label>
                   <textarea
                     value={form.cancellation_terms}
-                    disabled={isLocked}
+                    disabled={isReadOnly}
                     onChange={(e) => setField("cancellation_terms", e.target.value)}
-                    className={classNames(inputBase, "min-h-[100px] resize-y", isLocked && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
+                    className={classNames(inputBase, "min-h-[100px] resize-y", isReadOnly && "cursor-not-allowed bg-gray-50 dark:bg-white/5")}
                     placeholder="Cancellation rules (Optional)"
                   />
                 </div>
@@ -1810,6 +1828,7 @@ export default function PurchaseOrderCreatePage() {
       </div>
 
       {/* Footer actions */}
+      {!viewMode && (
       <div className="flex flex-wrap items-center justify-end gap-2">
         <button type="button" className={outlineBtn} onClick={onReset} disabled={isLocked || editMode}>
           Reset
@@ -1830,11 +1849,12 @@ export default function PurchaseOrderCreatePage() {
           className={classNames(primaryBtn, "active:scale-95")}
           style={{ backgroundColor: FORTUNA_PRIMARY_RED, opacity: isLocked ? 0.6 : 1 }}
           onClick={onSendForApproval}
-          disabled={isLocked}
+          disabled={isReadOnly}
         >
           Send for Approval
         </button> */}
       </div>
+      )}
     </div>
   );
 }
