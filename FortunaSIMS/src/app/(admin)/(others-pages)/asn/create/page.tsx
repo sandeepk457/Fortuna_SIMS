@@ -136,6 +136,7 @@ type ValidationErrors = Record<string, string>;
 
 type ASNAttachment = {
   id: string | number;
+  attachment_id?: string | number;
   file_name: string;
   file_url?: string;
   mime_type?: string;
@@ -480,6 +481,26 @@ async function asnApi(path: string, init?: RequestInit) {
 }
   return body;
 }
+
+const getAttachmentUrl = (fileUrl?: string) => {
+  if (!fileUrl) return "";
+
+  // Already a complete URL
+  if (/^https?:\/\//i.test(fileUrl)) {
+    return fileUrl;
+  }
+
+  // Remove /api from backend base URL for static uploads
+  const backendOrigin = RAW_API_BASE.replace(/\/api\/?$/, "");
+
+  const normalizedFileUrl = fileUrl.startsWith("/")
+    ? fileUrl
+    : `/${fileUrl}`;
+
+  return `${backendOrigin}${normalizedFileUrl}`;
+};
+
+
 const pick = (obj: any, ...keys: string[]) => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null) return obj[key]; return ""; };
 
 function buildPayload(form: ASNFormState) {
@@ -567,7 +588,7 @@ export default function CreateASNPage() {
             setForm(loaded);
             const attachmentRows = Array.isArray(a.attachments) ? a.attachments : [];
             setSavedAttachments(attachmentRows.map((item: any) => ({
-              id: item.id ?? item.attachment_id,
+              id: item.attachment_id ?? item.id,
               file_name: item.file_name || item.original_name || "Attachment",
               file_url: item.file_url || item.file_path || item.url || "",
               mime_type: item.mime_type || "",
@@ -1221,6 +1242,53 @@ export default function CreateASNPage() {
   const removePendingAttachment = (index: number) => {
     setPendingAttachments((current) => current.filter((_, i) => i !== index));
   };
+
+  
+const deleteSavedAttachment = async (file: ASNAttachment) => {
+  const attachmentId = file.attachment_id || file.id;
+
+  if (!editId || !attachmentId || attachmentBusy || isLocked) {
+    return;
+  }
+
+  const confirmed = window.confirm(
+    `Are you sure you want to delete "${file.file_name}"?`
+  );
+
+  if (!confirmed) return;
+
+  setAttachmentBusy(true);
+  setApiError("");
+
+  try {
+    const response = await asnApi(
+      `/${encodeURIComponent(editId)}/attachments/${encodeURIComponent(String(attachmentId))}`,
+      { method: "DELETE" }
+    );
+
+    if (response?.success !== true) {
+      throw new Error(
+        response?.message || "Attachment deletion was not confirmed by server."
+      );
+    }
+
+    // Remove deleted file from frontend state
+    setSavedAttachments((current) =>
+      current.filter(
+        (attachment) =>
+          String(attachment.attachment_id || attachment.id) !==
+          String(attachmentId)
+      )
+    );
+
+    alert("Attachment deleted successfully.");
+  } catch (error: any) {
+    setApiError(error.message || "Unable to delete attachment.");
+  } finally {
+    setAttachmentBusy(false);
+  }
+};
+
 
   const uploadPendingAttachments = async (asnId: string) => {
     if (!pendingAttachments.length) return;
@@ -2514,37 +2582,180 @@ export default function CreateASNPage() {
           />
         </div>
 
-        {/* Attachments */}
-        <div className="mt-5 rounded-xl border-2 border-dashed border-gray-200 p-5 dark:border-gray-800">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">Shipment Attachments</div>
-              <p className="mt-1 text-xs text-gray-500">Invoice, packing list, E-Way Bill and transport documents. PDF, JPG, PNG or XLS/XLSX up to 10 MB each.</p>
-            </div>
-            <div>
-              <input ref={attachmentInputRef} type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx" disabled={isLocked || attachmentBusy} onChange={(event) => addAttachmentFiles(event.target.files)} />
-              <button type="button" disabled={isLocked || attachmentBusy} className={classNames(outlineBtn, "whitespace-nowrap", (isLocked || attachmentBusy) && "cursor-not-allowed opacity-50")} onClick={() => attachmentInputRef.current?.click()}>
-                + Add Attachment
-              </button>
-            </div>
-          </div>
-          {!viewMode && pendingAttachments.length > 0 && <div className="mt-4 space-y-2">
-            <div className="text-xs font-semibold text-gray-600">Files waiting to upload (will upload after Save Draft)</div>
-            {pendingAttachments.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
-              <span className="min-w-0 truncate">{file.name} <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span></span>
-              <button type="button" disabled={attachmentBusy || isLocked} className="text-xs font-semibold text-red-600" onClick={() => removePendingAttachment(index)}>Remove</button>
-            </div>)}
-          </div>}
-          {savedAttachments.length > 0 && <div className="mt-4 space-y-2">
-            <div className="text-xs font-semibold text-gray-600">Uploaded attachments</div>
-            {savedAttachments.map((file) => <div key={String(file.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-gray-800">
-              <span className="min-w-0 truncate">{file.file_name}</span>
-              {file.file_url && <a className="text-xs font-semibold text-blue-700 underline" href={file.file_url} target="_blank" rel="noreferrer">Open file</a>}
-            </div>)}
-          </div>}
-          {attachmentBusy && <p className="mt-3 text-xs text-blue-700">Uploading attachments…</p>}
-          {!viewMode && !editId && pendingAttachments.length === 0 && <p className="mt-3 text-xs text-gray-500">Select files now; they will be uploaded when you save the ASN draft.</p>}
+            {/* =====================================================
+    ASN ATTACHMENTS
+====================================================== */}
+
+<div className="mt-5 rounded-xl border-2 border-dashed border-gray-200 p-5 dark:border-gray-800">
+
+  {/* Header + Add Button */}
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+        ASN Attachments
+      </div>
+
+      <p className="mt-1 text-xs text-gray-500">
+        Upload Invoice, Packing List, E-Way Bill and other shipment documents.
+        Maximum 10 MB per file.
+      </p>
+    </div>
+
+    <div>
+      <input
+        ref={attachmentInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx"
+        disabled={isLocked || attachmentBusy}
+        onChange={(event) => addAttachmentFiles(event.target.files)}
+      />
+
+      <button
+        type="button"
+        disabled={isLocked || attachmentBusy}
+        className={classNames(
+          outlineBtn,
+          "whitespace-nowrap",
+          (isLocked || attachmentBusy) && "cursor-not-allowed opacity-50"
+        )}
+        onClick={() => attachmentInputRef.current?.click()}
+      >
+        + Add Attachment
+      </button>
+    </div>
+  </div>
+
+  {/* Pending Files */}
+  {!viewMode && pendingAttachments.length > 0 && (
+    <div className="mt-4 space-y-2">
+      <div className="text-xs font-semibold text-gray-600">
+        Pending Upload ({pendingAttachments.length})
+      </div>
+
+      {pendingAttachments.map((file, index) => (
+        <div
+          key={`${file.name}-${index}`}
+          className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5"
+        >
+          <span className="min-w-0 truncate">
+            {file.name}
+            <span className="ml-2 text-xs text-gray-500">
+              ({(file.size / 1024 / 1024).toFixed(2)} MB)
+            </span>
+          </span>
+
+          <button
+            type="button"
+            disabled={attachmentBusy || isLocked}
+            onClick={() => removePendingAttachment(index)}
+            className="text-xs font-semibold text-red-600 disabled:opacity-50"
+          >
+            Remove
+          </button>
         </div>
+      ))}
+    </div>
+  )}
+
+  {/* Saved Files */}
+  {savedAttachments.length > 0 && (
+    <div className="mt-4 space-y-2">
+      <div className="text-xs font-semibold text-gray-600">
+        Uploaded Attachments ({savedAttachments.length})
+      </div>
+
+      {savedAttachments.map((file) => (
+        <div
+          key={String(file.attachment_id || file.id)}
+          className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-100 px-3 py-3 text-sm dark:border-gray-800"
+        >
+          <div className="min-w-0 flex-1">
+            <div className="truncate font-medium text-gray-800 dark:text-gray-200">
+              {file.file_name}
+            </div>
+
+            {file.file_size && (
+              <div className="mt-1 text-xs text-gray-500">
+                {(file.file_size / 1024 / 1024).toFixed(2)} MB
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            {file.file_url && (
+              <>
+                {/* VIEW */}
+                <a
+                  href={getAttachmentUrl(file.file_url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-blue-200 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                >
+                  View
+                </a>
+
+                {/* DOWNLOAD */}
+                <a
+                  href={getAttachmentUrl(file.file_url)}
+                  download={file.file_name}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-md border border-green-200 px-3 py-1.5 text-xs font-semibold text-green-700 hover:bg-green-50"
+                >
+                  Download
+                </a>
+              </>
+            )}
+
+            {/* DELETE */}
+            {!isLocked && (
+              <button
+                type="button"
+                disabled={attachmentBusy}
+                onClick={() => deleteSavedAttachment(file)}
+                className="rounded-md border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {/* Empty State */}
+  {savedAttachments.length === 0 && pendingAttachments.length === 0 && (
+    <div className="mt-4 rounded-lg bg-gray-50 px-4 py-5 text-center dark:bg-white/5">
+      <p className="text-sm text-gray-500">
+        No attachments uploaded yet.
+      </p>
+      {!isLocked && (
+        <p className="mt-1 text-xs text-gray-400">
+          Click Add Attachment to upload shipment documents.
+        </p>
+      )}
+    </div>
+  )}
+
+  {/* Upload Status */}
+  {attachmentBusy && (
+    <p className="mt-3 text-xs font-medium text-blue-700">
+      Uploading attachments...
+    </p>
+  )}
+
+  {/* New ASN Information */}
+  {!viewMode && !editId && pendingAttachments.length === 0 && (
+    <p className="mt-3 text-xs text-gray-500">
+      Selected files will be uploaded when you Save Draft or Submit the ASN.
+    </p>
+  )}
+
+</div>
+
       </Section>
 
       {/* =====================================================

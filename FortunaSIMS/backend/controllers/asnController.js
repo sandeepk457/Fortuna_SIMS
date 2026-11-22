@@ -1,5 +1,6 @@
 const pool = require("../config/db");
-
+const fs = require("fs");
+const path = require("path");
 const ASN_STATUSES = [
   "Draft",
   "Submitted",
@@ -482,7 +483,12 @@ exports.getASNById = async (req, res) => {
       data: {
         ...asn,
         items: items.rows,
-        attachments: attachments.rows,
+        attachments: attachments.rows.map((file) => ({
+  ...file,
+  id: file.attachment_id,
+  attachment_id: file.attachment_id,
+  file_size: file.file_size_bytes,
+})),
         history: history.rows,
       },
     });
@@ -1482,5 +1488,111 @@ exports.uploadASNAttachment = async (req, res) => {
       message: "Failed to upload ASN attachment.",
       error: error.message,
     });
+  }
+};
+
+
+/* ======================================================
+   DELETE ASN ATTACHMENT
+   DELETE /api/asn/:id/attachments/:attachmentId
+====================================================== */
+
+exports.deleteASNAttachment = async (req, res) => {
+  const client = await pool.connect();
+
+  try {
+    const { id, attachmentId } = req.params;
+
+    await client.query("BEGIN");
+
+    // Lock ASN + attachment while validating deletion
+    const result = await client.query(
+      `SELECT
+          aa.*,
+          a.status AS asn_status
+       FROM asn_attachments aa
+       INNER JOIN asns a ON a.id = aa.asn_id
+       WHERE aa.asn_id = $1
+         AND aa.attachment_id = $2
+       FOR UPDATE OF aa, a`,
+      [id, attachmentId]
+    );
+
+    if (!result.rows.length) {
+      await client.query("ROLLBACK");
+
+      return res.status(404).json({
+        success: false,
+        message: "ASN attachment not found.",
+      });
+    }
+
+    const attachment = result.rows[0];
+
+    // Explicit protection for Create Inward
+    if (attachment.asn_status === "Create Inward") {
+      await client.query("ROLLBACK");
+
+      return res.status(403).json({
+        success: false,
+        message: "Attachments cannot be deleted after Create Inward.",
+      });
+    }
+
+    // Only Draft ASN attachments may be deleted
+    if (attachment.asn_status !== "Draft") {
+      await client.query("ROLLBACK");
+
+      return res.status(403).json({
+        success: false,
+        message: "Attachments can only be deleted while ASN is in Draft status.",
+      });
+    }
+
+    // Delete attachment record from database
+    await client.query(
+      `DELETE FROM asn_attachments
+       WHERE asn_id = $1
+         AND attachment_id = $2`,
+      [id, attachmentId]
+    );
+
+    await client.query("COMMIT");
+
+    // Remove physical file from backend/uploads safely
+    if (attachment.file_url) {
+      try {
+        const fileName = path.basename(attachment.file_url);
+        const filePath = path.join(__dirname, "..", "uploads", fileName);
+
+        if (fs.existsSync(filePath)) {
+          await fs.promises.unlink(filePath);
+        }
+      } catch (fileError) {
+        console.error("Physical attachment delete error:", fileError);
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: "ASN attachment deleted successfully.",
+      attachment_id: attachmentId,
+    });
+  } catch (error) {
+    try {
+      await client.query("ROLLBACK");
+    } catch (rollbackError) {
+      console.error("ASN attachment rollback error:", rollbackError);
+    }
+
+    console.error("ASN Attachment Delete Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete ASN attachment.",
+      error: error.message,
+    });
+  } finally {
+    client.release();
   }
 };

@@ -30,6 +30,13 @@ router.post(
   asnController.uploadASNAttachment
 );
 
+router.delete(
+  "/:id/attachments/:attachmentId",
+  asnController.deleteASNAttachment
+);
+
+
+
 // Workflow
 router.post("/:id/submit", asnController.submitASN);
 router.patch("/:id/status", asnController.updateASNStatus);

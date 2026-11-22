@@ -512,6 +512,29 @@ export default function ASNListPage() {
   };
 
   /* =======================================================
+     EXPORT ASN DATA (EXCEL-COMPATIBLE CSV)
+  ======================================================= */
+
+  const exportToExcel = () => {
+    const header = ["ASN Number", "ASN Date", "PO Number", "Vendor", "Warehouse", "Shipment Date", "Expected Arrival", "Total Items", "Total Quantity", "Status", "Transporter", "Vehicle Number"];
+    const csvRows = filteredRows.map((asn) => [
+      asn.asn_number, asn.asn_date, asn.po_number, asn.vendor_name, asn.warehouse,
+      asn.shipment_date, asn.expected_arrival, asn.total_items, asn.total_qty,
+      asn.status, asn.transporter, asn.vehicle_number,
+    ].map((value) => `"${String(value ?? "").replace(/"/g, '""')}"`).join(","));
+    const csvContent = [header.map((value) => `"${value}"`).join(","), ...csvRows].join("\r\n");
+    const blob = new Blob(["\ufeff", csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "fortuna-asn-list.csv";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  /* =======================================================
      PAGE NUMBERS
   ======================================================= */
 
@@ -632,6 +655,17 @@ export default function ASNListPage() {
 
           <div className="flex flex-wrap gap-2">
 
+            {/* EXPORT EXCEL */}
+            <button
+              type="button"
+              onClick={exportToExcel}
+              className="inline-flex items-center justify-center rounded-xl border px-4 py-2.5 text-sm font-bold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              style={{ borderColor: FORTUNA_SECONDARY_BLUE, color: FORTUNA_SECONDARY_BLUE, background: `linear-gradient(135deg, ${FORTUNA_SECONDARY_BLUE}08 0%, ${FORTUNA_SECONDARY_BLUE}15 100%)` }}
+            >
+              Export Excel
+            </button>
+
+
             {/* CLEAR FILTERS */}
 
             <button
@@ -723,6 +757,10 @@ export default function ASNListPage() {
         />
 
       </div>
+
+      {/* MAIN CONTENT + RIGHT QUICK STATS LAYOUT */}
+      <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_330px] xl:items-start">
+        <div className="min-w-0 space-y-6">
 
       {/* ===================================================
           FILTERS
@@ -1522,6 +1560,41 @@ export default function ASNListPage() {
 
         </div>
 
+        </div>
+        </div>
+        {/* RIGHT SIDE QUICK STATS - PO LIST STYLE */}
+        <aside className="min-w-0">
+          <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm dark:border-gray-800 dark:bg-gray-900 xl:sticky xl:top-5">
+            <div className="mb-5 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-800 dark:text-white">Quick Stats</h3>
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: FORTUNA_PRIMARY_RED }} />
+            </div>
+            <div className="space-y-3">
+              {[
+                { label: "Total ASN", value: filteredRows.length, color: "bg-slate-100 text-slate-700" },
+                { label: "Draft", value: filteredRows.filter((x) => x.status === "Draft").length, color: "bg-slate-100 text-slate-700" },
+                { label: "Submitted", value: filteredRows.filter((x) => x.status === "Submitted").length, color: "bg-blue-100 text-blue-700" },
+                { label: "In Transit", value: filteredRows.filter((x) => x.status === "In Transit").length, color: "bg-indigo-100 text-indigo-700" },
+                { label: "Arrived", value: filteredRows.filter((x) => x.status === "Arrived").length, color: "bg-amber-100 text-amber-800" },
+                { label: "Partially Received", value: filteredRows.filter((x) => x.status === "Partially Received").length, color: "bg-orange-100 text-orange-700" },
+                { label: "Fully Received", value: filteredRows.filter((x) => x.status === "Fully Received").length, color: "bg-green-100 text-green-700" },
+                { label: "Closed", value: filteredRows.filter((x) => x.status === "Closed").length, color: "bg-purple-100 text-purple-700" },
+              ].map((stat) => (
+                <div key={stat.label} className="flex items-center justify-between gap-3">
+                  <span className="text-sm text-gray-700 dark:text-gray-300">{stat.label}</span>
+                  <span className={`min-w-[38px] rounded-full px-3 py-1 text-center text-xs font-bold ${stat.color}`}>{stat.value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="my-5 border-t border-gray-200 dark:border-gray-800" />
+            <div className="rounded-xl border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-300">
+              <span className="font-semibold">Tip:</span> Current search and filters apply to these stats and the export.
+            </div>
+            <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
+              ASN status summary updates automatically based on filtered records.
+            </div>
+          </div>
+        </aside>
       </div>
 
       {/* ===================================================
