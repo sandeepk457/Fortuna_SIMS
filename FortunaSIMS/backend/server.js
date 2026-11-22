@@ -89,6 +89,7 @@ const prRoutes = require("./routes/prRoutes");
 const ecommerceRoutes = require("./routes/ecommerceRoutes");
 const rfqRoutes = require("./routes/rfqRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
+const asnRoutes = require("./routes/asnRoutes");
 
 // =====================================================
 // API ROUTES
@@ -105,6 +106,7 @@ app.use("/api/pr", prRoutes);
 app.use("/api/ecommerce", ecommerceRoutes);
 app.use("/api/rfq", rfqRoutes);
 app.use("/api/purchase-orders", purchaseOrderRoutes);
+app.use("/api/asn", asnRoutes);
 
 // =====================================================
 // HEALTH CHECK

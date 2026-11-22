@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 const FORTUNA_PRIMARY_RED = "#C8102E";
@@ -76,7 +76,7 @@ type PurchaseOrder = {
   id: string;
   number: string;
   date: string;
-  status: "Approved" | "Issued" | "Open";
+  status: string;
   vendor_id: string;
   warehouse_id: string;
   items: POItem[];
@@ -133,6 +133,16 @@ type ASNFormState = {
 };
 
 type ValidationErrors = Record<string, string>;
+
+type ASNAttachment = {
+  id: string | number;
+  file_name: string;
+  file_url?: string;
+  mime_type?: string;
+  file_size?: number;
+  document_type?: string;
+  uploaded_at?: string;
+};
 
 /* =========================================================
    DEMO MASTER DATA
@@ -437,8 +447,69 @@ const initialState: ASNFormState = {
    PAGE
 ========================================================= */
 
+// NEXT_PUBLIC_API_URL must point to the backend API root, e.g. http://localhost:5000/api
+const RAW_API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+const ASN_API_BASE = RAW_API_BASE
+  ? (RAW_API_BASE.endsWith("/api") ? RAW_API_BASE : `${RAW_API_BASE}/api`)
+  : "";
+
+async function asnApi(path: string, init?: RequestInit) {
+  if (!ASN_API_BASE) {
+    throw new Error("NEXT_PUBLIC_API_URL is missing. Set it to your backend URL ending in /api, then restart the frontend.");
+  }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${ASN_API_BASE}/asn${normalizedPath}`;
+  const isFormData =
+    typeof FormData !== "undefined" && init?.body instanceof FormData;
+  const headers = new Headers(init?.headers || {});
+  if (!isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json");
+  }
+  const response = await fetch(url, {
+    ...init,
+    headers,
+    cache: "no-store",
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.success === false) {
+  throw new Error(
+    body.error
+      ? `${body.message || "ASN API failed"}: ${body.error}`
+      : body.message || `ASN API request failed (${response.status})`
+  );
+}
+  return body;
+}
+const pick = (obj: any, ...keys: string[]) => { for (const key of keys) if (obj?.[key] !== undefined && obj?.[key] !== null) return obj[key]; return ""; };
+
+function buildPayload(form: ASNFormState) {
+  return {
+    asn_date: form.asn_date || null, po_id: form.po_id, po_number: form.po_number, po_date: form.po_date || null,
+    vendor_id: form.vendor_id || null, vendor_name: form.vendor_name, vendor_address: form.vendor_address || null, vendor_gstin: form.vendor_gstin || null, vendor_contact: form.vendor_contact || null, vendor_email: form.vendor_email || null,
+    warehouse_id: form.warehouse_id || null, warehouse_name: form.warehouse_name || null, warehouse_address: form.warehouse_address || null,
+    shipment_date: form.shipment_date || null, expected_arrival: form.expected_arrival || null, delivery_schedule: form.delivery_schedule || null,
+    transporter: form.transporter || null, vehicle_number: form.vehicle_number || null, lr_awb_number: form.lr_awb_number || null, shipping_reference: form.shipping_reference || null,
+    package_count: form.package_count === "" ? null : Number(form.package_count), pallet_count: form.pallet_count === "" ? null : Number(form.pallet_count), total_weight: form.total_weight === "" ? null : Number(form.total_weight), weight_uom: form.weight_uom || null,
+    invoice_number: form.invoice_number || null, invoice_date: form.invoice_date || null, eway_bill_number: form.eway_bill_number || null, packing_list_number: form.packing_list_number || null, packing_instructions: form.packing_instructions || null, remarks: form.remarks || null,
+    items: form.items.map((item) => ({ po_item_id: item.po_item_id, shipping_qty: Number(item.shipping_qty || 0), delivery_date: item.delivery_date || null }))
+  };
+}
+
 export default function CreateASNPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const editId = searchParams.get("asn_id");
+  const viewMode = searchParams.get("view") === "1";
+  const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  // Synchronous guard prevents rapid double-clicks before React re-renders.
+  const savingRef = useRef(false);
+  const [apiError, setApiError] = useState("");
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
+  const [pendingAttachments, setPendingAttachments] = useState<File[]>([]);
+  const [savedAttachments, setSavedAttachments] = useState<ASNAttachment[]>([]);
+  const [attachmentBusy, setAttachmentBusy] = useState(false);
 
   const [form, setForm] =
     useState<ASNFormState>(initialState);
@@ -450,29 +521,78 @@ export default function CreateASNPage() {
     useState(false);
 
   const isLocked =
-    ASN_RULES.lockAfterSubmit &&
-    form.status !== "Draft";
+    viewMode ||
+    (ASN_RULES.lockAfterSubmit && form.status !== "Draft");
 
   /* =======================================================
      PO ELIGIBILITY
   ======================================================== */
 
-  const eligiblePurchaseOrders = useMemo(() => {
-    return PURCHASE_ORDERS.filter(
-      (po) =>
-        po.status === "Approved" ||
-        po.status === "Issued" ||
-        po.status === "Open"
-    ).filter((po) => {
-      const hasBalance = po.items.some(
-        (item) =>
-          item.previously_asn_qty <
-          item.ordered_qty
-      );
+  const eligiblePurchaseOrders = useMemo(() => purchaseOrders, [purchaseOrders]);
 
-      return hasBalance;
-    });
-  }, []);
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      setLoading(true); setApiError("");
+      try {
+        const poBody = await asnApi("/purchase-orders/eligible");
+        const poRows = Array.isArray(poBody.data) ? poBody.data
+          : Array.isArray(poBody.data?.rows) ? poBody.data.rows
+          : Array.isArray(poBody.rows) ? poBody.rows
+          : Array.isArray(poBody.purchaseOrders) ? poBody.purchaseOrders
+          : Array.isArray(poBody.data?.purchaseOrders) ? poBody.data.purchaseOrders
+          : [];
+        const normalized: PurchaseOrder[] = poRows.map((po: any) => ({
+          id: String(pick(po, "po_id", "id")), number: pick(po, "po_number", "number"), date: pick(po, "po_date", "date"),
+          status: "Issued", vendor_id: String(pick(po, "vendor_id")), warehouse_id: String(pick(po, "warehouse_id")), items: [],
+        }));
+        if (active) setPurchaseOrders(normalized);
+        if (editId) {
+          const body = await asnApi(`/${encodeURIComponent(editId)}`);
+          const a = body.data || body.asn || body;
+          const itemRows = Array.isArray(a.items) ? a.items : [];
+          const loaded: ASNFormState = {
+            ...initialState,
+            asn_id: String(a.asn_id || a.id || ""), asn_number: a.asn_number || "", asn_date: String(a.asn_date || "").slice(0,10), status: a.status || "Draft",
+            po_id: String(a.po_id || ""), po_number: a.po_number || "", po_date: String(a.po_date || "").slice(0,10),
+            vendor_id: String(a.vendor_id || ""), vendor_name: a.vendor_name || "", vendor_address: a.vendor_address || "", vendor_gstin: a.vendor_gstin || "", vendor_contact: a.vendor_contact || "", vendor_email: a.vendor_email || "",
+            warehouse_id: String(a.warehouse_id || ""), warehouse_name: a.warehouse_name || "", warehouse_address: a.warehouse_address || "",
+            shipment_date: String(a.shipment_date || "").slice(0,10), expected_arrival: String(a.expected_arrival || "").slice(0,10), delivery_schedule: a.delivery_schedule || "",
+            transporter: a.transporter || "", vehicle_number: a.vehicle_number || "", lr_awb_number: a.lr_awb_number || "", shipping_reference: a.shipping_reference || "",
+            package_count: a.package_count == null ? "" : String(a.package_count), pallet_count: a.pallet_count == null ? "" : String(a.pallet_count), total_weight: a.total_weight == null ? "" : String(a.total_weight), weight_uom: a.weight_uom || "",
+            invoice_number: a.invoice_number || "", invoice_date: String(a.invoice_date || "").slice(0,10), eway_bill_number: a.eway_bill_number || "", packing_list_number: a.packing_list_number || "", packing_instructions: a.packing_instructions || "", remarks: a.remarks || "",
+            items: itemRows.map((it: any) => ({ po_item_id: String(it.po_item_id || ""), item_id: it.item_id || "", description: it.item_description || it.description || "", uom: it.uom || "", ordered_qty: Number(it.ordered_qty || 0), previously_asn_qty: Number(it.previously_asn_qty || 0), delivery_date: String(it.delivery_date || "").slice(0,10), shipping_qty: Number(it.shipping_qty || 0) }))
+          };
+          if (active) {
+            setForm(loaded);
+            const attachmentRows = Array.isArray(a.attachments) ? a.attachments : [];
+            setSavedAttachments(attachmentRows.map((item: any) => ({
+              id: item.id ?? item.attachment_id,
+              file_name: item.file_name || item.original_name || "Attachment",
+              file_url: item.file_url || item.file_path || item.url || "",
+              mime_type: item.mime_type || "",
+              file_size: Number(item.file_size || item.size_bytes || 0),
+              document_type: item.document_type || item.attachment_type || "Other",
+              uploaded_at: item.uploaded_at || item.created_at || "",
+            })));
+            if (loaded.po_id && !normalized.some((p) => String(p.id).trim() === String(loaded.po_id).trim())) {
+              setPurchaseOrders((prev) => [...prev, {
+                id: loaded.po_id,
+                number: loaded.po_number,
+                date: loaded.po_date,
+                status: "Issued",
+                vendor_id: loaded.vendor_id,
+                warehouse_id: loaded.warehouse_id,
+                items: loaded.items,
+              }]);
+            }
+          }
+        }
+      } catch (error: any) { if (active) setApiError(error.message || "Unable to load ASN data."); }
+      finally { if (active) setLoading(false); }
+    })();
+    return () => { active = false; };
+  }, [editId]);
 
   /* =======================================================
      TOTALS
@@ -558,8 +678,8 @@ export default function CreateASNPage() {
 
     if (currentForm.po_id) {
       const selectedPO =
-        PURCHASE_ORDERS.find(
-          (po) => po.id === currentForm.po_id
+        eligiblePurchaseOrders.find(
+          (po) => String(po.id).trim() === String(currentForm.po_id).trim()
         );
 
       if (!selectedPO) {
@@ -576,10 +696,9 @@ export default function CreateASNPage() {
         }
 
         const hasBalance =
-          selectedPO.items.some(
-            (item) =>
-              item.previously_asn_qty <
-              item.ordered_qty
+          currentForm.items.some((item) =>
+            Number(item.ordered_qty || 0) -
+              Number(item.previously_asn_qty || 0) > 0
           );
 
         if (!hasBalance) {
@@ -640,38 +759,38 @@ export default function CreateASNPage() {
       ASN_RULES.vendorFromPOOnly
     ) {
       const selectedPO =
-        PURCHASE_ORDERS.find(
-          (po) => po.id === currentForm.po_id
+        eligiblePurchaseOrders.find(
+          (po) => String(po.id).trim() === String(currentForm.po_id).trim()
         );
 
       if (
         selectedPO &&
-        currentForm.vendor_id !==
-          selectedPO.vendor_id
+        String(currentForm.vendor_id || "").trim() !==
+          String(selectedPO.vendor_id || "").trim()
       ) {
         result.vendor_id =
           "Vendor must match the Purchase Order.";
       }
     }
 
-    if (
-      currentForm.po_id &&
-      ASN_RULES.warehouseFromPOOnly
-    ) {
-      const selectedPO =
-        PURCHASE_ORDERS.find(
-          (po) => po.id === currentForm.po_id
-        );
+    // if (
+    //   currentForm.po_id &&
+    //   ASN_RULES.warehouseFromPOOnly
+    // ) {
+    //   const selectedPO =
+    //     eligiblePurchaseOrders.find(
+    //       (po) => String(po.id).trim() === String(currentForm.po_id).trim()
+    //     );
 
-      if (
-        selectedPO &&
-        currentForm.warehouse_id !==
-          selectedPO.warehouse_id
-      ) {
-        result.warehouse_id =
-          "Warehouse must match the Purchase Order.";
-      }
-    }
+    //   if (
+    //     selectedPO &&
+    //     String(currentForm.warehouse_id || "").trim() !==
+    //       String(selectedPO.warehouse_id || "").trim()
+    //   ) {
+    //     result.warehouse_id =
+    //       "Warehouse must match the Purchase Order.";
+    //   }
+    // }
 
     /* -------------------------------------------------------
        ITEMS
@@ -945,7 +1064,7 @@ export default function CreateASNPage() {
     key: K,
     value: ASNFormState[K]
   ) => {
-    if (isLocked) return;
+    if (isLocked || saving) return;
 
     setForm((previous) => ({
       ...previous,
@@ -1002,94 +1121,124 @@ export default function CreateASNPage() {
      SELECT PURCHASE ORDER
   ======================================================== */
 
-  const selectPO = (
-    poId: string
-  ) => {
-    if (isLocked) return;
-
-    const po =
-      eligiblePurchaseOrders.find(
-        (item) => item.id === poId
-      );
-
-    if (!po) {
+  const selectPO = async (poId: string) => {
+    if (isLocked || saving) return;
+    if (!poId) {
       setForm((previous) => ({
         ...previous,
-
-        po_id: "",
-        po_number: "",
-        po_date: "",
-
-        vendor_id: "",
-        vendor_name: "",
-        vendor_address: "",
-        vendor_gstin: "",
-        vendor_contact: "",
-        vendor_email: "",
-
-        warehouse_id: "",
-        warehouse_name: "",
-        warehouse_address: "",
-
+        po_id: "", po_number: "", po_date: "",
+        vendor_id: "", vendor_name: "", vendor_address: "",
+        vendor_gstin: "", vendor_contact: "", vendor_email: "",
+        warehouse_id: "", warehouse_name: "", warehouse_address: "",
         items: [],
       }));
-
       return;
     }
 
-    const vendor =
-      VENDORS.find(
-        (item) =>
-          item.id === po.vendor_id
-      );
+    setApiError("");
+    try {
+      const detailBody = await asnApi(`/purchase-orders/${encodeURIComponent(poId)}`);
+      const detailRoot = detailBody?.data ?? detailBody;
+      const rawPO = detailRoot?.purchase_order ?? detailRoot?.po ?? detailRoot;
+      const vendor = detailRoot?.vendor ?? rawPO?.vendor ?? {};
+      const warehouse = detailRoot?.warehouse ?? rawPO?.warehouse ?? {};
+      const rawItems = Array.isArray(detailRoot?.items)
+        ? detailRoot.items
+        : Array.isArray(rawPO?.items) ? rawPO.items : [];
+      const basePO = eligiblePurchaseOrders.find((item) => String(item.id).trim() === String(poId).trim());
 
-    const warehouse =
-      WAREHOUSES.find(
-        (item) =>
-          item.id === po.warehouse_id
-      );
+      const vendorAddress = [
+        pick(rawPO, "vendor_address", "supplier_address", "master_registered_address"),
+        pick(rawPO, "master_vendor_city", "vendor_city"),
+        pick(rawPO, "master_vendor_state", "vendor_state"),
+        pick(rawPO, "master_vendor_country", "vendor_country"),
+        pick(rawPO, "master_vendor_postal_code", "vendor_postal_code"),
+      ].filter(Boolean).join(", ");
+      const warehouseAddress = [
+        pick(rawPO, "warehouse_address", "delivery_address", "master_warehouse_address"),
+        pick(rawPO, "master_warehouse_city", "warehouse_city"),
+        pick(rawPO, "master_warehouse_state", "warehouse_state"),
+        pick(rawPO, "master_warehouse_pincode", "warehouse_pincode", "pincode"),
+      ].filter(Boolean).join(", ");
 
-    const mappedItems: ASNItem[] =
-      po.items
-        .filter(
-          (item) =>
-            item.previously_asn_qty <
-            item.ordered_qty
-        )
-        .map((item) => ({
-          ...item,
+      const mappedItems: ASNItem[] = rawItems.map((it: any) => {
+        const ordered = Number(pick(it, "ordered_qty", "qty", "quantity") || 0);
+        const previous = Number(pick(it, "previously_asn_qty", "previous_asn_qty") || 0);
+        return {
+          po_item_id: String(pick(it, "po_item_id", "id") || ""),
+          item_id: String(pick(it, "item_id", "item_code", "sku") || ""),
+          description: String(pick(it, "item_description", "description", "item_name", "product_name") || ""),
+          uom: String(pick(it, "uom", "uom_code", "unit") || ""),
+          ordered_qty: ordered,
+          previously_asn_qty: previous,
+          delivery_date: String(pick(it, "delivery_date", "expected_delivery_date") || "").slice(0, 10),
           shipping_qty: 0,
-        }));
+        };
+      }).filter((item: ASNItem) => item.po_item_id && item.ordered_qty > item.previously_asn_qty);
 
-    setForm((previous) => ({
-      ...previous,
+      const vendorId = String(pick(rawPO, "vendor_id", "master_vendor_id") || pick(vendor, "id", "vendor_id") || basePO?.vendor_id || "");
+      const warehouseId = String(pick(rawPO, "warehouse_id", "master_warehouse_id") || pick(warehouse, "warehouse_id", "id") || basePO?.warehouse_id || "");
+      const vendorName = String(pick(rawPO, "vendor_name", "master_vendor_name", "supplier_name") || pick(vendor, "vendor_name", "name") || "");
+      const vendorContact = String(pick(rawPO, "vendor_contact", "vendor_contact_person") || [pick(rawPO, "master_contact_person_name"), pick(rawPO, "master_contact_phone")].filter(Boolean).join(" / ") || pick(vendor, "contact_person_name", "contact_person", "contact_phone") || "");
+      const vendorEmail = String(pick(rawPO, "vendor_email", "master_contact_email") || pick(vendor, "contact_email", "email", "email_id") || "");
+      const vendorGSTIN = String(pick(rawPO, "vendor_gstin", "gstin", "master_vendor_gstin") || pick(vendor, "gstin", "gst_number") || "");
+      const warehouseName = String(pick(rawPO, "warehouse_name", "master_warehouse_name") || pick(warehouse, "warehouse_name", "name") || pick(rawPO, "delivery_warehouse") || "");
 
-      po_id: po.id,
-      po_number: po.number,
-      po_date: po.date,
+      setForm((previous) => ({
+        ...previous,
+        po_id: String(pick(rawPO, "po_id", "id") || poId),
+        po_number: String(pick(rawPO, "po_number", "number") || basePO?.number || ""),
+        po_date: String(pick(rawPO, "po_date", "date") || basePO?.date || "").slice(0, 10),
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        vendor_address: vendorAddress || String(pick(vendor, "registered_address", "address") || ""),
+        vendor_gstin: vendorGSTIN,
+        vendor_contact: vendorContact,
+        vendor_email: vendorEmail,
+        warehouse_id: warehouseId,
+        warehouse_name: warehouseName,
+        warehouse_address: warehouseAddress || String(pick(warehouse, "address_line1", "address") || ""),
+        items: mappedItems,
+      }));
+      if (!mappedItems.length) setApiError("Selected Purchase Order has no remaining eligible item quantity for ASN.");
+    } catch (error: any) {
+      setApiError(error.message || "Unable to load complete Purchase Order details.");
+    }
+  };
 
-      vendor_id: vendor?.id || "",
-      vendor_name: vendor?.name || "",
-      vendor_address:
-        vendor?.address || "",
-      vendor_gstin:
-        vendor?.gstin || "",
-      vendor_contact:
-        vendor?.contact_person || "",
-      vendor_email:
-        vendor?.email || "",
+  const addAttachmentFiles = (fileList: FileList | null) => {
+    if (!fileList) return;
+    const accepted = Array.from(fileList);
+    const invalid = accepted.find((file) => file.size > 10 * 1024 * 1024);
+    if (invalid) {
+      setApiError(`File ${invalid.name} exceeds the 10 MB limit.`);
+      return;
+    }
+    setPendingAttachments((current) => [...current, ...accepted]);
+    if (attachmentInputRef.current) attachmentInputRef.current.value = "";
+  };
 
-      warehouse_id:
-        warehouse?.id || "",
-      warehouse_name:
-        warehouse?.name || "",
-      warehouse_address:
-        warehouse?.address || "",
+  const removePendingAttachment = (index: number) => {
+    setPendingAttachments((current) => current.filter((_, i) => i !== index));
+  };
 
-      items: mappedItems,
-    }));
-
-    touchField("po_id");
+  const uploadPendingAttachments = async (asnId: string) => {
+    if (!pendingAttachments.length) return;
+    setAttachmentBusy(true);
+    try {
+      for (const file of pendingAttachments) {
+        const data = new FormData();
+        data.append("file", file);
+        data.append("document_type", "Shipment Document");
+        await asnApi(`/${encodeURIComponent(asnId)}/attachments`, { method: "POST", body: data });
+      }
+      setPendingAttachments([]);
+      const detail = await asnApi(`/${encodeURIComponent(asnId)}`);
+      const record = detail.data ?? detail.asn ?? detail;
+      setSavedAttachments(Array.isArray(record.attachments) ? record.attachments : []);
+    } finally {
+      setAttachmentBusy(false);
+    }
   };
 
   /* =======================================================
@@ -1100,7 +1249,7 @@ export default function CreateASNPage() {
     index: number,
     value: string
   ) => {
-    if (isLocked) return;
+    if (isLocked || saving) return;
 
     const parsed =
       value === ""
@@ -1138,7 +1287,7 @@ export default function CreateASNPage() {
   ======================================================== */
 
   const resetForm = () => {
-    if (isLocked) return;
+    if (isLocked || saving) return;
 
     setForm({
       ...initialState,
@@ -1159,8 +1308,10 @@ export default function CreateASNPage() {
      - Draft may still contain incomplete shipment details
   ======================================================== */
 
-  const saveDraft = () => {
-    if (isLocked) return;
+  const saveDraft = async () => {
+    if (isLocked || saving || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
 
     const draftErrors: ValidationErrors =
       {};
@@ -1173,13 +1324,38 @@ export default function CreateASNPage() {
         "Purchase Order is required before saving ASN draft.";
     }
 
+    const selectedDraftPO = eligiblePurchaseOrders.find(
+      (po) => String(po.id).trim() === String(form.po_id).trim()
+    );
+
+    if (form.po_id && !selectedDraftPO) {
+      draftErrors.po_id =
+        "Selected Purchase Order is not available or is no longer eligible. Refresh the page and select an eligible PO.";
+    }
+
     if (
       form.po_id &&
-      form.items.length === 0
+      (!form.items.length ||
+        !form.items.some((item) =>
+          Number(item.ordered_qty || 0) -
+            Number(item.previously_asn_qty || 0) > 0
+        ))
     ) {
       draftErrors.items =
         "Selected Purchase Order does not contain an eligible item balance.";
     }
+
+    // Draft quantities must stay within each PO line's remaining allocation.
+    form.items.forEach((item, index) => {
+      const ordered = Number(item.ordered_qty || 0);
+      const alreadyAllocated = Number(item.previously_asn_qty || 0);
+      const newASNQty = Number(item.shipping_qty || 0);
+      const remaining = Math.max(0, ordered - alreadyAllocated);
+      if (newASNQty < 0 || newASNQty > remaining) {
+        draftErrors[`item_${index}_shipping_qty`] =
+          `ASN quantity for ${item.description || `PO line ${index + 1}`} cannot exceed remaining PO quantity (${remaining}).`;
+      }
+    });
 
     if (
       Object.keys(draftErrors).length > 0
@@ -1188,36 +1364,36 @@ export default function CreateASNPage() {
         po_id: true,
       });
 
-      alert(
-        Object.values(draftErrors)[0]
-      );
-
+      alert(Object.values(draftErrors)[0]);
+      savingRef.current = false;
+      setSaving(false);
       return;
     }
 
-    const draftPayload = {
-      ...form,
-      status: "Draft",
-    };
-
-    console.log(
-      "ASN Draft Payload:",
-      draftPayload
-    );
-
-    alert(
-      "ASN Draft saved successfully."
-    );
-
-    router.push("/asn/list");
+    const draftPayload = buildPayload(form);
+    setApiError("");
+    try {
+      const body = editId
+        ? await asnApi(`/${encodeURIComponent(editId)}`, { method: "PUT", body: JSON.stringify(draftPayload) })
+        : await asnApi("", { method: "POST", body: JSON.stringify(draftPayload) });
+      const savedRecord = body.data?.asn || body.data || body.asn || body;
+      const savedId = String(savedRecord.id || savedRecord.asn_id || savedRecord.asn_number || editId || "");
+      if (!savedId) throw new Error("Draft saved response did not include an ASN identifier.");
+      if (pendingAttachments.length) await uploadPendingAttachments(savedId);
+      alert(body.message || "ASN Draft saved successfully.");
+      router.push("/asn/list"); router.refresh();
+    } catch (error: any) { setApiError(error.message || "Unable to save ASN draft."); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   /* =======================================================
      SUBMIT ASN
   ======================================================== */
 
-  const submitASN = () => {
-    if (isLocked) return;
+  const submitASN = async () => {
+    if (isLocked || saving || savingRef.current) return;
+    savingRef.current = true;
+    setSaving(true);
 
     setSubmitAttempted(true);
     touchAllFields();
@@ -1232,25 +1408,26 @@ export default function CreateASNPage() {
       alert(
         "Please fix all validation errors before submitting the ASN."
       );
-
+      savingRef.current = false;
+      setSaving(false);
       return;
     }
 
-    const submittedPayload = {
-      ...form,
-      status: "Submitted" as ASNStatus,
-    };
-
-    console.log(
-      "ASN Submit Payload:",
-      submittedPayload
-    );
-
-    alert(
-      "ASN submitted successfully."
-    );
-
-    router.push("/asn/list");
+    setApiError("");
+    try {
+      const payload = buildPayload(form);
+      let saved: any;
+      if (editId) saved = await asnApi(`/${encodeURIComponent(editId)}`, { method: "PUT", body: JSON.stringify(payload) });
+      else saved = await asnApi("", { method: "POST", body: JSON.stringify(payload) });
+      const savedRecord = saved.data?.asn || saved.data || saved.asn || saved;
+      const savedId = savedRecord.id || savedRecord.asn_id || savedRecord.asn_number || editId;
+      if (!savedId) throw new Error("ASN saved, but server did not return its database ID.");
+      if (pendingAttachments.length) await uploadPendingAttachments(String(savedId));
+      const submitted = await asnApi(`/${encodeURIComponent(String(savedId))}/submit`, { method: "POST", body: JSON.stringify({ remarks: form.remarks }) });
+      alert(submitted.message || "ASN submitted successfully.");
+      router.push("/asn/list"); router.refresh();
+    } catch (error: any) { setApiError(error.message || "Unable to submit ASN."); }
+    finally { savingRef.current = false; setSaving(false); }
   };
 
   /* =======================================================
@@ -1262,6 +1439,8 @@ export default function CreateASNPage() {
       <PageBreadcrumb
         pageTitle="Advance Shipping Notice (ASN)"
       />
+      {apiError && <div className="rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-700">{apiError}</div>}
+      {loading && <div className="rounded-xl border border-gray-200 p-3 text-sm text-gray-500">Loading ASN and Purchase Order data...</div>}
 
       {/* =====================================================
           PAGE HEADER
@@ -1286,7 +1465,7 @@ export default function CreateASNPage() {
                     FORTUNA_PRIMARY_RED,
                 }}
               >
-                Create ASN
+                {viewMode ? "View ASN" : editId ? "Edit ASN" : "Create ASN"}
               </h3>
 
               <span
@@ -1299,7 +1478,7 @@ export default function CreateASNPage() {
             </div>
 
             <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
-              Create an Advance Shipping Notice against an eligible Purchase Order.
+              {viewMode ? "Viewing saved Advance Shipping Notice details. All fields are read-only." : "Create an Advance Shipping Notice against an eligible Purchase Order."}
             </p>
           </div>
 
@@ -1311,26 +1490,26 @@ export default function CreateASNPage() {
               ← ASN List
             </Link>
 
-            <button
+            {!viewMode && <button
               type="button"
               onClick={resetForm}
-              disabled={isLocked}
+              disabled={isLocked || saving}
               className={classNames(
                 outlineBtn,
-                isLocked &&
+                (isLocked || saving) &&
                   "cursor-not-allowed opacity-50"
               )}
             >
               Reset
-            </button>
+            </button>}
 
-            <button
+            {!viewMode && <button
               type="button"
               onClick={saveDraft}
-              disabled={isLocked}
+              disabled={isLocked || saving}
               className={classNames(
                 primaryBtn,
-                isLocked &&
+                (isLocked || saving) &&
                   "cursor-not-allowed opacity-50"
               )}
               style={{
@@ -1338,16 +1517,16 @@ export default function CreateASNPage() {
                   FORTUNA_SECONDARY_BLUE,
               }}
             >
-              Save Draft
-            </button>
+              {saving ? "Saving..." : "Save Draft"}
+            </button>}
 
-            <button
+            {!viewMode && <button
               type="button"
               onClick={submitASN}
-              disabled={isLocked}
+              disabled={isLocked || saving}
               className={classNames(
                 primaryBtn,
-                isLocked &&
+                (isLocked || saving) &&
                   "cursor-not-allowed opacity-50"
               )}
               style={{
@@ -1355,8 +1534,8 @@ export default function CreateASNPage() {
                   FORTUNA_PRIMARY_RED,
               }}
             >
-              Submit ASN
-            </button>
+              {saving ? "Processing..." : "Submit ASN"}
+            </button>}
           </div>
         </div>
       </div>
@@ -2336,33 +2515,35 @@ export default function CreateASNPage() {
         </div>
 
         {/* Attachments */}
-
-        <div className="mt-5 rounded-xl border-2 border-dashed border-gray-200 p-6 text-center dark:border-gray-800">
-          <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">
-            Shipment Attachments
+        <div className="mt-5 rounded-xl border-2 border-dashed border-gray-200 p-5 dark:border-gray-800">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-gray-700 dark:text-gray-200">Shipment Attachments</div>
+              <p className="mt-1 text-xs text-gray-500">Invoice, packing list, E-Way Bill and transport documents. PDF, JPG, PNG or XLS/XLSX up to 10 MB each.</p>
+            </div>
+            <div>
+              <input ref={attachmentInputRef} type="file" multiple className="hidden" accept=".pdf,.jpg,.jpeg,.png,.xls,.xlsx,.doc,.docx" disabled={isLocked || attachmentBusy} onChange={(event) => addAttachmentFiles(event.target.files)} />
+              <button type="button" disabled={isLocked || attachmentBusy} className={classNames(outlineBtn, "whitespace-nowrap", (isLocked || attachmentBusy) && "cursor-not-allowed opacity-50")} onClick={() => attachmentInputRef.current?.click()}>
+                + Add Attachment
+              </button>
+            </div>
           </div>
-
-          <p className="mt-1 text-xs text-gray-500">
-            Invoice, packing list, E-Way Bill and transport documents.
-          </p>
-
-          <button
-            type="button"
-            disabled={isLocked}
-            className={classNames(
-              outlineBtn,
-              "mt-4",
-              isLocked &&
-                "cursor-not-allowed opacity-50"
-            )}
-            onClick={() =>
-              alert(
-                "Attachment upload will be connected during backend/API integration."
-              )
-            }
-          >
-            + Add Attachment
-          </button>
+          {!viewMode && pendingAttachments.length > 0 && <div className="mt-4 space-y-2">
+            <div className="text-xs font-semibold text-gray-600">Files waiting to upload (will upload after Save Draft)</div>
+            {pendingAttachments.map((file, index) => <div key={`${file.name}-${index}`} className="flex items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm dark:bg-white/5">
+              <span className="min-w-0 truncate">{file.name} <span className="text-xs text-gray-500">({(file.size / 1024 / 1024).toFixed(2)} MB)</span></span>
+              <button type="button" disabled={attachmentBusy || isLocked} className="text-xs font-semibold text-red-600" onClick={() => removePendingAttachment(index)}>Remove</button>
+            </div>)}
+          </div>}
+          {savedAttachments.length > 0 && <div className="mt-4 space-y-2">
+            <div className="text-xs font-semibold text-gray-600">Uploaded attachments</div>
+            {savedAttachments.map((file) => <div key={String(file.id)} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-gray-100 px-3 py-2 text-sm dark:border-gray-800">
+              <span className="min-w-0 truncate">{file.file_name}</span>
+              {file.file_url && <a className="text-xs font-semibold text-blue-700 underline" href={file.file_url} target="_blank" rel="noreferrer">Open file</a>}
+            </div>)}
+          </div>}
+          {attachmentBusy && <p className="mt-3 text-xs text-blue-700">Uploading attachments…</p>}
+          {!viewMode && !editId && pendingAttachments.length === 0 && <p className="mt-3 text-xs text-gray-500">Select files now; they will be uploaded when you save the ASN draft.</p>}
         </div>
       </Section>
 
@@ -2549,13 +2730,17 @@ export default function CreateASNPage() {
         {/* Validation status */}
 
         <div className="mt-5">
-          {submitAttempted &&
+          {!viewMode && submitAttempted &&
           hasErrors ? (
             <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/50 dark:bg-red-500/10 dark:text-red-300">
               <span className="font-semibold">
                 ASN cannot be submitted.
               </span>{" "}
               Please correct the highlighted validation errors above.
+            </div>
+          ) : viewMode ? (
+            <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 text-sm text-gray-600 dark:border-gray-800 dark:bg-white/5 dark:text-gray-300">
+              View mode — saved ASN details are displayed without editing.
             </div>
           ) : (
             <div className="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-700 dark:border-green-900/40 dark:bg-green-500/10 dark:text-green-300">
@@ -2571,16 +2756,16 @@ export default function CreateASNPage() {
             href="/asn/list"
             className={outlineBtn}
           >
-            Cancel
+            {viewMode ? "← Back to ASN List" : "Cancel"}
           </Link>
 
-          <button
+          {!viewMode && <button
             type="button"
             onClick={saveDraft}
-            disabled={isLocked}
+            disabled={isLocked || saving}
             className={classNames(
               primaryBtn,
-              isLocked &&
+              (isLocked || saving) &&
                 "cursor-not-allowed opacity-50"
             )}
             style={{
@@ -2589,15 +2774,15 @@ export default function CreateASNPage() {
             }}
           >
             Save Draft
-          </button>
+          </button>}
 
-          <button
+          {!viewMode && <button
             type="button"
             onClick={submitASN}
-            disabled={isLocked}
+            disabled={isLocked || saving}
             className={classNames(
               primaryBtn,
-              isLocked &&
+              (isLocked || saving) &&
                 "cursor-not-allowed opacity-50"
             )}
             style={{
@@ -2606,7 +2791,7 @@ export default function CreateASNPage() {
             }}
           >
             Submit ASN
-          </button>
+          </button>}
         </div>
       </div>
     </div>

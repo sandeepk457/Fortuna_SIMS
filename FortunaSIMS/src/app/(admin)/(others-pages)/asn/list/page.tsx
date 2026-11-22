@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import PageBreadcrumb from "@/components/common/PageBreadCrumb";
 
 /* =========================================================
@@ -255,8 +256,74 @@ function statusPill(status: ASNStatus) {
    MAIN PAGE
 ========================================================= */
 
+// NEXT_PUBLIC_API_URL must point to the backend API root, e.g. http://localhost:5000/api
+const RAW_API_BASE = (process.env.NEXT_PUBLIC_API_URL || "").trim().replace(/\/+$/, "");
+const ASN_API_BASE = RAW_API_BASE
+  ? (RAW_API_BASE.endsWith("/api") ? RAW_API_BASE : `${RAW_API_BASE}/api`)
+  : "";
+
+async function asnApi(path: string, init?: RequestInit) {
+  if (!ASN_API_BASE) {
+    throw new Error("NEXT_PUBLIC_API_URL is missing. Set it to your backend URL ending in /api, then restart the frontend.");
+  }
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const url = `${ASN_API_BASE}/asn${normalizedPath}`;
+  const response = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    cache: "no-store",
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok || body.success === false) {
+    throw new Error(body.message || `ASN API request failed (${response.status}) at ${url}`);
+  }
+  return body;
+}
+
 export default function ASNListPage() {
-  const [rows] = useState<ASNRow[]>(DEMO_ASNS);
+  const router = useRouter();
+  const [rows, setRows] = useState<ASNRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [apiError, setApiError] = useState("");
+
+  const loadASNs = async () => {
+    setLoading(true); setApiError("");
+    try {
+      const body = await asnApi("?page=1&limit=100");
+      const records = Array.isArray(body.data) ? body.data
+        : Array.isArray(body.rows) ? body.rows
+        : Array.isArray(body.asns) ? body.asns
+        : Array.isArray(body.data?.rows) ? body.data.rows
+        : Array.isArray(body.data?.asns) ? body.data.asns
+        : Array.isArray(body.data?.records) ? body.data.records
+        : [];
+      setRows(records.map((a: any) => ({
+        asn_id: String(a.id ?? a.asn_id ?? ""),
+        asn_number: a.asn_number || a.asn_id || "—",
+        asn_date: a.asn_date || "",
+        po_number: a.po_number || "",
+        vendor_name: a.vendor_name || "",
+        warehouse: a.warehouse_name || "",
+        shipment_date: a.shipment_date || "",
+        expected_arrival: a.expected_arrival || "",
+        total_items: Number(a.item_count ?? a.total_items ?? 0),
+        total_qty: Number(a.total_shipping_qty ?? a.total_qty ?? 0),
+        status: a.status || "Draft",
+        transporter: a.transporter || "",
+        vehicle_number: a.vehicle_number || "",
+      })));
+    } catch (error: any) { setApiError(error.message || "Unable to load ASNs."); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { loadASNs(); }, []);
+
+  const deleteASN = async (row: ASNRow) => {
+    if (row.status !== "Draft") return;
+    if (!window.confirm(`Delete draft ${row.asn_number}? This cannot be undone.`)) return;
+    try { await asnApi(`/${encodeURIComponent(row.asn_id)}`, { method: "DELETE" }); await loadASNs(); }
+    catch (error: any) { alert(error.message || "Unable to delete ASN."); }
+  };
 
   /* =======================================================
      FILTERS
@@ -272,9 +339,13 @@ export default function ASNListPage() {
      MODAL
   ======================================================= */
 
-  const [selectedASN, setSelectedASN] =
-    useState<ASNRow | null>(null);
+  const [selectedASN, setSelectedASN] = useState<any | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
 
+  const openASNDetails = (row: ASNRow) => {
+  router.push(`/asn/create?asn_id=${encodeURIComponent(row.asn_id)}&view=1`);
+};
   /* =======================================================
      PAGINATION
   ======================================================= */
@@ -875,22 +946,20 @@ export default function ASNListPage() {
 
         <div className="w-full max-w-full overflow-x-auto overscroll-x-contain">
 
-          <table className="w-full min-w-[1080px] table-fixed text-[13px]">
+          <table className="w-full min-w-[1450px] table-auto text-[13px]">
 
             <colgroup>
-
-              <col className="w-[125px]" />
-              <col className="w-[95px]" />
-              <col className="w-[110px]" />
-              <col className="w-[135px]" />
-              <col className="w-[115px]" />
-              <col className="w-[110px]" />
-              <col className="w-[115px]" />
-              <col className="w-[65px]" />
-              <col className="w-[120px]" />
-              <col className="w-[120px]" />
               <col className="w-[150px]" />
-
+              <col className="w-[120px]" />
+              <col className="w-[145px]" />
+              <col className="w-[190px]" />
+              <col className="w-[170px]" />
+              <col className="w-[135px]" />
+              <col className="w-[145px]" />
+              <col className="w-[75px]" />
+              <col className="w-[175px]" />
+              <col className="w-[130px]" />
+              <col className="w-[210px]" />
             </colgroup>
 
             {/* =================================================
@@ -973,15 +1042,11 @@ export default function ASNListPage() {
 
                     {/* ASN NUMBER */}
 
-                    <td className="truncate px-3 py-4">
+                    <td className="max-w-[190px] px-3 py-4">
 
                       <button
                         type="button"
-                        onClick={() =>
-                          setSelectedASN(
-                            row
-                          )
-                        }
+                        onClick={() => openASNDetails(row)}
                         className="font-bold hover:underline"
                         style={{
                           color:
@@ -1004,7 +1069,7 @@ export default function ASNListPage() {
                     {/* PO NUMBER */}
 
                     <td
-                      className="truncate px-3 py-4 font-semibold"
+                      className="max-w-[145px] break-words px-3 py-4 font-semibold"
                       style={{
                         color:
                           FORTUNA_PRIMARY_RED,
@@ -1141,11 +1206,7 @@ export default function ASNListPage() {
 
                         <button
                           type="button"
-                          onClick={() =>
-                            setSelectedASN(
-                              row
-                            )
-                          }
+                          onClick={() => openASNDetails(row)}
                           className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                           style={{
                             background:
@@ -1171,6 +1232,10 @@ export default function ASNListPage() {
   </Link>
 )}
 
+{row.status === "Draft" && (
+                          <button type="button" onClick={() => deleteASN(row)} className="rounded-lg border border-red-200 px-3 py-1.5 text-[11px] font-bold text-red-700 hover:bg-red-50">Delete</button>
+                        )}
+
                         {/* CREATE INWARD */}
 
                         {(row.status ===
@@ -1181,19 +1246,14 @@ export default function ASNListPage() {
                             "Arrived") && (
 
                           <button
-                            type="button"
-                            className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                            style={{
-                              background:
-                                FORTUNA_RED_GRADIENT,
-                            }}
-                            onClick={() =>
-                              alert(
-                                `Goods Inward creation for ${row.asn_number} will be connected in the next phase.`
-                              )
-                            }
+                          type="button"
+                          className="rounded-lg px-3 py-1.5 text-[11px] font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+                          style={{
+                          background: FORTUNA_RED_GRADIENT,
+                           }}
+                          onClick={() => router.push("/GoodsInwardForm")}
                           >
-                            Create Inward
+                           Create Inward
                           </button>
 
                         )}
@@ -1472,7 +1532,7 @@ export default function ASNListPage() {
 
         <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-[2px]">
 
-          <div className="my-8 w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
+          <div className="my-8 w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-gray-900">
 
             {/* MODAL HEADER */}
 
@@ -1535,7 +1595,95 @@ export default function ASNListPage() {
 
             {/* MODAL BODY */}
 
-            <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="max-h-[70vh] space-y-5 overflow-y-auto p-5">
+              {detailLoading && <div className="rounded-xl bg-blue-50 p-4 text-sm text-blue-700">Loading complete ASN details…</div>}
+              {detailError && <div className="rounded-xl bg-red-50 p-4 text-sm text-red-700">{detailError}</div>}
+              {(() => {
+                const d: any = selectedASN;
+                const vendor = d.vendor || d.vendor_details || {};
+                const wh = d.warehouse_details || d.warehouse_master || {};
+                const items = d.items || d.asn_items || d.lines || [];
+                const attachments = d.attachments || d.asn_attachments || [];
+                const history = d.history || d.asn_history || [];
+                const value = (...vals: any[]) => vals.find(v => v !== null && v !== undefined && String(v).trim() !== "") ?? "—";
+                return <>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">ASN & Shipment Details</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <Info label="ASN Number" value={String(value(d.asn_number, d.asn_id))}/>
+                      <Info label="ASN Date" value={formatDate(value(d.asn_date))}/>
+                      <Info label="Status" value={String(value(d.status))}/>
+                      <Info label="PO Number" value={String(value(d.po_number))}/>
+                      <Info label="PO Date" value={formatDate(value(d.po_date))}/>
+                      <Info label="Shipment Date" value={formatDate(value(d.shipment_date))}/>
+                      <Info label="Expected Arrival" value={formatDate(value(d.expected_arrival))}/>
+                      <Info label="Delivery Schedule" value={String(value(d.delivery_schedule))}/>
+                      <Info label="Transporter" value={String(value(d.transporter))}/>
+                      <Info label="Vehicle Number" value={String(value(d.vehicle_number))}/>
+                      <Info label="LR / AWB Number" value={String(value(d.lr_awb_number))}/>
+                      <Info label="Shipping Reference" value={String(value(d.shipping_reference))}/>
+                      <Info label="Packages" value={String(value(d.package_count))}/>
+                      <Info label="Pallets" value={String(value(d.pallet_count))}/>
+                      <Info label="Total Weight" value={`${value(d.total_weight)} ${value(d.weight_uom, "")}`}/>
+                      <Info label="Invoice Number" value={String(value(d.invoice_number))}/>
+                      <Info label="Invoice Date" value={formatDate(value(d.invoice_date))}/>
+                      <Info label="E-Way Bill" value={String(value(d.eway_bill_number))}/>
+                      <Info label="Packing List" value={String(value(d.packing_list_number))}/>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Info label="Packing Instructions" value={String(value(d.packing_instructions))}/>
+                      <Info label="Remarks" value={String(value(d.remarks))}/>
+                    </div>
+                  </section>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">Vendor Details</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <Info label="Vendor ID" value={String(value(d.vendor_id, vendor.vendor_id, vendor.id))}/>
+                      <Info label="Vendor Name" value={String(value(d.vendor_name, vendor.vendor_name, vendor.name))}/>
+                      <Info label="Vendor Code" value={String(value(d.vendor_code, vendor.vendor_code))}/>
+                      <Info label="GSTIN" value={String(value(d.vendor_gstin, d.gstin, vendor.gstin))}/>
+                      <Info label="Contact Person" value={String(value(d.vendor_contact_person, d.contact_person, vendor.contact_person_name))}/>
+                      <Info label="Phone" value={String(value(d.vendor_phone, d.contact_phone, vendor.contact_phone))}/>
+                      <Info label="Email" value={String(value(d.vendor_email, d.contact_email, vendor.contact_email))}/>
+                      <Info label="Address" value={String(value(d.vendor_address, d.registered_address, vendor.registered_address, vendor.address))}/>
+                    </div>
+                  </section>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">Warehouse Details</h4>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                      <Info label="Warehouse ID" value={String(value(d.warehouse_id, wh.warehouse_id))}/>
+                      <Info label="Warehouse Name" value={String(value(d.warehouse_name, d.warehouse, wh.warehouse_name))}/>
+                      <Info label="Warehouse Code" value={String(value(d.warehouse_code, wh.warehouse_code))}/>
+                      <Info label="Address" value={String(value(d.warehouse_address, wh.address_line1, wh.address))}/>
+                      <Info label="City" value={String(value(d.warehouse_city, wh.city))}/>
+                      <Info label="State" value={String(value(d.warehouse_state, wh.state))}/>
+                      <Info label="Pincode" value={String(value(d.warehouse_pincode, wh.pincode, wh.postal_code))}/>
+                    </div>
+                  </section>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">ASN Items ({items.length})</h4>
+                    <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-gray-700">
+                      <table className="min-w-[850px] w-full text-left text-xs">
+                        <thead className="bg-gray-50 dark:bg-white/5"><tr>{["Item Code","Description","UOM","Ordered Qty","Previously ASN","Shipping Qty","Delivery Date"].map(h=><th key={h} className="whitespace-nowrap px-3 py-3 font-semibold">{h}</th>)}</tr></thead>
+                        <tbody>{items.map((it: any, i: number)=><tr key={it.asn_item_id || it.po_item_id || i} className="border-t border-gray-100 dark:border-gray-800"><td className="px-3 py-3">{value(it.item_id, it.item_code)}</td><td className="px-3 py-3">{value(it.item_description, it.description)}</td><td className="px-3 py-3">{value(it.uom)}</td><td className="px-3 py-3">{value(it.ordered_qty)}</td><td className="px-3 py-3">{value(it.previously_asn_qty)}</td><td className="px-3 py-3">{value(it.shipping_qty)}</td><td className="px-3 py-3">{formatDate(value(it.delivery_date))}</td></tr>)}</tbody>
+                      </table>
+                    </div>
+                    {!items.length && <p className="text-sm text-gray-500">No item details were returned by the ASN API.</p>}
+                  </section>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">Attachments ({attachments.length})</h4>
+                    {attachments.length ? <ul className="space-y-2">{attachments.map((a: any, i: number)=><li key={a.id || a.attachment_id || i} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3 text-sm dark:border-gray-700"><span>{value(a.file_name, a.original_name, a.name)}</span>{(a.file_url || a.url || a.file_path) && <a className="font-semibold text-[#005F99] underline" href={a.file_url || a.url || a.file_path} target="_blank" rel="noreferrer">Open file</a>}</li>)}</ul> : <p className="text-sm text-gray-500">No attachments.</p>}
+                  </section>
+                  <section>
+                    <h4 className="mb-3 text-sm font-bold text-gray-900 dark:text-white">Activity History ({history.length})</h4>
+                    {history.length ? <ul className="space-y-2">{history.map((h: any,i: number)=><li key={h.id || i} className="rounded-lg bg-gray-50 p-3 text-sm dark:bg-white/5">{value(h.action, h.status, h.description, h.remarks)} <span className="text-xs text-gray-500">{value(h.created_at, h.action_date)}</span></li>)}</ul> : <p className="text-sm text-gray-500">No history records returned.</p>}
+                  </section>
+                </>;
+              })()}
+            </div>
+
+            {/* LEGACY SUMMARY BODY (replaced by full detail sections) */}
+            {false && <div className="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
 
               <Info
                 label="ASN Date"
@@ -1625,7 +1773,7 @@ export default function ASNListPage() {
 
               </div>
 
-            </div>
+            </div>}
 
             {/* MODAL FOOTER */}
 
@@ -1674,21 +1822,16 @@ export default function ASNListPage() {
                 selectedASN.status ===
                   "Arrived") && (
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    alert(
-                      `Create Goods Inward from ${selectedASN.asn_number} — API integration pending.`
-                    )
-                  }
-                  className="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-                  style={{
-                    background:
-                      FORTUNA_RED_GRADIENT,
-                  }}
-                >
-                  Create Goods Inward
-                </button>
+                  <button
+  type="button"
+  onClick={() => router.push("/GoodsInwardForm")}
+  className="rounded-lg px-4 py-2 text-sm font-bold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+  style={{
+    background: FORTUNA_RED_GRADIENT,
+  }}
+>
+  Create Goods Inward
+</button>
 
               )}
 
