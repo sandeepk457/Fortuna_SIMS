@@ -90,6 +90,7 @@ const ecommerceRoutes = require("./routes/ecommerceRoutes");
 const rfqRoutes = require("./routes/rfqRoutes");
 const purchaseOrderRoutes = require("./routes/purchaseOrderRoutes");
 const asnRoutes = require("./routes/asnRoutes");
+const goodsInwardRoutes = require("./routes/goodsInwardRoutes");
 
 // =====================================================
 // API ROUTES
@@ -107,6 +108,7 @@ app.use("/api/ecommerce", ecommerceRoutes);
 app.use("/api/rfq", rfqRoutes);
 app.use("/api/purchase-orders", purchaseOrderRoutes);
 app.use("/api/asn", asnRoutes);
+app.use("/api/goods-inward", goodsInwardRoutes);
 
 // =====================================================
 // HEALTH CHECK

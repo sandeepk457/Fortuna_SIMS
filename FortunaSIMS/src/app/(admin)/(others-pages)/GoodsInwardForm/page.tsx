@@ -40,14 +40,19 @@ type OverAction =
 
 type ReceiverRole = "Receiver" | "QC Inspector" | "Supervisor";
 
+
 type Receiver = {
   id: string;
+  employeeId: string;
   name: string;
-  role: ReceiverRole;
+  role: string;
+  department: string;
+  email: string;
   phone: string;
   active: boolean;
-  receivingCount: number; // demo
+  receivingCount: number;
 };
+
 
 type PORef = {
   poNo: string;
@@ -331,7 +336,75 @@ export default function GoodsInwardCreatePage() {
   /** ASN */
   const [asnMode, setAsnMode] = useState(false);
   const [selectedASNId, setSelectedASNId] = useState("");
-  const [asnMaster] = useState<ASNRef[]>(DEMO_ASNS);
+  const [asnMaster, setAsnMaster] = useState<ASNRef[]>([]);
+  const [asnLoading, setAsnLoading] = useState(false);
+  const [asnError, setAsnError] = useState("");
+
+  useEffect(() => {
+  const loadEligibleASNs = async () => {
+    try {
+      setAsnLoading(true);
+      setAsnError("");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/goods-inward/asn/eligible`
+      );
+
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      const mappedASNs: ASNRef[] = (result.data || []).map((asn: any) => ({
+        id: String(asn.id),
+        asnNo: asn.asn_number,
+        asnDate: asn.asn_date,
+        shipmentDate: asn.shipment_date,
+        expectedArrival: asn.expected_arrival,
+        status: asn.status,
+        deliverySchedule:
+          asn.delivery_schedule === "Partial"
+            ? "Partial Delivery"
+            : "Single Delivery",
+        poNo: asn.po_number,
+        poDate: asn.po_date,
+        vendorName: asn.vendor_name,
+        vendorCode: asn.vendor_id || "",
+        warehouse: asn.warehouse_name,
+        items: (asn.items || []).map((item: any, index: number) => ({
+          id: String(item.id),
+          lineNo: index + 1,
+          sku: item.sku || item.itemId || "",
+          description: item.description || "",
+          uom: item.uom || "",
+          poQty: Number(item.orderedQty || 0),
+          previousASNQty: Number(item.previouslyAsnQty || 0),
+          shippingQty: Number(item.shippingQty || 0),
+          remainingPOQty: Math.max(
+            Number(item.orderedQty || 0) -
+              Number(item.previouslyAsnQty || 0) -
+              Number(item.shippingQty || 0),
+            0
+          ),
+        })),
+      }));
+
+      setAsnMaster(mappedASNs);
+    } catch (error: any) {
+      console.error("ASN API Loading Error:", error);
+      setAsnError(error.message || "Failed to load ASNs");
+    } finally {
+      setAsnLoading(false);
+    }
+  };
+
+  loadEligibleASNs();
+}, []);
+
+
+
+
   const selectedASN = useMemo(() => asnMaster.find((x) => x.id === selectedASNId) || null, [asnMaster, selectedASNId]);
 
   /** Basic */
@@ -383,23 +456,81 @@ export default function GoodsInwardCreatePage() {
     },
   ]);
 
-  /** Receivers */
-  const [receivers, setReceivers] = useState<Receiver[]>([
-    { id: "U-101", name: "Ravi", role: "Receiver", phone: "9000000001", active: true, receivingCount: 12 },
-    { id: "U-102", name: "Aparna", role: "Supervisor", phone: "9000000002", active: true, receivingCount: 7 },
-    { id: "U-103", name: "Kiran", role: "Receiver", phone: "9000000003", active: true, receivingCount: 3 },
-    { id: "U-104", name: "Divya", role: "QC Inspector", phone: "9000000004", active: true, receivingCount: 15 },
-    { id: "U-105", name: "Nikhil", role: "Receiver", phone: "9000000005", active: true, receivingCount: 6 },
-    { id: "U-106", name: "Meena", role: "Receiver", phone: "9000000006", active: true, receivingCount: 4 },
-    { id: "U-107", name: "Suresh", role: "Supervisor", phone: "9000000007", active: true, receivingCount: 9 },
-    { id: "U-108", name: "Pooja", role: "Receiver", phone: "9000000008", active: true, receivingCount: 2 },
-  ]);
-  const [assignedReceiverIds, setAssignedReceiverIds] = useState<string[]>(["U-101", "U-103"]);
+  
+  /** Receivers - Live data loaded from Users Master API */
+const [receivers, setReceivers] = useState<Receiver[]>([]);
+const [receiverSearch, setReceiverSearch] = useState("");
+const [receiversLoading, setReceiversLoading] = useState(false);
+const [receiversError, setReceiversError] = useState("");
+
+useEffect(() => {
+  const loadUsers = async () => {
+    try {
+      setReceiversLoading(true);
+      setReceiversError("");
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/goods-inward/users`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Users API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      const mappedUsers: Receiver[] = (result.data || [])
+        .filter((user: any) => user.status === "Active")
+        .map((user: any) => ({
+          id: String(user.id),
+          employeeId: user.employee_id || "",
+          name: user.name || "",
+          role: user.role || "",
+          department: user.department || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          active: user.status === "Active",
+          receivingCount: 0,
+        }));
+
+      setReceivers(mappedUsers);
+    } catch (error: any) {
+      console.error("Failed to load Users Master:", error);
+      setReceiversError(error.message || "Failed to load users");
+    } finally {
+      setReceiversLoading(false);
+    }
+  };
+
+  loadUsers();
+}, []);
+
+  const [assignedReceiverIds, setAssignedReceiverIds] = useState<string[]>([]);
 
   const assignedReceivers = useMemo(
     () => receivers.filter((r) => assignedReceiverIds.includes(r.id)),
     [receivers, assignedReceiverIds]
   );
+
+    const filteredReceivers = useMemo(() => {
+  const search = receiverSearch.trim().toLowerCase();
+
+  if (!search) return receivers;
+
+  return receivers.filter((receiver) => {
+    const name = String(receiver.name || "").toLowerCase();
+    const phone = String(receiver.phone || "").toLowerCase();
+    const email = String(receiver.email || "").toLowerCase();
+
+    return (
+      name.includes(search) ||
+      phone.includes(search) ||
+      email.includes(search)
+    );
+  });
+}, [receivers, receiverSearch]);
+
+
 
   /** Items */
   const [items, setItems] = useState<GIItem[]>([
@@ -1954,9 +2085,34 @@ export default function GoodsInwardCreatePage() {
 
                 {errors.assignment && <p className="mt-2 text-xs text-rose-600">{errors.assignment}</p>}
 
+                {/* <div className="mt-4">
+                  <input
+                    type="text"
+                    placeholder="Search receivers..."
+                    value={receiverSearch}
+                    onChange={(e) => setReceiverSearch(e.target.value)}
+                    className="border border-gray-300 bg-white py-2 px-4 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
+                  />
+                </div> */}
+
+                {/* Receiver Search Filter */}
+  <div className="mb-3">
+    <input
+      type="text"
+      placeholder="Search by name, phone or email..."
+      value={receiverSearch}
+      onChange={(e) => setReceiverSearch(e.target.value)}
+      className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-gray-700 dark:bg-gray-900"
+    />
+  </div>
+
                 <div className="mt-4 max-h-[430px] overflow-y-auto pr-1">
+
+                    
+
+
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                    {receivers.map((r) => {
+                    {filteredReceivers.map((r) => {
                       const checked = assignedReceiverIds.includes(r.id);
 
                       // ✅ FIX: use border + ring instead of outline (outline sometimes looks clipped on first cards)
@@ -1994,7 +2150,7 @@ export default function GoodsInwardCreatePage() {
                               {r.phone} • Active: {r.active ? "Yes" : "No"}
                             </div>
                             <div className="mt-2 text-xs text-gray-600 dark:text-gray-300">
-                              Receiving Count (demo): <span className="font-semibold">{r.receivingCount}</span>
+                              Receiving Count: <span className="font-semibold">{r.receivingCount}</span>
                             </div>
                           </div>
                         </label>
