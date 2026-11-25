@@ -91,7 +91,32 @@ type ASNRef = {
   vendorName: string;
   vendorCode: string;
   warehouse: string;
-  items: ASNItem[];
+
+  // Shipment & Logistics
+  transporter?: string;
+  vehicleNumber?: string;
+  lrAwbNumber?: string;
+  shippingReference?: string;
+
+  // Shipment Documents
+  invoiceNumber?: string;
+  invoiceDate?: string;
+  ewayBillNumber?: string;
+  packingListNumber?: string;
+
+// ASN Attachments - Live ASN API response
+attachments?: {
+  attachment_id: string;
+  document_type: string;
+  file_name: string;
+  file_url: string;
+  mime_type?: string;
+  file_size_bytes?: number;
+  uploaded_by?: string;
+  uploaded_at?: string;
+}[];
+
+items: ASNItem[];
 };
 
 type PutawayStatus = "Not Created" | "Created" | "In Progress" | "Completed";
@@ -372,6 +397,31 @@ export default function GoodsInwardCreatePage() {
         vendorName: asn.vendor_name,
         vendorCode: asn.vendor_id || "",
         warehouse: asn.warehouse_name,
+
+        // Shipment & Logistics - Live ASN Data
+transporter:
+  asn.transporter_name || asn.transporter || asn.transport_name || "",
+vehicleNumber:
+  asn.vehicle_number || asn.vehicle_no || asn.vehicleNumber || "",
+lrAwbNumber:
+  asn.lr_awb_number || asn.lr_number || asn.awb_number || asn.lrNo || "",
+shippingReference:
+  asn.shipping_reference || asn.shipping_ref || asn.shippingReference || "",
+
+// Shipment Documents - Live ASN Data
+invoiceNumber:
+  asn.invoice_number || asn.invoice_no || asn.invoiceNumber || "",
+invoiceDate:
+  asn.invoice_date || asn.invoiceDate || "",
+ewayBillNumber:
+  asn.eway_bill_number || asn.ewaybill_number || asn.eway_bill_no || asn.ewayBillNumber || "",
+packingListNumber:
+  asn.packing_list_number || asn.packing_list_no || asn.packingListNumber || "",
+
+// Attachments
+attachments:
+  asn.attachments || asn.asn_attachments || asn.documents || [],
+
         items: (asn.items || []).map((item: any, index: number) => ({
           id: String(item.id),
           lineNo: index + 1,
@@ -402,7 +452,60 @@ export default function GoodsInwardCreatePage() {
   loadEligibleASNs();
 }, []);
 
+// =====================================================
+// LIVE WAREHOUSE MASTER API
+// =====================================================
+useEffect(() => {
+  const loadWarehouses = async () => {
+    try {
+      setWarehouseLoading(true);
+      setWarehouseError("");
 
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/warehouses`
+      );
+
+      if (!response.ok) {
+        throw new Error(`Warehouse API Error: ${response.status}`);
+      }
+
+      const result = await response.json();
+
+      // API response is an array of warehouse records
+      const warehouseList: WarehouseMaster[] = Array.isArray(result)
+        ? result
+        : result.data || [];
+
+      // Only Active warehouses
+      const activeWarehouses = warehouseList
+        .filter(
+          (w) =>
+            String(w.status || "").trim().toLowerCase() === "active"
+        )
+        .sort((a, b) =>
+          String(a.warehouse_name || "").localeCompare(
+            String(b.warehouse_name || "")
+          )
+        );
+
+      setWarehouses(activeWarehouses);
+
+    } catch (error: any) {
+      console.error("Warehouse Master Loading Error:", error);
+
+      setWarehouseError(
+        error.message || "Failed to load Warehouse Master"
+      );
+
+      setWarehouses([]);
+
+    } finally {
+      setWarehouseLoading(false);
+    }
+  };
+
+  loadWarehouses();
+}, []);
 
 
   const selectedASN = useMemo(() => asnMaster.find((x) => x.id === selectedASNId) || null, [asnMaster, selectedASNId]);
@@ -412,14 +515,31 @@ export default function GoodsInwardCreatePage() {
   const [giDate, setGiDate] = useState(formatDateISO());
   const [inwardSource, setInwardSource] = useState<InwardSource>("Issued PO");
   const [receiptType, setReceiptType] = useState<ReceiptType>("Full");
-  const [warehouse, setWarehouse] = useState("WH-002");
+  // Live Warehouse Master
+type WarehouseMaster = {
+  warehouse_id: string;
+  warehouse_code: string;
+  warehouse_name: string;
+  warehouse_type?: string;
+  city?: string;
+  state?: string;
+  status: string;
+};
+
+const [warehouses, setWarehouses] = useState<WarehouseMaster[]>([]);
+const [warehouseLoading, setWarehouseLoading] = useState(false);
+const [warehouseError, setWarehouseError] = useState("");
+
+const [warehouse, setWarehouse] = useState("");
   const [gateEntryNo, setGateEntryNo] = useState("GE-2026-0501");
   const [receivedBy] = useState("Store User");
+  
 
   /** Header vehicle (reference only; shipments hold actual) */
-  const [vehicleType, setVehicleType] = useState<VehicleType>("Truck");
-  const [vehicleNo, setVehicleNo] = useState("AP39NN9197");
-  const [arrivalTime, setArrivalTime] = useState("10:45");
+ 
+const [vehicleType, setVehicleType] = useState<VehicleType>("Truck");
+const [vehicleNo, setVehicleNo] = useState("");
+const [arrivalTime, setArrivalTime] = useState("");
 
   /** Multi-PO */
   const [poRefs, setPoRefs] = useState<PORef[]>([
@@ -431,31 +551,41 @@ export default function GoodsInwardCreatePage() {
     },
   ]);
 
-  /** Common docs */
-  const [dcNo, setDcNo] = useState("DC-8871");
-  const [invoiceRef, setInvoiceRef] = useState("INV-5521");
-  const [ewayBill, setEwayBill] = useState("");
+    /** Common docs */
+const [dcNo, setDcNo] = useState("");
+const [invoiceRef, setInvoiceRef] = useState("");
+const [invoiceDate, setInvoiceDate] = useState("");
+const [ewayBill, setEwayBill] = useState("");
+const [packingListNumber, setPackingListNumber] = useState("");
 
   /** Shipments */
   const [shipments, setShipments] = useState<InboundShipment[]>([
-    {
-      id: uid("shp"),
-      shipmentNo: "SHP-2026-0001",
-      mode: "Direct (No ASN)",
-      asnId: undefined,
-      asnNo: undefined,
-      appointmentNo: "",
-      gateEntryNo: "GE-2026-0501",
-      vehicleType: "Truck",
-      vehicleNo: "AP39NN9197",
-      dockDoor: "D1",
-      stagingArea: "STG-D1",
-      arrivalTime: "10:45",
-      linkedPOs: ["PO-2026-0121"],
-      status: "Arrived",
-    },
-  ]);
+  {
+    id: uid("shp"),
+    shipmentNo: "",
+    mode: "Direct (No ASN)",
+    asnId: undefined,
+    asnNo: undefined,
+    appointmentNo: "",
 
+    gateEntryNo: "",
+    vehicleType: "Truck",
+    vehicleNo: "",
+
+    transporterName: "",
+    driverName: "",
+    driverMobile: "",
+    lrNo: "",
+    sealNo: "",
+
+    dockDoor: undefined,
+    stagingArea: "",
+
+    arrivalTime: "",
+    linkedPOs: [],
+    status: "Planned",
+  },
+]);
   
   /** Receivers - Live data loaded from Users Master API */
 const [receivers, setReceivers] = useState<Receiver[]>([]);
@@ -593,6 +723,8 @@ useEffect(() => {
     { id: uid("att"), type: "DC", fileName: "dc_scan.pdf" },
     { id: uid("att"), type: "Photo", fileName: "truck_unload.jpg" },
   ]);
+  const [selectedASNAttachments, setSelectedASNAttachments] =
+    useState<ASNRef["attachments"]>([]);
   const [internalRemarks, setInternalRemarks] = useState("");
 
   /** QC */
@@ -645,18 +777,117 @@ useEffect(() => {
   };
 
   /** ASN helpers */
+
+  // =====================================================
+// RESOLVE ASN DELIVERY WAREHOUSE TO WAREHOUSE MASTER
+// =====================================================
+const resolveASNWarehouse = (asnWarehouse: string) => {
+  const value = String(asnWarehouse || "").trim().toLowerCase();
+
+  if (!value) return null;
+
+  return (
+    warehouses.find((w) =>
+      String(w.warehouse_code || "").trim().toLowerCase() === value ||
+      String(w.warehouse_name || "").trim().toLowerCase() === value ||
+      String(w.warehouse_id || "").trim().toLowerCase() === value
+    ) || null
+  );
+};
+
   const getASNItem = (sku: string) => selectedASN?.items.find((x) => x.sku === sku) || null;
 
-  const applyASN = (asnId: string) => {
+  const applyASN = async (asnId: string) => {
     const asn = asnMaster.find((x) => x.id === asnId);
     if (!asn) return;
 
     setAsnMode(true);
-    setSelectedASNId(asn.id);
-    setInwardSource("Issued PO");
-    setWarehouse(asn.warehouse);
+setSelectedASNId(asn.id);
+setInwardSource("Issued PO");
+
+// =====================================================
+// FETCH LIVE ASN DETAILS & ATTACHMENTS
+// =====================================================
+try {
+  const response = await fetch(
+    `${process.env.NEXT_PUBLIC_API_URL}/api/asn/${asn.id}`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch ASN details");
+  }
+
+  const result = await response.json();
+
+  const asnDetails = result?.data;
+
+setSelectedASNAttachments(asnDetails?.attachments || []);
+
+// Live ASN document references
+setInvoiceRef(asnDetails?.invoice_number || "");
+setInvoiceDate(asnDetails?.invoice_date || "");
+setEwayBill(asnDetails?.eway_bill_number || "");
+setPackingListNumber(asnDetails?.packing_list_number || "");
+} catch (error) {
+  console.error("ASN attachments fetch error:", error);
+  setSelectedASNAttachments([]);
+  setInvoiceRef("");
+  setInvoiceDate("");
+  setEwayBill("");
+  setPackingListNumber("");
+
+
+
+  showToast("Unable to load ASN attachments.");
+}
+
+// =====================================================
+// ASN DELIVERY WAREHOUSE -> LIVE WAREHOUSE MASTER
+// =====================================================
+const matchedWarehouse = resolveASNWarehouse(asn.warehouse);
+
+if (matchedWarehouse) {
+  setWarehouse(matchedWarehouse.warehouse_code);
+  setWarehouseError("");
+} else {
+  setWarehouse("");
+  setWarehouseError(
+    `ASN Delivery Warehouse "${asn.warehouse}" could not be matched with an Active Warehouse in Warehouse Master.`
+  );
+}
+
+setReceiptType(
+  asn.deliverySchedule === "Partial Delivery" ? "Partial" : "Full"
+);
     setReceiptType(asn.deliverySchedule === "Partial Delivery" ? "Partial" : "Full");
     setPoRefs([{ poNo: asn.poNo, poDate: asn.poDate, vendorName: asn.vendorName, vendorCode: asn.vendorCode }]);
+    // Populate Header Vehicle Number from selected ASN
+    setVehicleNo(asn.vehicleNumber || "");
+    // =====================================================
+// ASN SHIPMENT & DOCUMENT DETAILS
+// =====================================================
+
+// Invoice & E-Way Bill
+setInvoiceRef(asn.invoiceNumber || "");
+setInvoiceDate(asn.invoiceDate || "");
+setEwayBill(asn.ewayBillNumber || "");
+setPackingListNumber(asn.packingListNumber || "");
+
+// Populate ASN logistics into existing shipment record
+setShipments((prev) =>
+  prev.map((s) => ({
+    ...s,
+    mode: "ASN/Pre-Receiving",
+    asnId: asn.id,
+    asnNo: asn.asnNo,
+    linkedPOs: [asn.poNo],
+
+    // Live ASN logistics details
+    transporterName: asn.transporter || "",
+    vehicleNo: asn.vehicleNumber || "",
+    lrNo: asn.lrAwbNumber || "",
+  }))
+);
 
     const nextItems: GIItem[] = asn.items.map((x) => ({
       id: uid("it"), lineNo: x.lineNo, sku: x.sku, description: x.description, uom: x.uom,
@@ -1560,23 +1791,38 @@ useEffect(() => {
                 <div>
                   <label className={labelBase}>Warehouse</label>
                   <select
-                    value={warehouse}
-                    onChange={(e) => setWarehouse(e.target.value)}
-                    disabled={lockedAfterInward}
-                    className={cn(
-                      inputBase,
-                      "mt-2",
-                      lockedAfterInward && "opacity-70",
-                      errors.warehouse && "border-rose-400"
-                    )}
-                  >
-                    <option value="">Select</option>
-                    <option value="WH-001">WH-001</option>
-                    <option value="WH-002">WH-002</option>
-                    <option value="WH-003">WH-003</option>
-                  </select>
+  value={warehouse}
+  onChange={(e) => {
+    setWarehouse(e.target.value);
+    setWarehouseError("");
+  }}
+  disabled={lockedAfterInward || asnMode || warehouseLoading}
+  className={cn(
+    inputBase,
+    "mt-2",
+    (lockedAfterInward || asnMode || warehouseLoading) && "opacity-70",
+    errors.warehouse && "border-rose-400"
+  )}
+>
+  <option value="">
+    {warehouseLoading ? "Loading warehouses..." : "Select Warehouse"}
+  </option>
+
+  {warehouses.map((w) => (
+    <option key={w.warehouse_id} value={w.warehouse_code}>
+      {w.warehouse_code} - {w.warehouse_name}
+      {w.city ? ` (${w.city})` : ""}
+    </option>
+  ))}
+</select>
                   {errors.warehouse && <p className="mt-1 text-xs text-rose-600">{errors.warehouse}</p>}
                 </div>
+
+                {warehouseError && (
+  <p className="mt-1 text-xs text-rose-600">
+    {warehouseError}
+  </p>
+)}
 
                 <div>
                   <label className={labelBase}>Received By</label>
@@ -1804,6 +2050,103 @@ useEffect(() => {
                   </div>
                 </div>
               </div>
+
+              {/* =====================================================
+    ASN DOCUMENT REFERENCES
+===================================================== */}
+<div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+  <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+    ASN Documents
+  </h4>
+
+  <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+    <div>
+      <label className={labelBase}>Invoice Number</label>
+      <div className={cn(inputBase, "mt-2 flex items-center min-h-[42px] opacity-80")}>
+        {invoiceRef || "—"}
+      </div>
+    </div>
+
+    <div>
+      <label className={labelBase}>Invoice Date</label>
+      <div className={cn(inputBase, "mt-2 flex items-center min-h-[42px] opacity-80")}>
+        {invoiceDate || "—"}
+      </div>
+    </div>
+
+    <div>
+      <label className={labelBase}>E-Way Bill Number</label>
+      <div className={cn(inputBase, "mt-2 flex items-center min-h-[42px] opacity-80")}>
+        {ewayBill || "—"}
+      </div>
+    </div>
+
+    <div>
+      <label className={labelBase}>Packing List Number</label>
+      <div className={cn(inputBase, "mt-2 flex items-center min-h-[42px] opacity-80")}>
+        {packingListNumber || "—"}
+      </div>
+    </div>
+  </div>
+</div>  
+
+                {/* =====================================================
+    ASN ATTACHMENTS
+===================================================== */}
+<div className="rounded-2xl border border-gray-200 p-4 dark:border-gray-800">
+  <h4 className="text-base font-semibold text-gray-900 dark:text-white">
+    ASN Attachments
+  </h4>
+
+  {(selectedASNAttachments ?? []).length === 0 ? (
+    <div className="mt-3 rounded-lg border border-dashed border-gray-300 p-4 text-sm text-gray-500 dark:border-gray-700">
+      No documents attached to this ASN.
+    </div>
+  ) : (
+    <div className="mt-3 space-y-3">
+      {(selectedASNAttachments ?? []).map((file) => (
+        <div
+          key={file.attachment_id}
+          className="flex flex-col gap-3 rounded-xl border border-gray-200 p-3 dark:border-gray-800 sm:flex-row sm:items-center sm:justify-between"
+        >
+          <div className="min-w-0">
+            <p className="text-sm font-medium text-gray-900 dark:text-white">
+              {file.file_name}
+            </p>
+
+            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              {file.document_type}
+              {file.file_size_bytes
+              ? ` • ${(file.file_size_bytes / 1024).toFixed(1)} KB`
+              : ""}
+            </p>
+          </div>
+
+          <div className="flex shrink-0 gap-2">
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="rounded-lg border border-[#C8102E] bg-[#C8102E] px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[#A50D25] hover:shadow-md"
+            >
+              View
+            </a>
+
+            <a
+              href={`${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`}
+              download={file.file_name}
+              className="rounded-lg border border-[#005F99] bg-[#005F99] px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[#004B78] hover:shadow-md"
+            >
+              Download
+            </a>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</div>
+  
+
             </div>
           )}
 
