@@ -2124,16 +2124,24 @@ setShipments((prev) =>
 
           <div className="flex shrink-0 gap-2">
             <a
-              href={`${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="rounded-lg border border-[#C8102E] bg-[#C8102E] px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[#A50D25] hover:shadow-md"
-            >
-              View
-            </a>
+  href={
+    file.file_url?.startsWith("http")
+      ? file.file_url
+      : `${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`
+  }
+  target="_blank"
+  rel="noopener noreferrer"
+  className="rounded-lg border border-[#C8102E] bg-[#C8102E] px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[#A50D25] hover:shadow-md"
+>
+  View
+</a>
 
             <a
-              href={`${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`}
+              href={
+                file.file_url?.startsWith("http")
+                  ? file.file_url
+                  : `${process.env.NEXT_PUBLIC_API_URL}${file.file_url}`
+              }
               download={file.file_name}
               className="rounded-lg border border-[#005F99] bg-[#005F99] px-3 py-2 text-sm font-medium text-white shadow-sm transition-all duration-200 hover:bg-[#004B78] hover:shadow-md"
             >

@@ -1447,7 +1447,12 @@ exports.uploadASNAttachment = async (req, res) => {
       });
     }
 
-    const fileUrl = `/uploads/${req.file.filename}`;
+    const fileUrl =
+  req.file.path?.startsWith("http")
+    ? req.file.path
+    : req.file.secure_url?.startsWith("http")
+    ? req.file.secure_url
+    : `/uploads/${req.file.filename}`;
     const attachmentId = `ASN-ATT-${crypto.randomUUID()}`;
 
     const result = await pool.query(
